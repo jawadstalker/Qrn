@@ -1,4 +1,4 @@
-export type PlantStageId = 'seed' | 'sprout' | 'sapling' | 'bud' | 'bloom';
+export type PlantStageId = "seed" | "sprout" | "sapling" | "bud" | "bloom";
 
 export interface PlantStage {
   id: PlantStageId;
@@ -6,11 +6,11 @@ export interface PlantStage {
 }
 
 export const PLANT_STAGES: readonly PlantStage[] = [
-  { id: 'seed', minLearned: 0 },
-  { id: 'sprout', minLearned: 1 },
-  { id: 'sapling', minLearned: 3 },
-  { id: 'bud', minLearned: 6 },
-  { id: 'bloom', minLearned: 10 },
+  { id: "seed", minLearned: 0 },
+  { id: "sprout", minLearned: 1 },
+  { id: "sapling", minLearned: 3 },
+  { id: "bud", minLearned: 6 },
+  { id: "bloom", minLearned: 10 },
 ];
 
 export const MAX_VISIBLE_LEAVES = 8;
@@ -30,7 +30,8 @@ export interface PlantSnapshot {
 export function computePlant(learned: number, stable: number): PlantSnapshot {
   const reached = PLANT_STAGES.filter((stage) => learned >= stage.minLearned);
   const stage = reached[reached.length - 1] ?? PLANT_STAGES[0]!;
-  const nextStage = PLANT_STAGES.find((candidate) => candidate.minLearned > learned) ?? null;
+  const nextStage =
+    PLANT_STAGES.find((candidate) => candidate.minLearned > learned) ?? null;
   const span = nextStage ? nextStage.minLearned - stage.minLearned : 1;
   const done = nextStage ? learned - stage.minLearned : 1;
 
@@ -48,11 +49,18 @@ const REVIEW_INTERVAL_DAYS = [1, 3, 7, 14, 30];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function reviewIntervalMs(reviews: number): number {
-  const index = Math.min(Math.max(reviews - 1, 0), REVIEW_INTERVAL_DAYS.length - 1);
+  const index = Math.min(
+    Math.max(reviews - 1, 0),
+    REVIEW_INTERVAL_DAYS.length - 1,
+  );
 
   return (REVIEW_INTERVAL_DAYS[index] ?? 1) * DAY_MS;
 }
 
-export function isDueForReview(reviews: number, lastReviewedAt: number, now: number): boolean {
+export function isDueForReview(
+  reviews: number,
+  lastReviewedAt: number,
+  now: number,
+): boolean {
   return now - lastReviewedAt >= reviewIntervalMs(reviews);
 }

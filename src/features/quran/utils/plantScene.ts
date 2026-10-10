@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from "three";
 
 export interface PlantSceneOptions {
   width: number;
@@ -73,21 +73,29 @@ function shapedGeometry(
     const w = width * Math.pow(Math.sin(Math.PI * Math.pow(v, round)), 0.8);
     const worldX = x * 2 * w;
 
-    position.setXYZ(index, worldX, v * length, curl * v * v * length - Math.abs(worldX) * fold);
+    position.setXYZ(
+      index,
+      worldX,
+      v * length,
+      curl * v * v * length - Math.abs(worldX) * fold,
+    );
     mixed.copy(base).lerp(tip, v);
     colors[index * 3] = mixed.r;
     colors[index * 3 + 1] = mixed.g;
     colors[index * 3 + 2] = mixed.b;
   }
 
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
 
   return geometry;
 }
 
 function surfaceMaterial(): THREE.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  return new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+  });
 }
 
 function solidMaterial(color: number): THREE.MeshLambertMaterial {
@@ -100,7 +108,10 @@ function createFlower(scale: number): FlowerPart {
   tilt.rotation.x = 0.75;
   group.add(tilt);
 
-  const center = new THREE.Mesh(new THREE.SphereGeometry(0.11, 24, 16), solidMaterial(0xe8b96a));
+  const center = new THREE.Mesh(
+    new THREE.SphereGeometry(0.11, 24, 16),
+    solidMaterial(0xe8b96a),
+  );
   center.scale.y = 0.55;
   tilt.add(center);
 
@@ -145,7 +156,15 @@ function createFlower(scale: number): FlowerPart {
       pivot.position.y = ring.lift;
 
       const petal = new THREE.Mesh(
-        shapedGeometry(ring.length, ring.width, 0.12, -0.3, ring.base, ring.tip, 1.4),
+        shapedGeometry(
+          ring.length,
+          ring.width,
+          0.12,
+          -0.3,
+          ring.base,
+          ring.tip,
+          1.4,
+        ),
         surfaceMaterial(),
       );
       petal.rotation.x = 0.1;
@@ -183,9 +202,17 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
     new THREE.Vector2(0.68, 0.7),
     new THREE.Vector2(0.58, 0.7),
   ];
-  root.add(new THREE.Mesh(new THREE.LatheGeometry(potProfile, 40), solidMaterial(0xc98b5e)));
+  root.add(
+    new THREE.Mesh(
+      new THREE.LatheGeometry(potProfile, 40),
+      solidMaterial(0xc98b5e),
+    ),
+  );
 
-  const soil = new THREE.Mesh(new THREE.CircleGeometry(0.58, 32), solidMaterial(0x5e4230));
+  const soil = new THREE.Mesh(
+    new THREE.CircleGeometry(0.58, 32),
+    solidMaterial(0x5e4230),
+  );
   soil.rotation.x = -Math.PI / 2;
   soil.position.y = STEM_BASE_Y;
   root.add(soil);
@@ -199,7 +226,9 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
   ];
   const curve = new THREE.CatmullRomCurve3(stemPoints);
   const relativeCurve = new THREE.CatmullRomCurve3(
-    stemPoints.map((point) => new THREE.Vector3(point.x, point.y - STEM_BASE_Y, point.z)),
+    stemPoints.map(
+      (point) => new THREE.Vector3(point.x, point.y - STEM_BASE_Y, point.z),
+    ),
   );
 
   const stemGroup = new THREE.Group();
@@ -218,9 +247,19 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
     const position = 0.12 + (0.78 * index) / Math.max(leaves - 1, 1);
     const isNew = hasNewLeaf && index === leaves - 1;
     const size = 0.92 - 0.045 * index;
-    const tipColor = isNew ? NEW_LEAF_TIP_COLOR : LEAF_TIP_COLORS[index % LEAF_TIP_COLORS.length]!;
+    const tipColor = isNew
+      ? NEW_LEAF_TIP_COLOR
+      : LEAF_TIP_COLORS[index % LEAF_TIP_COLORS.length]!;
     const mesh = new THREE.Mesh(
-      shapedGeometry(0.78 * size, 0.2 * size, 0.28, 0.35, LEAF_BASE_COLOR, tipColor, 0.85),
+      shapedGeometry(
+        0.78 * size,
+        0.2 * size,
+        0.28,
+        0.35,
+        LEAF_BASE_COLOR,
+        tipColor,
+        0.85,
+      ),
       surfaceMaterial(),
     );
     mesh.rotation.x = 1.15 + (index % 2) * 0.12;
@@ -244,7 +283,11 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
       flower.group.position.set(tip.x, tip.y + 0.04, tip.z);
     } else {
       const origin = curve.getPoint(0.55);
-      const end = new THREE.Vector3(origin.x + 0.55, origin.y + 0.5, origin.z + 0.08);
+      const end = new THREE.Vector3(
+        origin.x + 0.55,
+        origin.y + 0.5,
+        origin.z + 0.08,
+      );
       const branchCurve = new THREE.CatmullRomCurve3([
         origin.clone(),
         new THREE.Vector3(origin.x + 0.2, origin.y + 0.2, origin.z + 0.05),
@@ -301,19 +344,23 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
       const open = easeBack(progress);
 
       flower.group.scale.setScalar(
-        Math.max(0.001, easeBack(clamp(progress * 1.4, 0, 1))) * flower.baseScale,
+        Math.max(0.001, easeBack(clamp(progress * 1.4, 0, 1))) *
+          flower.baseScale,
       );
       flower.petals.forEach((petal) => {
         petal.mesh.rotation.x = 0.1 + (petal.open - 0.1) * open;
       });
 
       if (flower.branch) {
-        flower.branch.scale.setScalar(Math.max(0.001, easeOut(clamp((t - 1.6) / 0.6, 0, 1))));
+        flower.branch.scale.setScalar(
+          Math.max(0.001, easeOut(clamp((t - 1.6) / 0.6, 0, 1))),
+        );
       }
     });
 
     if (glow) {
-      (glow.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.25 * Math.sin(t * 2.2);
+      (glow.material as THREE.MeshBasicMaterial).opacity =
+        0.5 + 0.25 * Math.sin(t * 2.2);
     }
 
     root.rotation.z = Math.sin(t * 1.1) * 0.025;
@@ -328,7 +375,8 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
         mesh.geometry.dispose();
       }
 
-      const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      const material = mesh.material as
+        THREE.Material | THREE.Material[] | undefined;
 
       if (Array.isArray(material)) {
         material.forEach((item) => item.dispose());

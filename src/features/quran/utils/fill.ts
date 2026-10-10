@@ -4,6 +4,6 @@ export function fill(
 ): string {
   return Object.entries(values).reduce(
     (text, [key, value]) => text.split(`{${key}}`).join(String(value)),
-    template ?? '',
+    template ?? "",
   );
 }

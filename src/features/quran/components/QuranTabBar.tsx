@@ -1,28 +1,35 @@
-import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { usePathname, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
-import { BookOpen, ListOrdered, Sprout, type LucideIcon } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDirection } from '@/core/i18n/useDirection';
-import { useLanguage } from '@/core/i18n/LanguageContext';
-import { normalizeRoute } from '@/core/navigation/routes';
-import { useTheme } from '@/core/theme/ThemeContext';
-import { AppText } from '@/shared/components/ui/AppText';
+import React from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { usePathname, useRouter } from "expo-router";
+import * as Haptics from "expo-haptics";
+import {
+  BookOpen,
+  ListOrdered,
+  Settings,
+  Sprout,
+  type LucideIcon,
+} from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDirection } from "@/core/i18n/useDirection";
+import { useLanguage } from "@/core/i18n/LanguageContext";
+import { normalizeRoute } from "@/core/navigation/routes";
+import { useTheme } from "@/core/theme/ThemeContext";
+import { AppText } from "@/shared/components/ui/AppText";
 
 const BAR_HEIGHT = 72;
-const HIDDEN_ROUTES = ['/quran/moment'];
+const HIDDEN_ROUTES = ["/moment"];
 
 interface TabSpec {
-  route: '/quran' | '/quran/memorize' | '/quran/library';
+  route: "/" | "/memorize" | "/library" | "/settings";
   labelKey: string;
   icon: LucideIcon;
 }
 
 const TABS: readonly TabSpec[] = [
-  { route: '/quran', labelKey: 'quran_garden', icon: Sprout },
-  { route: '/quran/memorize', labelKey: 'quran_memorize', icon: BookOpen },
-  { route: '/quran/library', labelKey: 'quran_library', icon: ListOrdered },
+  { route: "/", labelKey: "quran_garden", icon: Sprout },
+  { route: "/memorize", labelKey: "quran_memorize", icon: BookOpen },
+  { route: "/library", labelKey: "quran_library", icon: ListOrdered },
+  { route: "/settings", labelKey: "quran_settings", icon: Settings },
 ];
 
 export function QuranTabBar() {
@@ -31,7 +38,7 @@ export function QuranTabBar() {
   const { row } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const pathname = normalizeRoute(usePathname() || '/');
+  const pathname = normalizeRoute(usePathname() || "/");
 
   if (HIDDEN_ROUTES.includes(pathname)) {
     return null;
@@ -71,7 +78,10 @@ export function QuranTabBar() {
             }}
           >
             <Icon size={25} color={color} strokeWidth={active ? 2.3 : 1.8} />
-            <AppText variant="caption" style={[styles.label, { color }, active && styles.active]}>
+            <AppText
+              variant="caption"
+              style={[styles.label, { color }, active && styles.active]}
+            >
               {t[tab.labelKey]}
             </AppText>
           </Pressable>
@@ -93,8 +103,8 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 2,
     minHeight: 48,
   },
@@ -103,6 +113,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   active: {
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

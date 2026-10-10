@@ -1,15 +1,15 @@
-export const MUSHAF_FONT_FAMILY = 'QCF_P001';
+export const MUSHAF_FONT_FAMILY = "QCF_P001";
 export const MUSHAF_UNITS_PER_EM = 2048;
 export const PAGE1_SURAH_ID = 1;
 export const PAGE1_FIRST_CODEPOINT = 0xfb51;
 
 export const PAGE1_ADVANCES: readonly number[] = [
-  2845, 1191, 2344, 2881, 1930, 3773, 1255, 2730, 6168, 1932, 3516, 3719, 1925, 2949, 1649, 3487,
-  1924, 2135, 2673, 3110, 5660, 1922, 3097, 3685, 4628, 1965, 2947, 2334, 3304, 2773, 1680, 6079,
-  3131, 1690, 4372, 1923,
+  2845, 1191, 2344, 2881, 1930, 3773, 1255, 2730, 6168, 1932, 3516, 3719, 1925,
+  2949, 1649, 3487, 1924, 2135, 2673, 3110, 5660, 1922, 3097, 3685, 4628, 1965,
+  2947, 2334, 3304, 2773, 1680, 6079, 3131, 1690, 4372, 1923,
 ];
 
-export type LineAlignment = 'justify' | 'center';
+export type LineAlignment = "justify" | "center";
 
 export interface MushafLine {
   from: number;
@@ -18,13 +18,13 @@ export interface MushafLine {
 }
 
 export const PAGE1_LINES: readonly MushafLine[] = [
-  { from: 0, to: 5, alignment: 'center' },
-  { from: 5, to: 11, alignment: 'justify' },
-  { from: 11, to: 17, alignment: 'justify' },
-  { from: 17, to: 22, alignment: 'justify' },
-  { from: 22, to: 27, alignment: 'justify' },
-  { from: 27, to: 32, alignment: 'justify' },
-  { from: 32, to: 36, alignment: 'center' },
+  { from: 0, to: 5, alignment: "center" },
+  { from: 5, to: 11, alignment: "justify" },
+  { from: 11, to: 17, alignment: "justify" },
+  { from: 17, to: 22, alignment: "justify" },
+  { from: 22, to: 27, alignment: "justify" },
+  { from: 27, to: 32, alignment: "justify" },
+  { from: 32, to: 36, alignment: "center" },
 ];
 
 export interface MushafVerse {

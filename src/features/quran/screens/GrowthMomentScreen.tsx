@@ -1,19 +1,19 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useDirection } from '@/core/i18n/useDirection';
-import { useLanguage } from '@/core/i18n/LanguageContext';
-import { formatNumber } from '@/core/i18n/format';
-import { useTheme } from '@/core/theme/ThemeContext';
-import { AppText } from '@/shared/components/ui/AppText';
-import { ChunkyButton } from '@/shared/components/ui/ChunkyButton';
-import { Mascot } from '@/shared/components/ui/Mascot';
-import { Float, Rise } from '@/shared/motion/motion';
-import { GrowthPlant } from '@/features/quran/components/GrowthPlant';
-import { PetalRain } from '@/features/quran/components/PetalRain';
-import { useQuranProgress } from '@/features/quran/state/QuranProgressContext';
-import { fill } from '@/features/quran/utils/fill';
+import React from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useDirection } from "@/core/i18n/useDirection";
+import { useLanguage } from "@/core/i18n/LanguageContext";
+import { formatNumber } from "@/core/i18n/format";
+import { useTheme } from "@/core/theme/ThemeContext";
+import { AppText } from "@/shared/components/ui/AppText";
+import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
+import { Mascot } from "@/shared/components/ui/Mascot";
+import { Float, Rise } from "@/shared/motion/motion";
+import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
+import { PetalRain } from "@/features/quran/components/PetalRain";
+import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { fill } from "@/features/quran/utils/fill";
 
 const HERO_HEIGHT = 470;
 const PLANT_WIDTH = 236;
@@ -30,10 +30,12 @@ export default function GrowthMomentScreen() {
   const { plant } = useQuranProgress();
   const ayah = Number(params.ayah) || 1;
   const number = (value: number) => formatNumber(value, language);
-  const nextName = plant.nextStage ? (t[`quran_stage_${plant.nextStage.id}`] ?? '') : '';
-  const stageName = t[`quran_stage_${plant.stage.id}`] ?? '';
+  const nextName = plant.nextStage
+    ? (t[`quran_stage_${plant.nextStage.id}`] ?? "")
+    : "";
+  const stageName = t[`quran_stage_${plant.stage.id}`] ?? "";
 
-  const goBack = () => router.replace('/quran');
+  const goBack = () => router.replace("/");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
@@ -42,7 +44,12 @@ export default function GrowthMomentScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        <View style={[styles.hero, { backgroundColor: colors.primary, paddingTop: insets.top }]}>
+        <View
+          style={[
+            styles.hero,
+            { backgroundColor: colors.primary, paddingTop: insets.top },
+          ]}
+        >
           <PetalRain distance={HERO_HEIGHT} />
           <View style={[styles.glow, { backgroundColor: colors.tintSoft }]} />
           <View style={styles.plant}>
@@ -54,7 +61,10 @@ export default function GrowthMomentScreen() {
             />
           </View>
           <View
-            style={[styles.mascot, isRTL ? styles.mascotRight : styles.mascotLeft]}
+            style={[
+              styles.mascot,
+              isRTL ? styles.mascotRight : styles.mascotLeft,
+            ]}
             pointerEvents="none"
           >
             <Float amplitude={8} duration={2300} delay={1000}>
@@ -67,20 +77,32 @@ export default function GrowthMomentScreen() {
           delay={600}
           style={[
             styles.sheet,
-            { backgroundColor: colors.background, paddingBottom: insets.bottom + 24 },
+            {
+              backgroundColor: colors.background,
+              paddingBottom: insets.bottom + 24,
+            },
           ]}
         >
           <View>
-            <AppText variant="h2" style={{ color: colors.text, textAlign, fontWeight: '800' }}>
+            <AppText
+              variant="h2"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
               {fill(t.quran_moment_title, { ayah: number(ayah) })}
             </AppText>
-            <AppText variant="bodySmall" style={{ color: colors.textSecondary, textAlign }}>
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, textAlign }}
+            >
               {t.quran_moment_sub}
             </AppText>
           </View>
 
           <View style={[styles.stageRow, { flexDirection: row }]}>
-            <AppText variant="caption" style={{ color: colors.text, fontWeight: '700' }}>
+            <AppText
+              variant="caption"
+              style={{ color: colors.text, fontWeight: "700" }}
+            >
               {stageName}
             </AppText>
             <View style={[styles.track, { backgroundColor: colors.tintSoft }]}>
@@ -97,20 +119,25 @@ export default function GrowthMomentScreen() {
             {plant.nextStage ? (
               <AppText
                 variant="caption"
-                style={{ color: colors.highlightShadow, fontWeight: '700' }}
+                style={{ color: colors.highlightShadow, fontWeight: "700" }}
               >
                 {nextName}
               </AppText>
             ) : null}
           </View>
 
-          <View style={[styles.note, { backgroundColor: colors.highlightTint }]}>
-            <AppText variant="caption" style={{ color: colors.text, textAlign, lineHeight: 22 }}>
+          <View
+            style={[styles.note, { backgroundColor: colors.highlightTint }]}
+          >
+            <AppText
+              variant="caption"
+              style={{ color: colors.text, textAlign, lineHeight: 22 }}
+            >
               {t.quran_moment_note}
             </AppText>
           </View>
 
-          <ChunkyButton label={t.quran_continue ?? ''} onPress={goBack} />
+          <ChunkyButton label={t.quran_continue ?? ""} onPress={goBack} />
           <View style={styles.later}>
             <AppText
               variant="bodySmall"
@@ -136,12 +163,12 @@ const styles = StyleSheet.create({
   },
   hero: {
     height: HERO_HEIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   glow: {
-    position: 'absolute',
+    position: "absolute",
     width: GLOW_SIZE,
     height: GLOW_SIZE,
     borderRadius: GLOW_SIZE / 2,
@@ -151,7 +178,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   mascot: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
   },
   mascotLeft: { left: 10 },
@@ -166,14 +193,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   stageRow: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: 10,
   },
   track: {
     flex: 1,
     height: 10,
     borderRadius: 5,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   fill: {
     height: 10,
@@ -184,8 +211,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   later: {
-    alignItems: 'center',
+    alignItems: "center",
     minHeight: 44,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
 });

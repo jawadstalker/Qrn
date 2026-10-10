@@ -6,16 +6,18 @@ import React, {
   useMemo,
   useState,
   type ReactNode,
-} from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAuth } from '@/features/auth/context/AuthContext';
-import { PAGE1_SURAH_ID, PAGE1_VERSES } from '@/features/quran/data/mushafPage1';
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  PAGE1_SURAH_ID,
+  PAGE1_VERSES,
+} from "@/features/quran/data/mushafPage1";
 import {
   STABLE_REVIEWS,
   computePlant,
   isDueForReview,
   type PlantSnapshot,
-} from '@/features/quran/utils/plantGrowth';
+} from "@/features/quran/utils/plantGrowth";
 
 export interface VerseRecord {
   learnedAt: number;
@@ -45,11 +47,11 @@ interface QuranProgressValue {
   reset: () => Promise<void>;
 }
 
-const QuranProgressContext = createContext<QuranProgressValue | undefined>(undefined);
+const QuranProgressContext = createContext<QuranProgressValue | undefined>(
+  undefined,
+);
 
-function storageKey(userId: string | number | undefined): string {
-  return `@neurolia_quran_${userId ?? 'guest'}`;
-}
+const STORAGE_KEY = "@quran_garden_progress";
 
 function parseProgress(raw: string | null): ProgressMap {
   if (!raw) {
@@ -59,15 +61,13 @@ function parseProgress(raw: string | null): ProgressMap {
   try {
     const value = JSON.parse(raw) as ProgressMap;
 
-    return value && typeof value === 'object' ? value : {};
+    return value && typeof value === "object" ? value : {};
   } catch {
     return {};
   }
 }
 
 export function QuranProgressProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  const key = storageKey(user?.id);
   const [progress, setProgress] = useState<ProgressMap>({});
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -75,7 +75,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     setIsLoaded(false);
 
-    AsyncStorage.getItem(key)
+    AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (mounted) {
           setProgress(parseProgress(raw));
@@ -95,30 +95,41 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [key]);
+  }, []);
 
-  const persist = useCallback(
-    async (next: ProgressMap) => {
-      setProgress(next);
+  const persist = useCallback(async (next: ProgressMap) => {
+    setProgress(next);
 
-      try {
-        await AsyncStorage.setItem(key, JSON.stringify(next));
-      } catch (error) {
-        console.error('[QURAN] Failed to save progress:', error);
-      }
-    },
-    [key],
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error("[QURAN] Failed to save progress:", error);
+    }
+  }, []);
+
+  const records = useMemo<SurahRecords>(
+    () => progress[PAGE1_SURAH_ID] ?? {},
+    [progress],
   );
-
-  const records = useMemo<SurahRecords>(() => progress[PAGE1_SURAH_ID] ?? {}, [progress]);
 
   const derived = useMemo(() => {
     const now = Date.now();
-    const entries = PAGE1_VERSES.map((verse) => ({ verse, record: records[verse.ayah] }));
+    const entries = PAGE1_VERSES.map((verse) => ({
+      verse,
+      record: records[verse.ayah],
+    }));
     const learned = entries.filter((entry) => entry.record);
-    const stable = learned.filter((entry) => (entry.record?.reviews ?? 0) >= STABLE_REVIEWS);
+    const stable = learned.filter(
+      (entry) => (entry.record?.reviews ?? 0) >= STABLE_REVIEWS,
+    );
     const due = learned
-      .filter((entry) => isDueForReview(entry.record!.reviews, entry.record!.lastReviewedAt, now))
+      .filter((entry) =>
+        isDueForReview(
+          entry.record!.reviews,
+          entry.record!.lastReviewedAt,
+          now,
+        ),
+      )
       .map((entry) => entry.verse.ayah);
     const nextNew = entries.find((entry) => !entry.record)?.verse.ayah ?? null;
 
@@ -127,7 +138,8 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
       stableCount: stable.length,
       dueAyahs: due,
       nextNewAyah: nextNew,
-      currentAyah: nextNew ?? due[0] ?? PAGE1_VERSES[PAGE1_VERSES.length - 1]!.ayah,
+      currentAyah:
+        nextNew ?? due[0] ?? PAGE1_VERSES[PAGE1_VERSES.length - 1]!.ayah,
     };
   }, [records]);
 
@@ -149,7 +161,9 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
           : { learnedAt: now, lastReviewedAt: now, reviews: 1 },
       };
       const before = computePlant(derived.learnedCount, derived.stableCount);
-      const learnedAfter = existing ? derived.learnedCount : derived.learnedCount + 1;
+      const learnedAfter = existing
+        ? derived.learnedCount
+        : derived.learnedCount + 1;
       const stableAfter = Object.values(nextRecords).filter(
         (record) => record.reviews >= STABLE_REVIEWS,
       ).length;
@@ -175,7 +189,10 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
 
       await persist({
         ...progress,
-        [PAGE1_SURAH_ID]: { ...records, [ayah]: { ...existing, reviews: 0, lastReviewedAt: 0 } },
+        [PAGE1_SURAH_ID]: {
+          ...records,
+          [ayah]: { ...existing, reviews: 0, lastReviewedAt: 0 },
+        },
       });
     },
     [persist, progress, records],
@@ -200,14 +217,20 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     [isLoaded, plant, derived, recordFor, remember, needsReview, reset],
   );
 
-  return <QuranProgressContext.Provider value={value}>{children}</QuranProgressContext.Provider>;
+  return (
+    <QuranProgressContext.Provider value={value}>
+      {children}
+    </QuranProgressContext.Provider>
+  );
 }
 
 export function useQuranProgress(): QuranProgressValue {
   const context = useContext(QuranProgressContext);
 
   if (!context) {
-    throw new Error('useQuranProgress must be used within a QuranProgressProvider');
+    throw new Error(
+      "useQuranProgress must be used within a QuranProgressProvider",
+    );
   }
 
   return context;

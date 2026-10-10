@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
-import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
-import * as THREE from 'three';
-import { createPlantScene } from '@/features/quran/utils/plantScene';
+import React, { useCallback, useEffect, useRef } from "react";
+import { PanResponder, StyleSheet, View } from "react-native";
+import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
+import * as THREE from "three";
+import { createPlantScene } from "@/features/quran/utils/plantScene";
 
 const ROTATION_PER_PIXEL = 0.012;
 
@@ -49,7 +49,8 @@ export function Plant3D({
         lastDxRef.current = 0;
       },
       onPanResponderMove: (_event, gesture) => {
-        userRotationRef.current += (gesture.dx - lastDxRef.current) * ROTATION_PER_PIXEL;
+        userRotationRef.current +=
+          (gesture.dx - lastDxRef.current) * ROTATION_PER_PIXEL;
         lastDxRef.current = gesture.dx;
       },
       onPanResponderRelease: () => {
@@ -119,7 +120,10 @@ export function Plant3D({
 
         render();
       } catch (error) {
-        console.error('[QURAN] 3D plant failed, using the illustration:', error);
+        console.error(
+          "[QURAN] 3D plant failed, using the illustration:",
+          error,
+        );
         onFailure();
       }
     },
@@ -127,14 +131,20 @@ export function Plant3D({
   );
 
   return (
-    <View style={[styles.container, { width, height }]} {...panResponder.panHandlers}>
-      <GLView style={StyleSheet.absoluteFill} onContextCreate={handleContextCreate} />
+    <View
+      style={[styles.container, { width, height }]}
+      {...panResponder.panHandlers}
+    >
+      <GLView
+        style={StyleSheet.absoluteFill}
+        onContextCreate={handleContextCreate}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    overflow: 'hidden',
+    overflow: "hidden",
   },
 });
