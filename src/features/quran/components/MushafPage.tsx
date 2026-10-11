@@ -8,7 +8,6 @@ import {
   PAGE1_VERSES,
   glyphChar,
 } from "@/features/quran/data/mushafPage1";
-// const LINE_HEIGHT_RATIO = 1.41;
 const LINE_HEIGHT_RATIO = 1.41;
 // const LINE_HEIGHT_RATIO = 1.41;
 const GLYPH_LINE_HEIGHT_RATIO = 1.7;

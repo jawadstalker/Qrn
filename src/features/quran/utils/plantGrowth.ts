@@ -1,3 +1,5 @@
+import { PAGE1_VERSES } from "@/features/quran/data/mushafPage1";
+
 export type PlantStageId = "seed" | "sprout" | "sapling" | "bud" | "bloom";
 
 export interface PlantStage {
@@ -5,12 +7,16 @@ export interface PlantStage {
   minLearned: number;
 }
 
+const TOTAL_VERSES = PAGE1_VERSES.length;
+
+// Stage thresholds scale with the verses that actually exist,
+// so "bloom" is always reachable (previously needed 10 of 7 verses).
 export const PLANT_STAGES: readonly PlantStage[] = [
   { id: "seed", minLearned: 0 },
   { id: "sprout", minLearned: 1 },
-  { id: "sapling", minLearned: 3 },
-  { id: "bud", minLearned: 6 },
-  { id: "bloom", minLearned: 10 },
+  { id: "sapling", minLearned: Math.max(2, Math.ceil(TOTAL_VERSES * 0.4)) },
+  { id: "bud", minLearned: Math.max(3, Math.ceil(TOTAL_VERSES * 0.7)) },
+  { id: "bloom", minLearned: TOTAL_VERSES },
 ];
 
 export const MAX_VISIBLE_LEAVES = 8;
@@ -39,7 +45,13 @@ export function computePlant(learned: number, stable: number): PlantSnapshot {
     stage,
     nextStage,
     leaves: Math.min(learned, MAX_VISIBLE_LEAVES),
-    flowers: Math.min(Math.floor(stable / VERSES_PER_FLOWER), MAX_FLOWERS),
+    flowers: Math.min(
+      Math.max(
+        Math.floor(stable / VERSES_PER_FLOWER),
+        stage.id === "bloom" ? 1 : 0,
+      ),
+      MAX_FLOWERS,
+    ),
     versesToNextStage: nextStage ? nextStage.minLearned - learned : 0,
     stageProgress: Math.min(done / span, 1),
   };

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -100,25 +100,55 @@ export default function MemorizeScreen() {
     setRevealed((previous) => new Set(previous).add(index));
   }, []);
 
+  const busy = useRef(false);
+  const isLast = current >= TOTAL_VERSES;
+
   const goNext = useCallback(() => {
     setRevealed(new Set());
     setCurrent((value) => Math.min(value + 1, TOTAL_VERSES));
   }, []);
 
   const handleRemembered = useCallback(async () => {
-    const result = await remember(current);
-
-    if (result.becameLearned) {
-      router.push({ pathname: "/moment", params: { ayah: String(current) } });
+    if (busy.current) {
+      return;
     }
 
-    goNext();
-  }, [current, goNext, remember, router]);
+    busy.current = true;
+
+    try {
+      const result = await remember(current);
+
+      if (result.becameLearned || result.stageChanged) {
+        router.push({ pathname: "/moment", params: { ayah: String(current) } });
+      } else if (isLast) {
+        router.replace("/");
+      }
+
+      goNext();
+    } finally {
+      busy.current = false;
+    }
+  }, [current, goNext, isLast, remember, router]);
 
   const handleAgain = useCallback(async () => {
-    await needsReview(current);
-    goNext();
-  }, [current, goNext, needsReview]);
+    if (busy.current) {
+      return;
+    }
+
+    busy.current = true;
+
+    try {
+      await needsReview(current);
+
+      if (isLast) {
+        router.replace("/");
+      } else {
+        goNext();
+      }
+    } finally {
+      busy.current = false;
+    }
+  }, [current, goNext, isLast, needsReview, router]);
 
   const pageWidth = width - PADDING * 2 - PAPER_PADDING * 2;
 

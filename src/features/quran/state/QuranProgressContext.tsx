@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -70,6 +71,7 @@ function parseProgress(raw: string | null): ProgressMap {
 export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<ProgressMap>({});
   const [isLoaded, setIsLoaded] = useState(false);
+  const progressRef = useRef<ProgressMap>({});
 
   useEffect(() => {
     let mounted = true;
@@ -78,7 +80,9 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((raw) => {
         if (mounted) {
-          setProgress(parseProgress(raw));
+          const parsed = parseProgress(raw);
+          progressRef.current = parsed;
+          setProgress(parsed);
         }
       })
       .catch(() => {
@@ -98,6 +102,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const persist = useCallback(async (next: ProgressMap) => {
+    progressRef.current = next;
     setProgress(next);
 
     try {
@@ -153,49 +158,58 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const remember = useCallback(
     async (ayah: number): Promise<RememberResult> => {
       const now = Date.now();
-      const existing = records[ayah];
+      const current = progressRef.current;
+      const currentRecords = current[PAGE1_SURAH_ID] ?? {};
+      const existing = currentRecords[ayah];
       const nextRecords: SurahRecords = {
-        ...records,
+        ...currentRecords,
         [ayah]: existing
           ? { ...existing, reviews: existing.reviews + 1, lastReviewedAt: now }
           : { learnedAt: now, lastReviewedAt: now, reviews: 1 },
       };
-      const before = computePlant(derived.learnedCount, derived.stableCount);
-      const learnedAfter = existing
-        ? derived.learnedCount
-        : derived.learnedCount + 1;
-      const stableAfter = Object.values(nextRecords).filter(
-        (record) => record.reviews >= STABLE_REVIEWS,
-      ).length;
-      const after = computePlant(learnedAfter, stableAfter);
+      const count = (map: SurahRecords) => {
+        const all = Object.values(map);
 
-      await persist({ ...progress, [PAGE1_SURAH_ID]: nextRecords });
+        return {
+          learned: all.length,
+          stable: all.filter((record) => record.reviews >= STABLE_REVIEWS)
+            .length,
+        };
+      };
+      const before = count(currentRecords);
+      const after = count(nextRecords);
+
+      await persist({ ...current, [PAGE1_SURAH_ID]: nextRecords });
 
       return {
         becameLearned: !existing,
-        stageChanged: before.stage.id !== after.stage.id,
+        stageChanged:
+          computePlant(before.learned, before.stable).stage.id !==
+          computePlant(after.learned, after.stable).stage.id,
       };
     },
-    [derived.learnedCount, derived.stableCount, persist, progress, records],
+    [persist],
   );
 
   const needsReview = useCallback(
     async (ayah: number) => {
-      const existing = records[ayah];
+      const current = progressRef.current;
+      const currentRecords = current[PAGE1_SURAH_ID] ?? {};
+      const existing = currentRecords[ayah];
 
       if (!existing) {
         return;
       }
 
       await persist({
-        ...progress,
+        ...current,
         [PAGE1_SURAH_ID]: {
-          ...records,
+          ...currentRecords,
           [ayah]: { ...existing, reviews: 0, lastReviewedAt: 0 },
         },
       });
     },
-    [persist, progress, records],
+    [persist],
   );
 
   const reset = useCallback(() => persist({}), [persist]);
