@@ -27,8 +27,7 @@ export default function QuranGardenScreen() {
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { plant, learnedCount, stableCount, dueAyahs, nextNewAyah } =
-    useQuranProgress();
+  const { plant, learnedCount, dueAyahs, nextNewAyah } = useQuranProgress();
   const number = (value: number) => formatNumber(value, language);
 
   const openMemorize = useCallback(
@@ -52,7 +51,7 @@ export default function QuranGardenScreen() {
   const stats = [
     { value: learnedCount, label: t.quran_stat_learned },
     {
-      value: Math.min(Math.floor(stableCount / 3), 2),
+      value: plant.flowers,
       label: t.quran_stat_blooms,
     },
     { value: plant.leaves, label: t.quran_stat_leaves },

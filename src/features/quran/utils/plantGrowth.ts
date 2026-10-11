@@ -1,5 +1,3 @@
-import { PAGE1_VERSES } from "@/features/quran/data/mushafPage1";
-
 export type PlantStageId = "seed" | "sprout" | "sapling" | "bud" | "bloom";
 
 export interface PlantStage {
@@ -7,22 +5,32 @@ export interface PlantStage {
   minLearned: number;
 }
 
-const TOTAL_VERSES = PAGE1_VERSES.length;
-
-// Stage thresholds scale with the verses that actually exist,
-// so "bloom" is always reachable (previously needed 10 of 7 verses).
-export const PLANT_STAGES: readonly PlantStage[] = [
-  { id: "seed", minLearned: 0 },
-  { id: "sprout", minLearned: 1 },
-  { id: "sapling", minLearned: Math.max(2, Math.ceil(TOTAL_VERSES * 0.4)) },
-  { id: "bud", minLearned: Math.max(3, Math.ceil(TOTAL_VERSES * 0.7)) },
-  { id: "bloom", minLearned: TOTAL_VERSES },
-];
-
 export const MAX_VISIBLE_LEAVES = 8;
 export const MAX_FLOWERS = 2;
 export const STABLE_REVIEWS = 3;
 export const VERSES_PER_FLOWER = 3;
+
+/** Stage thresholds scale with the surah length so "bloom" is always reachable. */
+export function stagesFor(total: number): readonly PlantStage[] {
+  const size = Math.max(total, 1);
+
+  return [
+    { id: "seed", minLearned: 0 },
+    { id: "sprout", minLearned: 1 },
+    {
+      id: "sapling",
+      minLearned: Math.min(Math.max(2, Math.ceil(size * 0.4)), size),
+    },
+    {
+      id: "bud",
+      minLearned: Math.min(Math.max(3, Math.ceil(size * 0.7)), size),
+    },
+    { id: "bloom", minLearned: size },
+  ].filter(
+    (stage, index, all) =>
+      index === 0 || stage.minLearned > all[index - 1]!.minLearned,
+  ) as readonly PlantStage[];
+}
 
 export interface PlantSnapshot {
   stage: PlantStage;
@@ -33,11 +41,16 @@ export interface PlantSnapshot {
   stageProgress: number;
 }
 
-export function computePlant(learned: number, stable: number): PlantSnapshot {
-  const reached = PLANT_STAGES.filter((stage) => learned >= stage.minLearned);
-  const stage = reached[reached.length - 1] ?? PLANT_STAGES[0]!;
+export function computePlant(
+  learned: number,
+  stable: number,
+  total: number,
+): PlantSnapshot {
+  const stages = stagesFor(total);
+  const reached = stages.filter((stage) => learned >= stage.minLearned);
+  const stage = reached[reached.length - 1] ?? stages[0]!;
   const nextStage =
-    PLANT_STAGES.find((candidate) => candidate.minLearned > learned) ?? null;
+    stages.find((candidate) => candidate.minLearned > learned) ?? null;
   const span = nextStage ? nextStage.minLearned - stage.minLearned : 1;
   const done = nextStage ? learned - stage.minLearned : 1;
 

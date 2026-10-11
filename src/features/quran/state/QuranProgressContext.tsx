@@ -10,9 +10,10 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  PAGE1_SURAH_ID,
-  PAGE1_VERSES,
-} from "@/features/quran/data/mushafPage1";
+  DEFAULT_SURAH_ID,
+  getMushafPage,
+  type MushafPageData,
+} from "@/features/quran/data/mushafPages";
 import {
   STABLE_REVIEWS,
   computePlant,
@@ -34,8 +35,23 @@ export interface RememberResult {
   stageChanged: boolean;
 }
 
+export interface SurahStats {
+  learned: number;
+  stable: number;
+  total: number;
+  dueAyahs: number[];
+  nextNewAyah: number | null;
+  /** Where "continue" should open: next new verse, else first due, else the last verse. */
+  startAyah: number;
+  plant: PlantSnapshot;
+}
+
 interface QuranProgressValue {
   isLoaded: boolean;
+  surahId: number;
+  page: MushafPageData;
+  setSurah: (surahId: number) => void;
+  statsFor: (surahId: number) => SurahStats | undefined;
   plant: PlantSnapshot;
   learnedCount: number;
   stableCount: number;
@@ -53,6 +69,7 @@ const QuranProgressContext = createContext<QuranProgressValue | undefined>(
 );
 
 const STORAGE_KEY = "@quran_garden_progress";
+const SURAH_KEY = "@quran_garden_active_surah";
 
 function parseProgress(raw: string | null): ProgressMap {
   if (!raw) {
@@ -68,28 +85,65 @@ function parseProgress(raw: string | null): ProgressMap {
   }
 }
 
+function computeStats(page: MushafPageData, records: SurahRecords): SurahStats {
+  const now = Date.now();
+  const entries = page.verses.map((verse) => ({
+    ayah: verse.ayah,
+    record: records[verse.ayah],
+  }));
+  const learned = entries.filter((entry) => entry.record);
+  const stable = learned.filter(
+    (entry) => (entry.record?.reviews ?? 0) >= STABLE_REVIEWS,
+  );
+  const due = learned
+    .filter((entry) =>
+      isDueForReview(entry.record!.reviews, entry.record!.lastReviewedAt, now),
+    )
+    .map((entry) => entry.ayah);
+  const nextNew = entries.find((entry) => !entry.record)?.ayah ?? null;
+
+  return {
+    learned: learned.length,
+    stable: stable.length,
+    total: page.verses.length,
+    dueAyahs: due,
+    nextNewAyah: nextNew,
+    startAyah: nextNew ?? due[0] ?? page.verses[page.verses.length - 1]!.ayah,
+    plant: computePlant(learned.length, stable.length, page.verses.length),
+  };
+}
+
 export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<ProgressMap>({});
+  const [surahId, setSurahId] = useState(DEFAULT_SURAH_ID);
   const [isLoaded, setIsLoaded] = useState(false);
   const progressRef = useRef<ProgressMap>({});
+  const surahRef = useRef(DEFAULT_SURAH_ID);
 
   useEffect(() => {
     let mounted = true;
-    setIsLoaded(false);
 
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (mounted) {
-          const parsed = parseProgress(raw);
-          progressRef.current = parsed;
-          setProgress(parsed);
+    Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY),
+      AsyncStorage.getItem(SURAH_KEY),
+    ])
+      .then(([raw, storedSurah]) => {
+        if (!mounted) {
+          return;
+        }
+
+        const parsed = parseProgress(raw);
+        const id = Number(storedSurah);
+
+        progressRef.current = parsed;
+        setProgress(parsed);
+
+        if (getMushafPage(id)) {
+          surahRef.current = id;
+          setSurahId(id);
         }
       })
-      .catch(() => {
-        if (mounted) {
-          setProgress({});
-        }
-      })
+      .catch(() => undefined)
       .finally(() => {
         if (mounted) {
           setIsLoaded(true);
@@ -112,54 +166,43 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const records = useMemo<SurahRecords>(
-    () => progress[PAGE1_SURAH_ID] ?? {},
-    [progress],
+  const setSurah = useCallback((id: number) => {
+    if (!getMushafPage(id)) {
+      return;
+    }
+
+    surahRef.current = id;
+    setSurahId(id);
+    AsyncStorage.setItem(SURAH_KEY, String(id)).catch(() => undefined);
+  }, []);
+
+  const page = useMemo(
+    () => getMushafPage(surahId) ?? getMushafPage(DEFAULT_SURAH_ID)!,
+    [surahId],
   );
+  const records = useMemo<SurahRecords>(
+    () => progress[page.surahId] ?? {},
+    [progress, page.surahId],
+  );
+  const stats = useMemo(() => computeStats(page, records), [page, records]);
 
-  const derived = useMemo(() => {
-    const now = Date.now();
-    const entries = PAGE1_VERSES.map((verse) => ({
-      verse,
-      record: records[verse.ayah],
-    }));
-    const learned = entries.filter((entry) => entry.record);
-    const stable = learned.filter(
-      (entry) => (entry.record?.reviews ?? 0) >= STABLE_REVIEWS,
-    );
-    const due = learned
-      .filter((entry) =>
-        isDueForReview(
-          entry.record!.reviews,
-          entry.record!.lastReviewedAt,
-          now,
-        ),
-      )
-      .map((entry) => entry.verse.ayah);
-    const nextNew = entries.find((entry) => !entry.record)?.verse.ayah ?? null;
+  const statsFor = useCallback(
+    (id: number) => {
+      const target = getMushafPage(id);
 
-    return {
-      learnedCount: learned.length,
-      stableCount: stable.length,
-      dueAyahs: due,
-      nextNewAyah: nextNew,
-      currentAyah:
-        nextNew ?? due[0] ?? PAGE1_VERSES[PAGE1_VERSES.length - 1]!.ayah,
-    };
-  }, [records]);
-
-  const plant = useMemo(
-    () => computePlant(derived.learnedCount, derived.stableCount),
-    [derived.learnedCount, derived.stableCount],
+      return target ? computeStats(target, progress[id] ?? {}) : undefined;
+    },
+    [progress],
   );
 
   const recordFor = useCallback((ayah: number) => records[ayah], [records]);
 
   const remember = useCallback(
     async (ayah: number): Promise<RememberResult> => {
+      const target = getMushafPage(surahRef.current)!;
       const now = Date.now();
       const current = progressRef.current;
-      const currentRecords = current[PAGE1_SURAH_ID] ?? {};
+      const currentRecords = current[target.surahId] ?? {};
       const existing = currentRecords[ayah];
       const nextRecords: SurahRecords = {
         ...currentRecords,
@@ -167,34 +210,21 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
           ? { ...existing, reviews: existing.reviews + 1, lastReviewedAt: now }
           : { learnedAt: now, lastReviewedAt: now, reviews: 1 },
       };
-      const count = (map: SurahRecords) => {
-        const all = Object.values(map);
+      const before = computeStats(target, currentRecords).plant.stage.id;
+      const after = computeStats(target, nextRecords).plant.stage.id;
 
-        return {
-          learned: all.length,
-          stable: all.filter((record) => record.reviews >= STABLE_REVIEWS)
-            .length,
-        };
-      };
-      const before = count(currentRecords);
-      const after = count(nextRecords);
+      await persist({ ...current, [target.surahId]: nextRecords });
 
-      await persist({ ...current, [PAGE1_SURAH_ID]: nextRecords });
-
-      return {
-        becameLearned: !existing,
-        stageChanged:
-          computePlant(before.learned, before.stable).stage.id !==
-          computePlant(after.learned, after.stable).stage.id,
-      };
+      return { becameLearned: !existing, stageChanged: before !== after };
     },
     [persist],
   );
 
   const needsReview = useCallback(
     async (ayah: number) => {
+      const id = surahRef.current;
       const current = progressRef.current;
-      const currentRecords = current[PAGE1_SURAH_ID] ?? {};
+      const currentRecords = current[id] ?? {};
       const existing = currentRecords[ayah];
 
       if (!existing) {
@@ -203,7 +233,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
 
       await persist({
         ...current,
-        [PAGE1_SURAH_ID]: {
+        [id]: {
           ...currentRecords,
           [ayah]: { ...existing, reviews: 0, lastReviewedAt: 0 },
         },
@@ -217,18 +247,32 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const value = useMemo<QuranProgressValue>(
     () => ({
       isLoaded,
-      plant,
-      learnedCount: derived.learnedCount,
-      stableCount: derived.stableCount,
-      dueAyahs: derived.dueAyahs,
-      nextNewAyah: derived.nextNewAyah,
-      currentAyah: derived.currentAyah,
+      surahId: page.surahId,
+      page,
+      setSurah,
+      statsFor,
+      plant: stats.plant,
+      learnedCount: stats.learned,
+      stableCount: stats.stable,
+      dueAyahs: stats.dueAyahs,
+      nextNewAyah: stats.nextNewAyah,
+      currentAyah: stats.startAyah,
       recordFor,
       remember,
       needsReview,
       reset,
     }),
-    [isLoaded, plant, derived, recordFor, remember, needsReview, reset],
+    [
+      isLoaded,
+      page,
+      setSurah,
+      statsFor,
+      stats,
+      recordFor,
+      remember,
+      needsReview,
+      reset,
+    ],
   );
 
   return (

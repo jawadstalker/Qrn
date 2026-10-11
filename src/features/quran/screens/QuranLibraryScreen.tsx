@@ -20,10 +20,7 @@ import {
   MiniPlant,
   type MiniPlantState,
 } from "@/features/quran/components/MiniPlant";
-import {
-  PAGE1_SURAH_ID,
-  PAGE1_VERSES,
-} from "@/features/quran/data/mushafPage1";
+import { hasMushafPage } from "@/features/quran/data/mushafPages";
 import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 
@@ -47,35 +44,48 @@ export default function QuranLibraryScreen() {
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { plant, learnedCount, currentAyah } = useQuranProgress();
+  const { statsFor, setSurah } = useQuranProgress();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const number = (value: number) => formatNumber(value, language);
 
-  const fatihaState = useMemo<RowState>(() => {
-    const done = learnedCount === PAGE1_VERSES.length;
-    const miniState: MiniPlantState =
-      plant.flowers > 0 || done
-        ? "flower"
-        : learnedCount >= 3
-          ? "leafy"
-          : learnedCount >= 1
-            ? "sprout"
-            : "seed";
-    const labelKey = {
-      flower: "quran_state_flower",
-      leafy: "quran_state_leaf",
-      sprout: "quran_state_sprout",
-      seed: "quran_state_seed",
-    }[miniState];
+  const rowStates = useMemo(() => {
+    const map = new Map<number, RowState & { startAyah: number }>();
 
-    return {
-      plant: miniState,
-      labelKey,
-      isLearning: learnedCount > 0 && !done,
-      isDone: done,
-    };
-  }, [learnedCount, plant.flowers]);
+    SURAHS.forEach((surah) => {
+      const stats = statsFor(surah.id);
+
+      if (!stats) {
+        return;
+      }
+
+      const done = stats.learned === stats.total;
+      const miniState: MiniPlantState =
+        stats.plant.flowers > 0 || done
+          ? "flower"
+          : stats.learned >= 3
+            ? "leafy"
+            : stats.learned >= 1
+              ? "sprout"
+              : "seed";
+      const labelKey = {
+        flower: "quran_state_flower",
+        leafy: "quran_state_leaf",
+        sprout: "quran_state_sprout",
+        seed: "quran_state_seed",
+      }[miniState];
+
+      map.set(surah.id, {
+        plant: miniState,
+        labelKey,
+        isLearning: stats.learned > 0 && !done,
+        isDone: done,
+        startAyah: stats.startAyah,
+      });
+    });
+
+    return map;
+  }, [statsFor]);
 
   const data = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -86,21 +96,24 @@ export default function QuranLibraryScreen() {
         surah.name.includes(normalized) ||
         surah.transliteration.toLowerCase().includes(normalized) ||
         String(surah.id) === normalized;
-      const isFatiha = surah.id === PAGE1_SURAH_ID;
+      const state = rowStates.get(surah.id);
       const matchesFilter =
         filter === "all" ||
-        (isFatiha &&
-          ((filter === "learning" && fatihaState.isLearning) ||
-            (filter === "done" && fatihaState.isDone)));
+        (state !== undefined &&
+          ((filter === "learning" && state.isLearning) ||
+            (filter === "done" && state.isDone)));
 
       return matchesQuery && matchesFilter;
-    });
-  }, [query, filter, fatihaState]);
+    }).sort(
+      (a, b) => Number(hasMushafPage(b.id)) - Number(hasMushafPage(a.id)),
+    );
+  }, [query, filter, rowStates]);
 
   const renderItem = ({ item }: ListRenderItemInfo<SurahInfo>) => {
-    const available = item.id === PAGE1_SURAH_ID;
-    const state: RowState = available
-      ? fatihaState
+    const rowState = rowStates.get(item.id);
+    const available = rowState !== undefined;
+    const state: RowState = rowState
+      ? rowState
       : {
           plant: "seed",
           labelKey: "quran_soon",
@@ -113,12 +126,17 @@ export default function QuranLibraryScreen() {
         accessibilityRole="button"
         accessibilityState={{ disabled: !available }}
         disabled={!available}
-        onPress={() =>
+        onPress={() => {
+          if (!rowState) {
+            return;
+          }
+
+          setSurah(item.id);
           router.push({
             pathname: "/memorize",
-            params: { ayah: String(currentAyah) },
-          })
-        }
+            params: { ayah: String(rowState.startAyah) },
+          });
+        }}
         style={[
           styles.rowItem,
           {

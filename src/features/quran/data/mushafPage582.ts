@@ -1,0 +1,96 @@
+import type {
+  MushafLine,
+  MushafVerse,
+} from "@/features/quran/data/mushafPage1";
+
+// Madinah Mushaf page 582 (Surah An-Naba, verses 1-30), KFGQPC QCF v1 font.
+// Glyphs are listed in reading order; one glyph per word plus one per verse marker.
+export const PAGE582_SURAH_ID = 78;
+export const PAGE582_NUMBER = 582;
+export const PAGE582_FONT_FAMILY = "QCF_P582";
+
+export const PAGE582_CODEPOINTS: readonly number[] = [
+  0xfb51, 0xfb52, 0xfb53, 0xfb54, 0xfb55, 0xfb56, 0xfb57, 0xfb58, 0xfb59,
+  0xfb5a, 0xfb5b, 0xfb5c, 0xfb5d, 0xfb5e, 0xfb5f, 0xfb60, 0xfb61, 0xfb62,
+  0xfb63, 0xfb64, 0xfb65, 0xfb66, 0xfb67, 0xfb68, 0xfb69, 0xfb6a, 0xfb6b,
+  0xfb6c, 0xfb6d, 0xfb6e, 0xfb6f, 0xfb70, 0xfb71, 0xfb72, 0xfb73, 0xfb74,
+  0xfb75, 0xfb76, 0xfb77, 0xfb78, 0xfb79, 0xfb7a, 0xfb7b, 0xfb7c, 0xfb7d,
+  0xfb7e, 0xfb7f, 0xfb80, 0xfb81, 0xfb82, 0xfb83, 0xfb84, 0xfb85, 0xfb86,
+  0xfb87, 0xfb88, 0xfb89, 0xfb8a, 0xfb8b, 0xfb8c, 0xfb8d, 0xfb8e, 0xfb8f,
+  0xfb90, 0xfb91, 0xfb92, 0xfb93, 0xfb94, 0xfb95, 0xfb96, 0xfb97, 0xfb98,
+  0xfb99, 0xfb9a, 0xfb9b, 0xfb9c, 0xfb9d, 0xfb9e, 0xfb9f, 0xfba0, 0xfba1,
+  0xfba2, 0xfba3, 0xfba4, 0xfba5, 0xfba6, 0xfba7, 0xfba8, 0xfba9, 0xfbaa,
+  0xfbab, 0xfbac, 0xfbad, 0xfbae, 0xfbaf, 0xfbb0, 0xfbb1, 0xfbd3, 0xfbd4,
+  0xfbd5, 0xfbd6, 0xfbd7, 0xfbd8, 0xfbd9, 0xfbda, 0xfbdb, 0xfbdc, 0xfbdd,
+  0xfbde, 0xfbdf, 0xfbe0, 0xfbe1, 0xfbe2, 0xfbe3, 0xfbe4, 0xfbe5, 0xfbe6,
+  0xfbe7, 0xfbe8, 0xfbe9, 0xfbea, 0xfbeb, 0xfbec, 0xfbed, 0xfbee, 0xfbef,
+  0xfbf0, 0xfbf1, 0xfbf2, 0xfbf3, 0xfbf4, 0xfbf5, 0xfbf6, 0xfbf7, 0xfbf8,
+];
+
+export const PAGE582_ADVANCES: readonly number[] = [
+  1507, 4055, 2562, 1779, 2274, 3375, 2549, 2588, 1209, 1618, 3611, 2536, 1284,
+  4115, 2555, 1226, 1323, 3866, 2542, 1572, 2228, 3329, 3093, 2555, 4073, 2647,
+  2555, 5047, 3040, 2569, 3769, 3053, 2949, 2569, 3735, 2359, 2673, 2529, 3546,
+  2765, 3053, 2542, 3814, 3648, 2658, 3250, 2554, 4083, 3230, 3617, 2555, 4272,
+  1778, 5334, 1759, 2457, 2542, 3307, 1402, 2013, 2477, 2569, 3958, 2660, 2542,
+  1585, 1717, 3801, 2002, 3329, 2529, 1939, 2569, 1880, 3198, 3359, 2988, 2542,
+  4358, 3644, 3636, 2372, 2529, 4338, 3171, 3604, 2582, 2582, 1562, 3579, 2276,
+  3617, 2555, 4286, 2267, 2569, 3389, 1874, 3185, 2542, 1388, 3927, 2019, 2516,
+  1717, 2411, 2542, 1520, 3376, 3722, 2555, 3735, 3080, 2546, 2634, 3958, 1087,
+  3638, 3342, 2555, 3915, 3816, 2660, 2542, 2576, 3276, 4862, 4535, 2542, 3878,
+  2248, 4386, 1669, 3001, 2542,
+];
+
+export const PAGE582_LINES: readonly MushafLine[] = [
+  { from: 0, to: 12, alignment: "justify" },
+  { from: 12, to: 24, alignment: "justify" },
+  { from: 24, to: 33, alignment: "justify" },
+  { from: 33, to: 43, alignment: "justify" },
+  { from: 43, to: 52, alignment: "justify" },
+  { from: 52, to: 63, alignment: "justify" },
+  { from: 63, to: 75, alignment: "justify" },
+  { from: 75, to: 84, alignment: "justify" },
+  { from: 84, to: 94, alignment: "justify" },
+  { from: 94, to: 106, alignment: "justify" },
+  { from: 106, to: 116, alignment: "justify" },
+  { from: 116, to: 126, alignment: "justify" },
+  { from: 126, to: 135, alignment: "justify" },
+];
+
+export const PAGE582_VERSES: readonly MushafVerse[] = [
+  { ayah: 1, from: 0, to: 3, markerIndex: 2 },
+  { ayah: 2, from: 3, to: 7, markerIndex: 6 },
+  { ayah: 3, from: 7, to: 12, markerIndex: 11 },
+  { ayah: 4, from: 12, to: 15, markerIndex: 14 },
+  { ayah: 5, from: 15, to: 19, markerIndex: 18 },
+  { ayah: 6, from: 19, to: 24, markerIndex: 23 },
+  { ayah: 7, from: 24, to: 27, markerIndex: 26 },
+  { ayah: 8, from: 27, to: 30, markerIndex: 29 },
+  { ayah: 9, from: 30, to: 34, markerIndex: 33 },
+  { ayah: 10, from: 34, to: 38, markerIndex: 37 },
+  { ayah: 11, from: 38, to: 42, markerIndex: 41 },
+  { ayah: 12, from: 42, to: 47, markerIndex: 46 },
+  { ayah: 13, from: 47, to: 51, markerIndex: 50 },
+  { ayah: 14, from: 51, to: 57, markerIndex: 56 },
+  { ayah: 15, from: 57, to: 62, markerIndex: 61 },
+  { ayah: 16, from: 62, to: 65, markerIndex: 64 },
+  { ayah: 17, from: 65, to: 71, markerIndex: 70 },
+  { ayah: 18, from: 71, to: 78, markerIndex: 77 },
+  { ayah: 19, from: 78, to: 83, markerIndex: 82 },
+  { ayah: 20, from: 83, to: 88, markerIndex: 87 },
+  { ayah: 21, from: 88, to: 93, markerIndex: 92 },
+  { ayah: 22, from: 93, to: 96, markerIndex: 95 },
+  { ayah: 23, from: 96, to: 100, markerIndex: 99 },
+  { ayah: 24, from: 100, to: 107, markerIndex: 106 },
+  { ayah: 25, from: 107, to: 111, markerIndex: 110 },
+  { ayah: 26, from: 111, to: 114, markerIndex: 113 },
+  { ayah: 27, from: 114, to: 120, markerIndex: 119 },
+  { ayah: 28, from: 120, to: 124, markerIndex: 123 },
+  { ayah: 29, from: 124, to: 129, markerIndex: 128 },
+  { ayah: 30, from: 129, to: 135, markerIndex: 134 },
+];
+
+// QCF_BSML glyphs for the bismillah line.
+export const BISMILLAH_FONT_FAMILY = "QCF_BSML";
+export const BISMILLAH_CODEPOINTS: readonly number[] = [0xfb51, 0xfb52, 0xfb53];
+export const BISMILLAH_ADVANCES: readonly number[] = [7203, 7877, 2777];

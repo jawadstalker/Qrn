@@ -42,6 +42,8 @@ export default function RootLayout() {
     Inter_700Bold,
     EstedadMedium: require("../../assets/fonts/Estedad-Medium.ttf"),
     QCF_P001: require("../../assets/fonts/QCF_P001.ttf"),
+    QCF_P582: require("../../assets/fonts/QCF_P582.ttf"),
+    QCF_BSML: require("../../assets/fonts/QCF_BSML.ttf"),
     UthmanicHafs: require("../../assets/fonts/UthmanicHafs.ttf"),
   });
 

@@ -19,10 +19,7 @@ import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
 import { Mascot } from "@/shared/components/ui/Mascot";
 import { Rise } from "@/shared/motion/motion";
 import { MushafPage } from "@/features/quran/components/MushafPage";
-import {
-  PAGE1_SURAH_ID,
-  PAGE1_VERSES,
-} from "@/features/quran/data/mushafPage1";
+import type { MushafVerse } from "@/features/quran/data/mushafPage1";
 import { getSurah } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { fill } from "@/features/quran/utils/fill";
@@ -32,17 +29,20 @@ type Mode = "full" | "half" | "hidden";
 const MODES: readonly Mode[] = ["full", "half", "hidden"];
 const PADDING = 20;
 const PAPER_PADDING = 14;
-const TOTAL_VERSES = PAGE1_VERSES.length;
 const MASCOT_SIZE = 84;
 
-function hiddenIndicesFor(mode: Mode, currentAyah: number): Set<number> {
+function hiddenIndicesFor(
+  verses: readonly MushafVerse[],
+  mode: Mode,
+  currentAyah: number,
+): Set<number> {
   const hidden = new Set<number>();
 
   if (mode === "full") {
     return hidden;
   }
 
-  PAGE1_VERSES.forEach((verse) => {
+  verses.forEach((verse) => {
     for (let index = verse.from; index < verse.to; index += 1) {
       if (index === verse.markerIndex) {
         continue;
@@ -71,7 +71,10 @@ export default function MemorizeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ ayah?: string }>();
-  const { currentAyah, recordFor, remember, needsReview } = useQuranProgress();
+  const { page, currentAyah, recordFor, remember, needsReview } =
+    useQuranProgress();
+  const verses = page.verses;
+  const TOTAL_VERSES = verses.length;
   const initial = Number(params.ayah);
   const [current, setCurrent] = useState(
     Number.isInteger(initial) && initial >= 1 && initial <= TOTAL_VERSES
@@ -82,14 +85,14 @@ export default function MemorizeScreen() {
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
   const number = (value: number) => formatNumber(value, language);
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
-  const surah = getSurah(PAGE1_SURAH_ID);
+  const surah = getSurah(page.surahId);
 
   const hidden = useMemo(() => {
-    const base = hiddenIndicesFor(mode, current);
+    const base = hiddenIndicesFor(verses, mode, current);
     revealed.forEach((index) => base.delete(index));
 
     return base;
-  }, [mode, current, revealed]);
+  }, [verses, mode, current, revealed]);
 
   const changeMode = useCallback((next: Mode) => {
     setMode(next);
@@ -106,7 +109,7 @@ export default function MemorizeScreen() {
   const goNext = useCallback(() => {
     setRevealed(new Set());
     setCurrent((value) => Math.min(value + 1, TOTAL_VERSES));
-  }, []);
+  }, [TOTAL_VERSES]);
 
   const handleRemembered = useCallback(async () => {
     if (busy.current) {
@@ -228,6 +231,7 @@ export default function MemorizeScreen() {
       <Rise delay={160}>
         <View style={[styles.paper, { padding: PAPER_PADDING }]}>
           <MushafPage
+            page={page}
             width={pageWidth}
             highlightAyah={current}
             hiddenIndices={hidden}
@@ -258,7 +262,7 @@ export default function MemorizeScreen() {
             total: number(TOTAL_VERSES),
           })}
         </AppText>
-        {PAGE1_VERSES.map((verse) => {
+        {verses.map((verse) => {
           const learned = Boolean(recordFor(verse.ayah));
           const isCurrent = verse.ayah === current;
 
