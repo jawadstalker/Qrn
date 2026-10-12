@@ -11,6 +11,7 @@ import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
 import { Rise } from "@/shared/motion/motion";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
+import { Sun } from "@/features/quran/components/Sun";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { getSurah } from "@/features/quran/data/surahs";
 import { fill } from "@/features/quran/utils/fill";
@@ -19,6 +20,7 @@ const PADDING = 20;
 const CARD_HEIGHT = 380;
 const PLANT_WIDTH = 200;
 const AVATAR_SIZE = 52;
+const SUN_SIZE = 132;
 
 export default function QuranGardenScreen() {
   const { colors } = useTheme();
@@ -94,12 +96,11 @@ export default function QuranGardenScreen() {
       <Rise delay={80}>
         <View style={[styles.plantCard, { backgroundColor: colors.tintSoft }]}>
           <View
-            style={[
-              styles.sun,
-              { backgroundColor: colors.highlightTint },
-              isRTL ? styles.sunStart : styles.sunEnd,
-            ]}
-          />
+            style={[styles.sun, isRTL ? styles.sunStart : styles.sunEnd]}
+            pointerEvents="none"
+          >
+            <Sun size={SUN_SIZE} />
+          </View>
           <View
             style={[
               styles.stageChip,
@@ -266,15 +267,16 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: "hidden",
   },
+  // The canvas is larger than the sun body so the flames have room; offsets keep the body
+  // near its old corner position (the card clips the overflow).
   sun: {
     position: "absolute",
-    top: 18,
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    top: -SUN_SIZE / 2 + 44,
+    width: SUN_SIZE,
+    height: SUN_SIZE,
   },
-  sunEnd: { right: 18 },
-  sunStart: { left: 18 },
+  sunEnd: { right: -SUN_SIZE / 2 + 44 },
+  sunStart: { left: -SUN_SIZE / 2 + 44 },
   stageChip: {
     position: "absolute",
     top: 16,
