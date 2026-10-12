@@ -8,8 +8,7 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-// import { Mascot } from "@/shared/components/ui/Mascot";
-import { Float, Rise } from "@/shared/motion/motion";
+import { Rise } from "@/shared/motion/motion";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
 import { PetalRain } from "@/features/quran/components/PetalRain";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
@@ -17,13 +16,12 @@ import { fill } from "@/features/quran/utils/fill";
 
 const HERO_HEIGHT = 470;
 const PLANT_WIDTH = 236;
-const MASCOT_SIZE = 112;
 const GLOW_SIZE = 330;
 
 export default function GrowthMomentScreen() {
   const { colors } = useTheme();
   const { t, language } = useLanguage();
-  const { row, textAlign, isRTL } = useDirection();
+  const { row, textAlign } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ ayah?: string }>();
@@ -59,16 +57,6 @@ export default function GrowthMomentScreen() {
               flowers={plant.flowers}
               hasNewLeaf
             />
-          </View>
-          <View
-            style={[
-              styles.mascot,
-              isRTL ? styles.mascotRight : styles.mascotLeft,
-            ]}
-            pointerEvents="none"
-          >
-            <Float amplitude={8} duration={2300} delay={1000}>
-            </Float>
           </View>
         </View>
 
@@ -176,12 +164,6 @@ const styles = StyleSheet.create({
   plant: {
     marginTop: 6,
   },
-  mascot: {
-    position: "absolute",
-    bottom: 20,
-  },
-  mascotLeft: { left: 10 },
-  mascotRight: { right: 10 },
   sheet: {
     flexGrow: 1,
     marginTop: -28,

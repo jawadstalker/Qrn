@@ -16,7 +16,6 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-// import { Mascot } from "@/shared/components/ui/Mascot";
 import { Rise } from "@/shared/motion/motion";
 import { MushafPage } from "@/features/quran/components/MushafPage";
 import type { MushafVerse } from "@/features/quran/data/mushafPage1";
@@ -30,7 +29,6 @@ type Mode = "full" | "half" | "hidden";
 const MODES: readonly Mode[] = ["full", "half", "hidden"];
 const PADDING = 20;
 const PAPER_PADDING = 14;
-const MASCOT_SIZE = 84;
 
 function hiddenIndicesFor(
   verses: readonly MushafVerse[],
@@ -67,7 +65,7 @@ function hiddenIndicesFor(
 export default function MemorizeScreen() {
   const { colors } = useTheme();
   const { t, language } = useLanguage();
-  const { row, textAlign, isRTL } = useDirection();
+  const { row, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -240,17 +238,24 @@ export default function MemorizeScreen() {
             highlightAyah={current}
             hiddenIndices={hidden}
             onRevealWord={reveal}
-            accessibilityLabel={t.quran_page_label ?? ""}
+            accessibilityLabel={fill(t.quran_page_label, {
+              page: number(page.pageNumber),
+              surah: surah?.transliteration ?? "",
+            })}
           />
         </View>
       </Rise>
 
       <Rise delay={220}>
-        <View style={[styles.hintRow, { flexDirection: row }]}>
+        <View style={styles.hintRow}>
           <View style={[styles.bubble, { backgroundColor: colors.surface }]}>
             <AppText
               variant="caption"
-              style={{ color: colors.text, fontWeight: "700", textAlign }}
+              style={{
+                color: colors.text,
+                fontWeight: "700",
+                textAlign: "center",
+              }}
             >
               {mode === "full" ? t.quran_bubble : t.quran_tap_hint}
             </AppText>
@@ -258,33 +263,35 @@ export default function MemorizeScreen() {
         </View>
       </Rise>
 
-      <View style={[styles.dotsRow, { flexDirection: row }]}>
+      <View style={styles.progress}>
         <AppText variant="caption" style={{ color: colors.textSecondary }}>
           {fill(t.quran_verse_of, {
             ayah: number(current),
             total: number(TOTAL_VERSES),
           })}
         </AppText>
-        {verses.map((verse) => {
-          const learned = Boolean(recordFor(verse.ayah));
-          const isCurrent = verse.ayah === current;
+        <View style={[styles.dotsRow, { flexDirection: row }]}>
+          {verses.map((verse) => {
+            const learned = Boolean(recordFor(verse.ayah));
+            const isCurrent = verse.ayah === current;
 
-          return (
-            <View
-              key={verse.ayah}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor: isCurrent
-                    ? colors.highlight
-                    : learned
-                      ? colors.primary
-                      : colors.tint,
-                },
-              ]}
-            />
-          );
-        })}
+            return (
+              <View
+                key={verse.ayah}
+                style={[
+                  styles.dot,
+                  {
+                    backgroundColor: isCurrent
+                      ? colors.highlight
+                      : learned
+                        ? colors.primary
+                        : colors.tint,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
       </View>
 
       <View style={[styles.actions, { flexDirection: row }]}>
@@ -358,13 +365,16 @@ const styles = StyleSheet.create({
   },
   hintRow: {
     alignItems: "center",
-    gap: 8,
   },
   bubble: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
     flexShrink: 1,
+  },
+  progress: {
+    alignItems: "center",
+    gap: 8,
   },
   dotsRow: {
     alignItems: "center",
@@ -379,7 +389,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 12,
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   secondary: {
     flex: 1,

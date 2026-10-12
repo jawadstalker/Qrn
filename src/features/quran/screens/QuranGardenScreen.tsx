@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Droplets, BookOpen } from "lucide-react-native";
+import { BookOpen, Droplets, Sprout } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -9,16 +9,15 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-// import { Mascot } from "@/shared/components/ui/Mascot";
 import { Rise } from "@/shared/motion/motion";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { getSurah } from "@/features/quran/data/surahs";
 import { fill } from "@/features/quran/utils/fill";
 
 const PADDING = 20;
 const CARD_HEIGHT = 380;
 const PLANT_WIDTH = 200;
-const MASCOT_SIZE = 104;
 const AVATAR_SIZE = 52;
 
 export default function QuranGardenScreen() {
@@ -27,7 +26,9 @@ export default function QuranGardenScreen() {
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { plant, learnedCount, dueAyahs, nextNewAyah } = useQuranProgress();
+  const { plant, learnedCount, dueAyahs, nextNewAyah, mushaf } =
+    useQuranProgress();
+  const surah = getSurah(mushaf.surahId);
   const number = (value: number) => formatNumber(value, language);
 
   const openMemorize = useCallback(
@@ -68,14 +69,24 @@ export default function QuranGardenScreen() {
     >
       <Rise>
         <View style={[styles.header, { flexDirection: row }]}>
-          <AppText
-            variant="h1"
-            style={{ color: colors.text, fontWeight: "800" }}
-          >
-            {t.quran_garden}
-          </AppText>
+          <View style={styles.headerText}>
+            <AppText
+              variant="h1"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
+              {t.quran_garden}
+            </AppText>
+            {surah ? (
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign }}
+              >
+                {`${surah.transliteration} · ${number(surah.verses)} ${t.quran_verses_word}`}
+              </AppText>
+            ) : null}
+          </View>
           <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
-            {/* <Mascot pose="head" size={AVATAR_SIZE} /> */}
+            <Sprout size={28} color={colors.onTint} strokeWidth={2.2} />
           </View>
         </View>
       </Rise>
@@ -110,15 +121,6 @@ export default function QuranGardenScreen() {
               leaves={plant.leaves}
               flowers={plant.flowers}
             />
-          </View>
-          <View
-            style={[
-              styles.mascot,
-              isRTL ? styles.mascotRight : styles.mascotLeft,
-            ]}
-            pointerEvents="none"
-          >
-            {/* <Mascot pose="calm" size={MASCOT_SIZE} /> */}
           </View>
           <View style={[styles.progressRow, { flexDirection: row }]}>
             <View style={[styles.track, { backgroundColor: colors.surface }]}>
@@ -186,7 +188,13 @@ export default function QuranGardenScreen() {
             style={{ color: colors.textSecondary, textAlign }}
           >
             {nextNewAyah
-              ? fill(t.quran_learn_next, { ayah: number(nextNewAyah) })
+              ? fill(t.quran_learn_next, {
+                  ayah: number(nextNewAyah),
+                  surah:
+                    language === "fa"
+                      ? (surah?.name ?? "")
+                      : (surah?.transliteration ?? ""),
+                })
               : t.quran_learn_done}
           </AppText>
           {nextNewAyah ? (
@@ -243,11 +251,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  headerText: {
+    flex: 1,
+  },
   avatar: {
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
   plantCard: {
     height: CARD_HEIGHT,
@@ -276,15 +288,11 @@ const styles = StyleSheet.create({
   chipRight: { right: 16 },
   plant: {
     position: "absolute",
-    top: 44,
-    alignSelf: "center",
+    top: 48,
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
-  mascot: {
-    position: "absolute",
-    bottom: 42,
-  },
-  mascotLeft: { left: 6 },
-  mascotRight: { right: 6 },
   progressRow: {
     position: "absolute",
     left: 18,

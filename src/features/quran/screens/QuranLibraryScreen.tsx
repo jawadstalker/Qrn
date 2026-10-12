@@ -168,11 +168,14 @@ export default function QuranLibraryScreen() {
             {`${item.transliteration} · ${number(item.verses)} ${t.quran_verses_word}`}
           </AppText>
         </View>
-        <View style={styles.plantState}>
-          <MiniPlant state={state.plant} />
+        <View style={[styles.plantState, !available && styles.soonState]}>
+          {available ? <MiniPlant state={state.plant} /> : null}
           <AppText
             variant="caption"
-            style={{ color: colors.onTint, fontWeight: "700" }}
+            style={{
+              color: available ? colors.onTint : colors.textSecondary,
+              fontWeight: "700",
+            }}
           >
             {t[state.labelKey]}
           </AppText>
@@ -313,5 +316,9 @@ const styles = StyleSheet.create({
   },
   plantState: {
     alignItems: "center",
+    minWidth: 64,
+  },
+  soonState: {
+    justifyContent: "center",
   },
 });
