@@ -9,7 +9,7 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-import { Mascot } from "@/shared/components/ui/Mascot";
+// import { Mascot } from "@/shared/components/ui/Mascot";
 import { Rise } from "@/shared/motion/motion";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
@@ -75,7 +75,7 @@ export default function QuranGardenScreen() {
             {t.quran_garden}
           </AppText>
           <View style={[styles.avatar, { backgroundColor: colors.tint }]}>
-            <Mascot pose="head" size={AVATAR_SIZE} />
+            {/* <Mascot pose="head" size={AVATAR_SIZE} /> */}
           </View>
         </View>
       </Rise>
@@ -118,7 +118,7 @@ export default function QuranGardenScreen() {
             ]}
             pointerEvents="none"
           >
-            <Mascot pose="calm" size={MASCOT_SIZE} />
+            {/* <Mascot pose="calm" size={MASCOT_SIZE} /> */}
           </View>
           <View style={[styles.progressRow, { flexDirection: row }]}>
             <View style={[styles.track, { backgroundColor: colors.surface }]}>

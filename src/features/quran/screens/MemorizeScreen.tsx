@@ -16,7 +16,7 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-import { Mascot } from "@/shared/components/ui/Mascot";
+// import { Mascot } from "@/shared/components/ui/Mascot";
 import { Rise } from "@/shared/motion/motion";
 import { MushafPage } from "@/features/quran/components/MushafPage";
 import type { MushafVerse } from "@/features/quran/data/mushafPage1";
@@ -247,7 +247,6 @@ export default function MemorizeScreen() {
 
       <Rise delay={220}>
         <View style={[styles.hintRow, { flexDirection: row }]}>
-          <Mascot pose="wave" size={MASCOT_SIZE} />
           <View style={[styles.bubble, { backgroundColor: colors.surface }]}>
             <AppText
               variant="caption"

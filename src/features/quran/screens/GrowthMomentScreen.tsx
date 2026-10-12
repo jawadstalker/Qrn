@@ -8,7 +8,7 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-import { Mascot } from "@/shared/components/ui/Mascot";
+// import { Mascot } from "@/shared/components/ui/Mascot";
 import { Float, Rise } from "@/shared/motion/motion";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
 import { PetalRain } from "@/features/quran/components/PetalRain";
@@ -68,7 +68,6 @@ export default function GrowthMomentScreen() {
             pointerEvents="none"
           >
             <Float amplitude={8} duration={2300} delay={1000}>
-              <Mascot pose="wave" size={MASCOT_SIZE} />
             </Float>
           </View>
         </View>
