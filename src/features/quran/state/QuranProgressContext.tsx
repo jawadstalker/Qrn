@@ -11,8 +11,8 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   DEFAULT_SURAH_ID,
-  getMushafPage,
-  type MushafPageData,
+  getMushafSurah,
+  type MushafSurah,
 } from "@/features/quran/data/mushafPages";
 import {
   STABLE_REVIEWS,
@@ -49,7 +49,7 @@ export interface SurahStats {
 interface QuranProgressValue {
   isLoaded: boolean;
   surahId: number;
-  page: MushafPageData;
+  mushaf: MushafSurah;
   setSurah: (surahId: number) => void;
   statsFor: (surahId: number) => SurahStats | undefined;
   plant: PlantSnapshot;
@@ -85,9 +85,9 @@ function parseProgress(raw: string | null): ProgressMap {
   }
 }
 
-function computeStats(page: MushafPageData, records: SurahRecords): SurahStats {
+function computeStats(surah: MushafSurah, records: SurahRecords): SurahStats {
   const now = Date.now();
-  const entries = page.verses.map((verse) => ({
+  const entries = surah.verses.map((verse) => ({
     ayah: verse.ayah,
     record: records[verse.ayah],
   }));
@@ -105,11 +105,11 @@ function computeStats(page: MushafPageData, records: SurahRecords): SurahStats {
   return {
     learned: learned.length,
     stable: stable.length,
-    total: page.verses.length,
+    total: surah.verses.length,
     dueAyahs: due,
     nextNewAyah: nextNew,
-    startAyah: nextNew ?? due[0] ?? page.verses[page.verses.length - 1]!.ayah,
-    plant: computePlant(learned.length, stable.length, page.verses.length),
+    startAyah: nextNew ?? due[0] ?? surah.verses[surah.verses.length - 1]!.ayah,
+    plant: computePlant(learned.length, stable.length, surah.verses.length),
   };
 }
 
@@ -138,7 +138,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
         progressRef.current = parsed;
         setProgress(parsed);
 
-        if (getMushafPage(id)) {
+        if (getMushafSurah(id)) {
           surahRef.current = id;
           setSurahId(id);
         }
@@ -167,7 +167,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setSurah = useCallback((id: number) => {
-    if (!getMushafPage(id)) {
+    if (!getMushafSurah(id)) {
       return;
     }
 
@@ -176,19 +176,19 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(SURAH_KEY, String(id)).catch(() => undefined);
   }, []);
 
-  const page = useMemo(
-    () => getMushafPage(surahId) ?? getMushafPage(DEFAULT_SURAH_ID)!,
+  const mushaf = useMemo(
+    () => getMushafSurah(surahId) ?? getMushafSurah(DEFAULT_SURAH_ID)!,
     [surahId],
   );
   const records = useMemo<SurahRecords>(
-    () => progress[page.surahId] ?? {},
-    [progress, page.surahId],
+    () => progress[mushaf.surahId] ?? {},
+    [progress, mushaf.surahId],
   );
-  const stats = useMemo(() => computeStats(page, records), [page, records]);
+  const stats = useMemo(() => computeStats(mushaf, records), [mushaf, records]);
 
   const statsFor = useCallback(
     (id: number) => {
-      const target = getMushafPage(id);
+      const target = getMushafSurah(id);
 
       return target ? computeStats(target, progress[id] ?? {}) : undefined;
     },
@@ -199,7 +199,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
 
   const remember = useCallback(
     async (ayah: number): Promise<RememberResult> => {
-      const target = getMushafPage(surahRef.current)!;
+      const target = getMushafSurah(surahRef.current)!;
       const now = Date.now();
       const current = progressRef.current;
       const currentRecords = current[target.surahId] ?? {};
@@ -247,8 +247,8 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const value = useMemo<QuranProgressValue>(
     () => ({
       isLoaded,
-      surahId: page.surahId,
-      page,
+      surahId: mushaf.surahId,
+      mushaf,
       setSurah,
       statsFor,
       plant: stats.plant,
@@ -264,7 +264,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     }),
     [
       isLoaded,
-      page,
+      mushaf,
       setSurah,
       statsFor,
       stats,

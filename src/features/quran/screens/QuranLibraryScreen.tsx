@@ -20,7 +20,6 @@ import {
   MiniPlant,
   type MiniPlantState,
 } from "@/features/quran/components/MiniPlant";
-import { hasMushafPage } from "@/features/quran/data/mushafPages";
 import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 
@@ -104,9 +103,7 @@ export default function QuranLibraryScreen() {
             (filter === "done" && state.isDone)));
 
       return matchesQuery && matchesFilter;
-    }).sort(
-      (a, b) => Number(hasMushafPage(b.id)) - Number(hasMushafPage(a.id)),
-    );
+    });
   }, [query, filter, rowStates]);
 
   const renderItem = ({ item }: ListRenderItemInfo<SurahInfo>) => {

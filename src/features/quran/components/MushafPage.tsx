@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
-  glyphChar,
+  cellText,
   type MushafPageData,
 } from "@/features/quran/data/mushafPages";
 
@@ -43,8 +43,8 @@ export function MushafPage({
   onRevealWord,
   accessibilityLabel,
 }: MushafPageProps) {
-  const { ornament } = page;
-  const innerWidth = ornament ? width - FRAME_INSET * 2 : width;
+  const { frame, surahHeader } = page;
+  const innerWidth = frame ? width - FRAME_INSET * 2 : width;
 
   const { markers, verseByIndex } = useMemo(() => {
     const byIndex: number[] = [];
@@ -114,7 +114,7 @@ export function MushafPage({
               },
             ]}
           >
-            {glyphChar(page, index)}
+            {cellText(page, index)}
           </Text>
         );
 
@@ -133,7 +133,7 @@ export function MushafPage({
     </View>
   ));
 
-  if (!ornament) {
+  if (!frame) {
     return (
       <View
         accessible
@@ -146,10 +146,11 @@ export function MushafPage({
     );
   }
 
-  const bismillahAdvance = ornament.bismillahAdvances.reduce(
-    (sum, advance) => sum + advance,
-    0,
-  );
+  const bismillahAdvance =
+    surahHeader?.bismillahAdvances?.reduce(
+      (sum, advance) => sum + advance,
+      0,
+    ) ?? 1;
   const bismillahSize =
     (innerWidth * BISMILLAH_WIDTH_RATIO * page.unitsPerEm) / bismillahAdvance;
   const medallion = Math.max(innerWidth * 0.17, 44);
@@ -164,79 +165,85 @@ export function MushafPage({
       <View style={styles.innerFrame}>
         <View style={styles.runningHeader}>
           <Text style={styles.runningText} allowFontScaling={false}>
-            {ornament.runningHeader}
+            {frame.runningHeader}
           </Text>
           <Text style={styles.runningText} allowFontScaling={false}>
-            {ornament.title}
+            {frame.runningTitle}
           </Text>
         </View>
 
-        <View style={styles.banner}>
-          <View
-            style={[
-              styles.medallion,
-              {
-                width: medallion,
-                height: medallion,
-                borderRadius: medallion / 2,
-              },
-            ]}
-          >
-            <Text style={styles.medallionLabel} allowFontScaling={false}>
-              ترتيبها
-            </Text>
-            <Text style={styles.medallionValue} allowFontScaling={false}>
-              {toArabicDigits(ornament.order)}
-            </Text>
-          </View>
-          <View style={styles.cartouche}>
-            <Text style={styles.title} allowFontScaling={false}>
-              {ornament.title}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.medallion,
-              {
-                width: medallion,
-                height: medallion,
-                borderRadius: medallion / 2,
-              },
-            ]}
-          >
-            <Text style={styles.medallionLabel} allowFontScaling={false}>
-              آياتها
-            </Text>
-            <Text style={styles.medallionValue} allowFontScaling={false}>
-              {toArabicDigits(ornament.versesCount)}
-            </Text>
-          </View>
-        </View>
+        {surahHeader ? (
+          <>
+            <View style={styles.banner}>
+              <View
+                style={[
+                  styles.medallion,
+                  {
+                    width: medallion,
+                    height: medallion,
+                    borderRadius: medallion / 2,
+                  },
+                ]}
+              >
+                <Text style={styles.medallionLabel} allowFontScaling={false}>
+                  ترتيبها
+                </Text>
+                <Text style={styles.medallionValue} allowFontScaling={false}>
+                  {toArabicDigits(surahHeader!.order)}
+                </Text>
+              </View>
+              <View style={styles.cartouche}>
+                <Text style={styles.title} allowFontScaling={false}>
+                  {surahHeader!.title}
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.medallion,
+                  {
+                    width: medallion,
+                    height: medallion,
+                    borderRadius: medallion / 2,
+                  },
+                ]}
+              >
+                <Text style={styles.medallionLabel} allowFontScaling={false}>
+                  آياتها
+                </Text>
+                <Text style={styles.medallionValue} allowFontScaling={false}>
+                  {toArabicDigits(surahHeader!.versesCount)}
+                </Text>
+              </View>
+            </View>
 
-        <View
-          style={[
-            styles.line,
-            { height: lineHeight, justifyContent: "center" },
-          ]}
-        >
-          {ornament.bismillahCodepoints.map((codepoint) => (
-            <Text
-              key={codepoint}
-              allowFontScaling={false}
-              style={[
-                styles.glyph,
-                {
-                  fontFamily: ornament.bismillahFont,
-                  fontSize: bismillahSize,
-                  lineHeight: bismillahSize * GLYPH_LINE_HEIGHT_RATIO,
-                  color: INK,
-                },
-              ]}
-            >
-              {String.fromCodePoint(codepoint)}
-            </Text>
-          ))}
-        </View>
+            {surahHeader.bismillahCodepoints ? (
+              <View
+                style={[
+                  styles.line,
+                  { height: lineHeight, justifyContent: "center" },
+                ]}
+              >
+                {surahHeader.bismillahCodepoints.map((codepoint) => (
+                  <Text
+                    key={codepoint}
+                    allowFontScaling={false}
+                    style={[
+                      styles.glyph,
+                      {
+                        fontFamily: surahHeader!.bismillahFont,
+                        fontSize: bismillahSize,
+                        lineHeight: bismillahSize * GLYPH_LINE_HEIGHT_RATIO,
+                        color: INK,
+                      },
+                    ]}
+                  >
+                    {String.fromCodePoint(codepoint)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : null}
 
         {lines}
 

@@ -21,6 +21,7 @@ import { Rise } from "@/shared/motion/motion";
 import { MushafPage } from "@/features/quran/components/MushafPage";
 import type { MushafVerse } from "@/features/quran/data/mushafPage1";
 import { getSurah } from "@/features/quran/data/surahs";
+import { pageForAyah } from "@/features/quran/data/mushafPages";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { fill } from "@/features/quran/utils/fill";
 
@@ -71,9 +72,9 @@ export default function MemorizeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ ayah?: string }>();
-  const { page, currentAyah, recordFor, remember, needsReview } =
+  const { mushaf, currentAyah, recordFor, remember, needsReview } =
     useQuranProgress();
-  const verses = page.verses;
+  const verses = mushaf.verses;
   const TOTAL_VERSES = verses.length;
   const initial = Number(params.ayah);
   const [current, setCurrent] = useState(
@@ -85,14 +86,16 @@ export default function MemorizeScreen() {
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
   const number = (value: number) => formatNumber(value, language);
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
-  const surah = getSurah(page.surahId);
+  const surah = getSurah(mushaf.surahId);
+
+  const page = pageForAyah(mushaf, current);
 
   const hidden = useMemo(() => {
-    const base = hiddenIndicesFor(verses, mode, current);
+    const base = hiddenIndicesFor(page.verses, mode, current);
     revealed.forEach((index) => base.delete(index));
 
     return base;
-  }, [verses, mode, current, revealed]);
+  }, [page, mode, current, revealed]);
 
   const changeMode = useCallback((next: Mode) => {
     setMode(next);
@@ -231,6 +234,7 @@ export default function MemorizeScreen() {
       <Rise delay={160}>
         <View style={[styles.paper, { padding: PAPER_PADDING }]}>
           <MushafPage
+            key={page.pageNumber}
             page={page}
             width={pageWidth}
             highlightAyah={current}
@@ -366,12 +370,13 @@ const styles = StyleSheet.create({
   dotsRow: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    flexWrap: "wrap",
+    gap: 6,
   },
   dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   actions: {
     gap: 12,
