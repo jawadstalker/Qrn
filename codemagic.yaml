@@ -1,0 +1,35 @@
+workflows:
+  android-apk:
+    name: Quran Garden - Android APK
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 20
+      java: 17
+      vars:
+        PACKAGE_NAME: "com.deathstalker_owen.qurangarden"
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm ci --legacy-peer-deps
+      - name: Type-check
+        script: |
+          npm run typecheck
+      - name: Generate native Android project (expo prebuild)
+        script: |
+          npx expo prebuild --platform android --clean --no-install
+      - name: Set Android SDK path
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Build release APK
+        script: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
+    artifacts:
+      - android/app/build/outputs/apk/release/*.apk
