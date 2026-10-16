@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,6 +17,7 @@ import { ThemeProvider, useTheme } from "@/core/theme/ThemeContext";
 import { SoundProvider } from "@/shared/audio/SoundContext";
 import { MiniPlayer } from "@/features/quran/components/MiniPlayer";
 import { QuranTabBar } from "@/features/quran/components/QuranTabBar";
+import { SplashIntro } from "@/features/quran/components/SplashIntro";
 import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
 
@@ -38,6 +39,7 @@ function Shell() {
 }
 
 export default function RootLayout() {
+  const [splashDone, setSplashDone] = useState(false);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -72,6 +74,9 @@ export default function RootLayout() {
                   <Shell />
                 </RecitationProvider>
               </QuranProgressProvider>
+              {splashDone ? null : (
+                <SplashIntro onDone={() => setSplashDone(true)} />
+              )}
             </SoundProvider>
           </LanguageProvider>
         </ThemeProvider>

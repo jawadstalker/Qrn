@@ -23,7 +23,7 @@ export const CREAM = "#FFFBEF";
 const INNER_RATIO = 0.7654;
 
 /** 8-pointed star (Rub el Hizb): two overlapping squares. */
-function starPoints(cx: number, cy: number, radius: number): string {
+export function starPoints(cx: number, cy: number, radius: number): string {
   const points: string[] = [];
 
   for (let step = 0; step < 16; step += 1) {
