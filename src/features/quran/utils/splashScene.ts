@@ -1,4 +1,11 @@
 import * as THREE from "three";
+import {
+  COVER_GOLD,
+  PAGE_A,
+  PAGE_B,
+  PAGE_C,
+  type PackedMask,
+} from "@/features/quran/data/splashArt";
 
 /**
  * Splash intro: a 3D Quran flies in spinning, the cover opens, pages flip, and the camera settles
@@ -23,14 +30,15 @@ const PAGE_COUNT = 6;
 const PAGE_STEP = 0.01;
 const PAGE_W = 0.97;
 const PAGE_H = 1.34;
-const PAGE_SEGMENTS = 14;
+const PAGE_SEGMENTS = 22;
+const PAGE_ROWS = 6;
 
 /** Cover opens, then pages flip one after another. */
 const COVER_OPEN_START = 1.45;
 const COVER_OPEN_END = 2.3;
-const PAGE_START = 2.1;
-const PAGE_STAGGER = 0.14;
-const PAGE_DURATION = 0.5;
+/** Hand-tuned, slightly irregular turns: start second and duration of each page. */
+export const PAGE_STARTS: readonly number[] = [2.1, 2.24, 2.35, 2.5, 2.6, 2.76];
+const PAGE_DURATIONS: readonly number[] = [0.72, 0.62, 0.7, 0.6, 0.68, 0.64];
 
 const GREEN_DARK = 0x174a34;
 const GREEN = 0x1f5c42;
@@ -135,6 +143,40 @@ const FINAL_FOV = 30;
 /** Share of the screen width the open book fills at the end. */
 const FINAL_WIDTH_SHARE = 0.58;
 
+/** 0 -> 1 -> 0 over [a, b]. */
+const bump = (t: number, a: number, b: number) =>
+  Math.pow(Math.sin(Math.PI * clamp01((t - a) / (b - a))), 2);
+
+/** Soft black blob (radial) or one-sided ramp (shadow of a lifted page) as an alpha texture. */
+function makeShadowTexture(kind: "blob" | "ramp"): THREE.DataTexture {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+
+  for (let row = 0; row < size; row += 1) {
+    for (let col = 0; col < size; col += 1) {
+      const u = (col + 0.5) / size;
+      const v = (row + 0.5) / size;
+      const alpha =
+        kind === "blob"
+          ? Math.pow(clamp01(1 - Math.hypot(u - 0.5, v - 0.5) * 2), 1.6)
+          : Math.pow(1 - u, 1.4) *
+            Math.pow(clamp01(1 - Math.abs(v - 0.5) * 2.2), 0.7);
+      const at = (row * size + col) * 4;
+
+      data[at + 3] = Math.round(clamp01(alpha) * 255);
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
 function hash(a: number, b: number): number {
   const value = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
 
@@ -166,6 +208,43 @@ function paint(
       const x = ((col + 0.5) / width - 0.5) * COVER_W;
       const y = ((row + 0.5) / height - 0.5) * COVER_H;
       const [r, g, b] = pixel(x, y);
+      const at = (row * width + col) * 4;
+
+      data[at] = Math.round(clamp01(r) * 255);
+      data[at + 1] = Math.round(clamp01(g) * 255);
+      data[at + 2] = Math.round(clamp01(b) * 255);
+      data[at + 3] = 255;
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+/** Like paint(), but the callback also gets the pixel column/row. Textures come out upright. */
+function paintPixels(
+  width: number,
+  height: number,
+  pixel: (
+    col: number,
+    row: number,
+    x: number,
+    y: number,
+  ) => readonly [number, number, number],
+): THREE.DataTexture {
+  const data = new Uint8Array(width * height * 4);
+
+  for (let row = 0; row < height; row += 1) {
+    for (let col = 0; col < width; col += 1) {
+      const x = ((col + 0.5) / width - 0.5) * COVER_W;
+      const y = ((row + 0.5) / height - 0.5) * COVER_H;
+      const [r, g, b] = pixel(col, row, x, y);
       const at = (row * width + col) * 4;
 
       data[at] = Math.round(clamp01(r) * 255);
@@ -221,62 +300,76 @@ function starCoverage(
   return clamp01(distance / (2 * aa) + 0.5);
 }
 
-/** Green cover: gold frame, geometric ground and an 8-pointed star medallion. */
+const BASE64 =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/** Unpacks a PackedMask to ink coverage 0..1, one float per pixel (row-major). */
+function decodeMask(mask: PackedMask): Float32Array {
+  const lookup = new Uint8Array(128);
+
+  for (let i = 0; i < BASE64.length; i += 1) {
+    lookup[BASE64.charCodeAt(i)] = i;
+  }
+
+  const levels = (1 << mask.bits) - 1;
+  const perByte = 8 / mask.bits;
+  const out = new Float32Array(mask.width * mask.height);
+  const text = mask.data;
+  let bitBuffer = 0;
+  let bitCount = 0;
+  let pixel = 0;
+
+  for (let i = 0; i < text.length && pixel < out.length; i += 1) {
+    const ch = text.charCodeAt(i);
+
+    if (ch === 61) {
+      break; // '='
+    }
+
+    bitBuffer = (bitBuffer << 6) | lookup[ch];
+    bitCount += 6;
+
+    if (bitCount >= 8) {
+      bitCount -= 8;
+
+      const byte = (bitBuffer >> bitCount) & 255;
+
+      bitBuffer &= (1 << bitCount) - 1;
+
+      for (let k = perByte - 1; k >= 0 && pixel < out.length; k -= 1) {
+        out[pixel] = ((byte >> (k * mask.bits)) & levels) / levels;
+        pixel += 1;
+      }
+    }
+  }
+
+  return out;
+}
+
+/** Cover: deep green leather with a gold-tooled Mushaf design (the ornaments are baked offline). */
 function makeCoverTexture(): THREE.DataTexture {
   const green = rgb(GREEN);
   const greenDark = rgb(GREEN_DARK);
-  const gold = rgb(GOLD);
-  const goldLight: [number, number, number] = [0.98, 0.9, 0.62];
-  const aa = 0.0045;
+  const goldDark: [number, number, number] = [0.7, 0.52, 0.2];
+  const goldLight: [number, number, number] = [1, 0.92, 0.62];
+  const ink = decodeMask(COVER_GOLD);
+  const { width, height } = COVER_GOLD;
 
-  return paint(256, 512, (x, y) => {
-    const radial = clamp01(Math.hypot(x / 0.62, y / 0.82));
-    let color = mix3(green, greenDark, smooth(radial));
-    // Faint woven grid, only to keep the big green area from looking flat.
-    const weave = 0.5 + 0.5 * Math.cos(x * 70) * Math.cos(y * 70);
+  return paintPixels(width, height, (col, row, x, y) => {
+    const radial = clamp01(Math.hypot(x / 0.7, y / 0.9));
+    let color = mix3(green, greenDark, smooth(radial) * 0.9);
+    // Leather grain.
+    const grain = 0.5 + 0.5 * Math.cos(x * 210 + Math.sin(y * 90) * 2);
 
-    color = mix3(color, greenDark, 0.18 * weave);
+    color = mix3(color, greenDark, 0.1 * grain * hash(col % 7, row % 5));
 
-    const edge = Math.min(COVER_W / 2 - Math.abs(x), COVER_H / 2 - Math.abs(y));
-    const frame = Math.max(
-      stroke(edge - 0.04, 0.009, aa),
-      stroke(edge - 0.075, 0.004, aa),
+    // Gold shimmer diagonal across the tooling.
+    const shine = smooth(
+      clamp01(0.5 + 1.1 * (x * 0.6 - y * 0.4) + 0.2 * Math.sin(y * 9)),
     );
+    const gold = mix3(goldDark, goldLight, shine);
 
-    color = mix3(color, gold, frame);
-
-    const cy = y - 0.08;
-    const r = Math.hypot(x, cy);
-    const theta = Math.atan2(cy, x);
-    const star = starCoverage(r, theta, 0.29, 0.15, aa);
-    const ring = Math.max(
-      stroke(r - 0.34, 0.007, aa),
-      stroke(r - 0.31, 0.003, aa),
-    );
-    const hub = clamp01((0.075 - r) / (2 * aa) + 0.5);
-    const hubRing = stroke(r - 0.095, 0.004, aa);
-
-    color = mix3(color, gold, ring);
-    color = mix3(color, goldLight, star * 0.95);
-    color = mix3(color, greenDark, hub);
-    color = mix3(color, goldLight, Math.max(hubRing, hub * 0.0));
-
-    // Lower ornament: two rules and a row of small diamonds.
-    const bandY = y + 0.44;
-    const rules = Math.max(
-      stroke(bandY - 0.04, 0.004, aa),
-      stroke(bandY + 0.04, 0.004, aa),
-    );
-    const diamondX = ((x + 0.5) * 10) % 1;
-    const diamond = clamp01(
-      (0.16 - (Math.abs(diamondX - 0.5) + Math.abs(bandY * 10))) / 0.05,
-    );
-
-    if (Math.abs(x) < 0.3) {
-      color = mix3(color, gold, Math.max(rules, diamond * 0.9));
-    }
-
-    return color;
+    return mix3(color, gold, ink[(height - 1 - row) * width + col]);
   });
 }
 
@@ -303,46 +396,30 @@ function makeEndpaperTexture(): THREE.DataTexture {
   });
 }
 
-/** Cream page with a gold frame and lines of small ink strokes standing in for the text. */
-function makePageTexture(): THREE.DataTexture {
+/** Cream Mushaf page: gold frame plus real Quran text from a baked ink mask. */
+function makePageTexture(mask: PackedMask, mirror: boolean): THREE.DataTexture {
   const paper = rgb(CREAM);
-  const paperShade: [number, number, number] = [0.88, 0.8, 0.6];
+  const paperShade: [number, number, number] = [0.9, 0.82, 0.62];
   const gold = rgb(GOLD);
-  const ink: [number, number, number] = [0.13, 0.09, 0.04];
+  const inkColor: [number, number, number] = [0.1, 0.07, 0.04];
+  const ink = decodeMask(mask);
+  const { width, height } = mask;
   const aa = 0.005;
-  const lines = 15;
 
-  return paint(256, 512, (x, y) => {
+  return paintPixels(width, height, (col, row, x, y) => {
+    const sx = mirror ? width - 1 - col : col;
+    const fx = mirror ? -x : x;
     let color = mix3(
       paper,
       paperShade,
-      smooth(clamp01(Math.hypot(x / 0.9, y / 1.2))) * 0.6,
+      smooth(clamp01(Math.hypot(fx / 0.9, y / 1.2))) * 0.6,
     );
     const edge = Math.min(COVER_W / 2 - Math.abs(x), COVER_H / 2 - Math.abs(y));
 
     color = mix3(color, gold, stroke(edge - 0.045, 0.006, aa));
     color = mix3(color, gold, stroke(edge - 0.065, 0.0025, aa));
 
-    const area = Math.abs(x) < 0.38 && Math.abs(y) < 0.52;
-
-    if (area) {
-      const slot = ((y + 0.52) / 1.04) * lines;
-      const index = Math.floor(slot);
-      const within = (slot - index - 0.5) * (1.04 / lines);
-      const word = Math.floor((x + 0.38) / 0.09);
-      const wordX = ((x + 0.38) % 0.09) / 0.09;
-      const present =
-        hash(index + 1, word + 3) > 0.16 && wordX > 0.08 && wordX < 0.92;
-      const wobble = 0.004 * Math.sin(x * 90 + index * 3);
-
-      color = mix3(
-        color,
-        ink,
-        present ? stroke(within + wobble, 0.0085, aa) * 0.92 : 0,
-      );
-    }
-
-    return color;
+    return mix3(color, inkColor, ink[(height - 1 - row) * width + sx] * 0.95);
   });
 }
 
@@ -352,11 +429,13 @@ const SPARKLE_VERTEX = /* glsl */ `
   uniform float uTime;
   uniform float uPx;
   uniform float uOpacity;
+  uniform float uGather;
   varying float vAlpha;
   void main() {
     vec3 p = position;
     p.y += mod(uTime * 0.18 + aPhase * 3.0, 3.2) - 1.6;
     p.x += sin(uTime * 0.7 + aPhase * 12.0) * 0.08;
+    p = mix(p, vec3(0.0, 0.0, 0.25), uGather);
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
     gl_PointSize = aSize * uPx / max(-mv.z, 0.1);
@@ -375,6 +454,53 @@ const SPARKLE_FRAGMENT = /* glsl */ `
     float cross = smoothstep(0.06, 0.0, min(abs(c.x), abs(c.y))) * smoothstep(0.5, 0.1, d);
     float a = (core * core + cross * 0.6) * vAlpha;
     gl_FragColor = vec4(vec3(1.0, 0.84, 0.46) * a, a);
+  }
+`;
+
+const MOTE_VERTEX = /* glsl */ `
+  attribute float aPhase;
+  attribute float aSize;
+  attribute vec3 aDir;
+  uniform float uTime;
+  uniform float uStart;
+  uniform float uPx;
+  uniform float uOpacity;
+  varying float vAlpha;
+  void main() {
+    float age = fract((uTime - uStart) * 0.5 + aPhase);
+    vec3 p = position + aDir * age * 1.4;
+    p.y += age * 0.9;
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = aSize * (1.0 - 0.6 * age) * uPx / max(-mv.z, 0.1);
+    float twinkle = 0.6 + 0.4 * sin(uTime * 6.0 + aPhase * 50.0);
+    vAlpha = sin(age * 3.14159) * twinkle * uOpacity;
+  }
+`;
+
+const BOKEH_FRAGMENT = /* glsl */ `
+  precision mediump float;
+  varying float vAlpha;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    float a = smoothstep(0.5, 0.3, d) * (0.55 + 0.45 * smoothstep(0.3, 0.5, d)) * vAlpha * 0.16;
+    gl_FragColor = vec4(vec3(1.0, 0.8, 0.45) * a, a);
+  }
+`;
+
+const RAYS_FRAGMENT = /* glsl */ `
+  precision mediump float;
+  uniform float uOpacity;
+  uniform float uTime;
+  varying vec2 vUv;
+  void main() {
+    vec2 c = vUv - 0.5;
+    float d = length(c) * 2.0;
+    float ang = atan(c.y, c.x);
+    float r1 = pow(0.5 + 0.5 * sin(ang * 13.0 + uTime * 0.7), 3.0);
+    float r2 = pow(0.5 + 0.5 * sin(ang * 7.0 - uTime * 0.45 + 1.7), 4.0);
+    float a = (r1 * 0.6 + r2 * 0.5) * pow(clamp(1.0 - d, 0.0, 1.0), 1.5) * uOpacity;
+    gl_FragColor = vec4(vec3(1.0, 0.86, 0.5) * a, a);
   }
 `;
 
@@ -459,23 +585,24 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
   /* Materials */
   const coverTexture = makeCoverTexture();
-  const pageTexture = makePageTexture();
+  const textureA = makePageTexture(PAGE_A, false);
+  const textureB = makePageTexture(PAGE_B, false);
+  const textureC = makePageTexture(PAGE_C, false);
+  const mirroredB = makePageTexture(PAGE_B, true);
+  const mirroredC = makePageTexture(PAGE_C, true);
   const coverFace = new THREE.MeshPhongMaterial({
     map: coverTexture,
     shininess: 40,
     specular: 0x6a5a2a,
   });
-  const pageFace = new THREE.MeshPhongMaterial({
-    map: pageTexture,
-    shininess: 6,
-    specular: 0x222222,
-  });
-  const pageFaceDouble = new THREE.MeshPhongMaterial({
-    map: pageTexture,
-    shininess: 6,
-    specular: 0x222222,
-    side: THREE.DoubleSide,
-  });
+  const pageMaterial = (map: THREE.Texture, side: THREE.Side) =>
+    new THREE.MeshPhongMaterial({
+      map,
+      shininess: 6,
+      specular: 0x222222,
+      side,
+    });
+  const pageFace = pageMaterial(textureC, THREE.FrontSide);
   const goldEdge = new THREE.MeshPhongMaterial({
     color: GOLD,
     shininess: 80,
@@ -565,14 +692,30 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
   blockMesh.position.x = PAGE_W / 2 + 0.005;
   pivot.add(blockMesh);
 
-  // Flipping pages: a polyline of PAGE_SEGMENTS strips from the hinge, re-laid every frame.
+  // Flipping pages: a grid of PAGE_SEGMENTS x PAGE_ROWS quads from the hinge, re-laid every frame.
   interface Page {
-    mesh: THREE.Mesh;
+    meshes: THREE.Mesh[];
     positions: THREE.BufferAttribute;
+    geometry: THREE.BufferGeometry;
+    tipX: number;
+    shadow: THREE.Mesh;
   }
 
+  const shadowRamp = makeShadowTexture("ramp");
   const pages: Page[] = [];
-  const vertexCount = (PAGE_SEGMENTS + 1) * 2;
+  const columns = PAGE_SEGMENTS + 1;
+  const vertexCount = columns * (PAGE_ROWS + 1);
+
+  // Page n shows front[n] on the right and back[n] once turned (text reads correctly on both).
+  const fronts = [textureA, textureB, textureC, textureB, textureC, textureB];
+  const backs = [
+    mirroredC,
+    mirroredB,
+    mirroredC,
+    mirroredB,
+    mirroredC,
+    mirroredB,
+  ];
 
   for (let index = 0; index < PAGE_COUNT; index += 1) {
     const geometry = new THREE.BufferGeometry();
@@ -583,15 +726,21 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     const uvs = new Float32Array(vertexCount * 2);
     const indices: number[] = [];
 
-    for (let k = 0; k <= PAGE_SEGMENTS; k += 1) {
-      const u = k / PAGE_SEGMENTS;
+    for (let j = 0; j <= PAGE_ROWS; j += 1) {
+      for (let k = 0; k <= PAGE_SEGMENTS; k += 1) {
+        const at = j * columns + k;
 
-      uvs.set([u, 0, u, 1], k * 4);
+        uvs[at * 2] = k / PAGE_SEGMENTS;
+        uvs[at * 2 + 1] = j / PAGE_ROWS;
 
-      if (k < PAGE_SEGMENTS) {
-        const a = k * 2;
+        if (j < PAGE_ROWS && k < PAGE_SEGMENTS) {
+          const a = at;
+          const b = at + 1;
+          const c = at + columns;
+          const d = at + columns + 1;
 
-        indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+          indices.push(a, b, c, b, d, c);
+        }
       }
     }
 
@@ -599,45 +748,95 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
 
-    const mesh = new THREE.Mesh(geometry, pageFaceDouble);
+    const front = new THREE.Mesh(
+      geometry,
+      pageMaterial(fronts[index], THREE.FrontSide),
+    );
+    const back = new THREE.Mesh(
+      geometry,
+      pageMaterial(backs[index], THREE.BackSide),
+    );
 
-    mesh.frustumCulled = false;
-    pivot.add(mesh);
-    pages.push({ mesh, positions });
+    [front, back].forEach((mesh) => {
+      mesh.frustumCulled = false;
+      pivot.add(mesh);
+    });
+    const shadowGeometry = new THREE.PlaneGeometry(1, PAGE_H * 0.98);
+
+    shadowGeometry.translate(0.5, 0, 0);
+
+    const shadow = new THREE.Mesh(
+      shadowGeometry,
+      new THREE.MeshBasicMaterial({
+        map: shadowRamp,
+        color: 0x000000,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+
+    shadow.frustumCulled = false;
+    shadow.visible = false;
+    pivot.add(shadow);
+    pages.push({ meshes: [front, back], positions, geometry, tipX: 0, shadow });
   }
 
-  /** Lays page `index` out for flip progress p (0 = on the right, 1 = on the left). */
-  const layoutPage = (page: Page, index: number, p: number) => {
+  /**
+   * Lays page `index` out for flip progress p (0 = on the right, 1 = on the left).
+   * The page is a soft sheet: the free edge trails behind the hinge (lag), the top and bottom
+   * corners trail a little more than the middle (cup), and a small ripple runs along it.
+   */
+  const layoutPage = (page: Page, index: number, p: number, t: number) => {
     const eased = easeInOutCubic(p);
     const theta = eased * Math.PI;
-    const lag = 0.75 * Math.sin(eased * Math.PI);
+    const swing = Math.sin(eased * Math.PI);
+    const lag = 1.35 * Math.pow(swing, 0.85);
+    const cup = 0.55 * swing;
+    // Resting pages breathe a little (wind): lift away from their stack, never into it.
+    const resting = p <= 0 ? 1 : p >= 1 ? -1 : 0;
+    const flutter =
+      resting * 0.07 * (0.5 + 0.5 * Math.sin(t * 5.2 + index * 1.9));
+    const ripple = 0.16 * swing + flutter;
     const zRight = BLOCK_HALF - 0.002 - index * PAGE_STEP;
     const zOffset = lerp(zRight, -zRight, smooth(eased));
     const step = PAGE_W / PAGE_SEGMENTS;
     const array = page.positions.array as Float32Array;
-    let x = 0;
-    let z = 0;
 
-    for (let k = 0; k <= PAGE_SEGMENTS; k += 1) {
-      if (k > 0) {
-        const angle = theta - lag * (k / PAGE_SEGMENTS);
+    for (let j = 0; j <= PAGE_ROWS; j += 1) {
+      const v = (j / PAGE_ROWS) * 2 - 1;
+      let x = 0;
+      let z = 0;
 
-        x += step * Math.cos(angle);
-        z += step * Math.sin(angle);
+      for (let k = 0; k <= PAGE_SEGMENTS; k += 1) {
+        const u = k / PAGE_SEGMENTS;
+
+        if (k > 0) {
+          const angle =
+            theta -
+            lag * Math.pow(u, 1.15) -
+            cup * v * v * u +
+            ripple *
+              Math.sin(u * 7 + index) *
+              u *
+              (1 + 0.4 * Math.sin(t * 9 + index));
+
+          x += step * Math.cos(angle);
+          z += step * Math.sin(angle);
+        }
+
+        const at = (j * columns + k) * 3;
+
+        array[at] = x;
+        array[at + 1] = (v * PAGE_H) / 2;
+        array[at + 2] = z + zOffset;
       }
-
-      const at = k * 6;
-
-      array[at] = x;
-      array[at + 1] = -PAGE_H / 2;
-      array[at + 2] = z + zOffset;
-      array[at + 3] = x;
-      array[at + 4] = PAGE_H / 2;
-      array[at + 5] = z + zOffset;
     }
 
+    page.tipX = array[((PAGE_ROWS >> 1) * columns + PAGE_SEGMENTS) * 3]!;
     page.positions.needsUpdate = true;
-    page.mesh.geometry.computeVertexNormals();
+    page.geometry.computeVertexNormals();
   };
 
   /* Soft glow behind the book and sparkles around it */
@@ -697,6 +896,7 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       uTime: { value: 0 },
       uPx: { value: 1 },
       uOpacity: { value: 0 },
+      uGather: { value: 0 },
     },
     transparent: true,
     depthWrite: false,
@@ -707,13 +907,149 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
   sparkles.frustumCulled = false;
   scene.add(sparkles);
 
+  /* Rays of light that burst out of the book as the cover opens */
+  const raysMaterial = new THREE.ShaderMaterial({
+    vertexShader: GLOW_VERTEX,
+    fragmentShader: RAYS_FRAGMENT,
+    uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 } },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const rays = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), raysMaterial);
+
+  rays.scale.set(9, 9, 1);
+  scene.add(rays);
+
+  /* Golden motes rising out of the open pages */
+  const moteCount = 90;
+  const motePositions = new Float32Array(moteCount * 3);
+  const moteDirs = new Float32Array(moteCount * 3);
+  const motePhase = new Float32Array(moteCount);
+  const moteSize = new Float32Array(moteCount);
+
+  for (let i = 0; i < moteCount; i += 1) {
+    motePositions.set(
+      [
+        (hash(i, 11) - 0.5) * 1.5,
+        (hash(i, 12) - 0.5) * 0.9,
+        0.06 + hash(i, 13) * 0.1,
+      ],
+      i * 3,
+    );
+    moteDirs.set(
+      [(hash(i, 14) - 0.5) * 0.9, hash(i, 15) * 0.5, 0.2 + hash(i, 16) * 0.8],
+      i * 3,
+    );
+    motePhase[i] = hash(i, 17);
+    moteSize[i] = 0.02 + hash(i, 18) * 0.035;
+  }
+
+  const moteGeometry = new THREE.BufferGeometry();
+
+  moteGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(motePositions, 3),
+  );
+  moteGeometry.setAttribute("aDir", new THREE.BufferAttribute(moteDirs, 3));
+  moteGeometry.setAttribute("aPhase", new THREE.BufferAttribute(motePhase, 1));
+  moteGeometry.setAttribute("aSize", new THREE.BufferAttribute(moteSize, 1));
+
+  const moteMaterial = new THREE.ShaderMaterial({
+    vertexShader: MOTE_VERTEX,
+    fragmentShader: SPARKLE_FRAGMENT,
+    uniforms: {
+      uTime: { value: 0 },
+      uStart: { value: 2 },
+      uPx: { value: 1 },
+      uOpacity: { value: 0 },
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const motes = new THREE.Points(moteGeometry, moteMaterial);
+
+  motes.frustumCulled = false;
+  scene.add(motes);
+
+  /* Large soft bokeh discs near the lens: cheap depth of field */
+  const bokehCount = 16;
+  const bokehPositions = new Float32Array(bokehCount * 3);
+  const bokehPhase = new Float32Array(bokehCount);
+  const bokehSize = new Float32Array(bokehCount);
+
+  for (let i = 0; i < bokehCount; i += 1) {
+    const side = hash(i, 21) > 0.5 ? 1 : -1;
+
+    bokehPositions.set(
+      [
+        side * (1.15 + hash(i, 22) * 0.9),
+        (hash(i, 23) - 0.5) * 3,
+        0.5 + hash(i, 24) * 1.1,
+      ],
+      i * 3,
+    );
+    bokehPhase[i] = hash(i, 25);
+    bokehSize[i] = 0.16 + hash(i, 26) * 0.2;
+  }
+
+  const bokehGeometry = new THREE.BufferGeometry();
+
+  bokehGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(bokehPositions, 3),
+  );
+  bokehGeometry.setAttribute(
+    "aPhase",
+    new THREE.BufferAttribute(bokehPhase, 1),
+  );
+  bokehGeometry.setAttribute("aSize", new THREE.BufferAttribute(bokehSize, 1));
+
+  const bokehMaterial = new THREE.ShaderMaterial({
+    vertexShader: SPARKLE_VERTEX,
+    fragmentShader: BOKEH_FRAGMENT,
+    uniforms: {
+      uTime: { value: 0 },
+      uPx: { value: 1 },
+      uOpacity: { value: 0 },
+      uGather: { value: 0 },
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const bokeh = new THREE.Points(bokehGeometry, bokehMaterial);
+
+  bokeh.frustumCulled = false;
+  scene.add(bokeh);
+
+  /* Soft contact shadow of the book on the floor */
+  const groundShadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({
+      map: makeShadowTexture("blob"),
+      color: 0x000000,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    }),
+  );
+
+  groundShadow.rotation.x = -Math.PI / 2;
+  scene.add(groundShadow);
+
   const update = (seconds: number) => {
     const t = Math.min(Math.max(seconds, 0), SPLASH_SECONDS);
 
     /* Camera: orbit, dolly and a dolly-zoom, ending face-on */
     const azimuth = curve(CAMERA_AZIMUTH, t);
     const elevation = curve(CAMERA_ELEVATION, t);
-    const distance = curve(CAMERA_DISTANCE, t) * finalDistance;
+    // Punch-in as the cover opens, a gentle push as the book settles; both end at exactly 1.
+    const distance =
+      curve(CAMERA_DISTANCE, t) *
+      finalDistance *
+      (1 - 0.07 * bump(t, 1.45, 2.0) - 0.04 * bump(t, 3.0, 3.6));
     const fov = curve(CAMERA_FOV, t);
 
     camera.fov = fov;
@@ -726,6 +1062,13 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     camera.up.set(0, 1, 0);
     camera.lookAt(0, 0, 0);
     camera.rotateZ(curve(CAMERA_ROLL, t));
+
+    // Handheld shake that dies out before the camera locks off.
+    const shake =
+      0.009 * smooth(range(t, 0.15, 0.7)) * (1 - smooth(range(t, 2.5, 3.3)));
+
+    camera.rotateX(shake * (Math.sin(t * 9.7) + 0.6 * Math.sin(t * 17.3 + 1)));
+    camera.rotateY(shake * (Math.sin(t * 8.1 + 2) + 0.6 * Math.sin(t * 19.1)));
 
     /* Flight: the book rises out of the dark, spinning and levelling out */
     const fly = easeOutCubic(range(t, 0, 1.65));
@@ -752,18 +1095,21 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
     let flipped = 0;
 
-    pages.forEach((page, index) => {
-      const p = range(
-        t,
-        PAGE_START + index * PAGE_STAGGER,
-        PAGE_START + index * PAGE_STAGGER + PAGE_DURATION,
-      );
+    let landed = 0;
+    const progress: number[] = [];
 
+    pages.forEach((page, index) => {
+      const start = PAGE_STARTS[index]!;
+      const p = range(t, start, start + PAGE_DURATIONS[index]!);
+
+      progress.push(p);
       flipped += easeInOutCubic(p);
-      layoutPage(page, index, p);
-      // Pages that have not started stay hidden inside the block.
-      page.mesh.visible =
-        t >= PAGE_START + index * PAGE_STAGGER - 0.001 && open > 0.2;
+      landed += p >= 1 ? 1 : 0;
+      layoutPage(page, index, p, t);
+      // Unturned pages lie stacked on the block (page 0 shows the first Mushaf page).
+      page.meshes.forEach((mesh) => {
+        mesh.visible = open > 0.05;
+      });
     });
 
     const topZ = BLOCK_HALF - 0.004 - flipped * PAGE_STEP;
@@ -772,19 +1118,75 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     blockMesh.scale.z = Math.max(thickness, 0.001);
     blockMesh.position.z = -BLOCK_HALF + thickness / 2;
 
+    /* Shadows: each lifted page darkens the surface it hovers over */
+    const leftTop = -BLOCK_HALF + 0.002 + landed * PAGE_STEP;
+
+    pages.forEach((page, index) => {
+      const p = progress[index]!;
+      const lifted = p > 0 && p < 1 && open > 0.5;
+      const eased = easeInOutCubic(p);
+      const strength = Math.pow(Math.sin(eased * Math.PI), 0.8);
+
+      page.shadow.visible = lifted && Math.abs(page.tipX) > 0.02;
+
+      if (page.shadow.visible) {
+        const onRight = page.tipX > 0;
+        const rightZ = Math.max(
+          BLOCK_HALF - 0.002 - Math.min(index + 1, PAGE_COUNT) * PAGE_STEP,
+          topZ,
+        );
+
+        page.shadow.scale.x = page.tipX;
+        page.shadow.position.z = (onRight ? rightZ : leftTop) + 0.003;
+        (page.shadow.material as THREE.MeshBasicMaterial).opacity =
+          0.4 * strength;
+      }
+    });
+
     /* Light and glow swell as the book opens */
     const reveal = smooth(range(t, COVER_OPEN_START, COVER_OPEN_END + 0.4));
     const fade = 1 - smooth(range(t, GL_FADE_START, GL_FADE_END));
 
-    pointLight.intensity = 0.16 * reveal * fade;
+    pointLight.intensity =
+      (0.16 * reveal + 0.5 * bump(t, 1.55, 2.4) + 0.3 * bump(t, 3.45, 4.1)) *
+      fade;
     root.updateMatrixWorld(true);
     glow.quaternion.copy(camera.quaternion);
     glow.position.set(0, 0, -0.5).applyMatrix4(root.matrixWorld);
     glowMaterial.uniforms.uOpacity!.value =
-      (0.1 + 0.26 * reveal + 0.1 * smooth(range(t, 3, 3.65))) *
+      (0.1 +
+        0.26 * reveal +
+        0.1 * smooth(range(t, 3, 3.65)) +
+        0.55 * bump(t, 3.45, 4.15)) *
       fade *
       smooth(range(t, 0.2, 1));
 
+    rays.quaternion.copy(camera.quaternion);
+    rays.position.set(0, 0, -0.45).applyMatrix4(root.matrixWorld);
+    raysMaterial.uniforms.uTime!.value = t;
+    raysMaterial.uniforms.uOpacity!.value = 0.5 * bump(t, 1.6, 3.3) * fade;
+
+    moteMaterial.uniforms.uTime!.value = t;
+    moteMaterial.uniforms.uPx!.value =
+      height / (2 * Math.tan((fov * Math.PI) / 360));
+    moteMaterial.uniforms.uOpacity!.value =
+      smooth(range(t, 2.0, 2.4)) * fade * (1 - smooth(range(t, 3.2, 3.9)));
+
+    bokehMaterial.uniforms.uTime!.value = t;
+    bokehMaterial.uniforms.uPx!.value =
+      height / (2 * Math.tan((fov * Math.PI) / 360));
+    bokehMaterial.uniforms.uOpacity!.value = smooth(range(t, 0.3, 1.2)) * fade;
+
+    groundShadow.position.set(
+      root.position.x,
+      root.position.y - 0.95 * root.scale.x,
+      root.position.z,
+    );
+    groundShadow.scale.set(2.2 * root.scale.x, 1.6 * root.scale.x, 1);
+    (groundShadow.material as THREE.MeshBasicMaterial).opacity =
+      0.5 * smooth(range(t, 0.2, 1)) * (1 - smooth(range(t, 2.4, 3.2)));
+
+    sparkleMaterial.uniforms.uGather!.value = smooth(range(t, 3.1, 3.9));
     sparkleMaterial.uniforms.uTime!.value = t;
     sparkleMaterial.uniforms.uPx!.value =
       height / (2 * Math.tan((fov * Math.PI) / 360));

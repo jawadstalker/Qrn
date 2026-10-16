@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { useAudioPlayer } from "expo-audio";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
+import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import * as THREE from "three";
 import Animated, {
   Easing,
@@ -22,8 +30,8 @@ import {
   createSplashScene,
 } from "@/features/quran/utils/splashScene";
 
-/** Same green as the native splash (app.json), so the hand-off has no flash. */
-const BACKGROUND = "#2F6B4F";
+/** Deep ink green, so the green-and-gold Quran stands out. Same as the native splash (app.json). */
+const BACKGROUND = "#0C1A16";
 const LOGO_FADE_START = 3.75;
 const LOGO_FADE_END = 4.4;
 /** The overlay itself fades out over the last quarter second of the 5 seconds. */
@@ -31,6 +39,10 @@ const OVERLAY_FADE_START = SPLASH_SECONDS - 0.25;
 /** Where the clock starts when the 3D part is skipped (reduced motion or no WebGL). */
 const LOGO_ONLY_START = LOGO_FADE_START - 0.15;
 const LOGO_ONLY_HOLD_SECONDS = 1.6;
+
+// Whoosh, cover thump, page turns and a soft chime, synthesized to match the timeline.
+const SPLASH_SOUND =
+  require("../../../../assets/sounds/splash/splash.wav") as number;
 
 interface SplashIntroProps {
   onDone: () => void;
@@ -46,13 +58,40 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   const frameRef = useRef(0);
   const stoppedRef = useRef(false);
   const logoSize = Math.min(width * 0.74, 320);
+  const player = useAudioPlayer(SPLASH_SOUND);
+
+  // Browsers refuse to start audio without a tap and reject play() asynchronously, so the
+  // promise is handled too. The intro simply runs silent in that case.
+  const playSound = useCallback(() => {
+    // Web browsers block audio before a tap, and expo-audio cannot catch that rejection.
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    const ignore = () => undefined;
+
+    try {
+      Promise.resolve(player.seekTo(0)).catch(ignore);
+      Promise.resolve(player.play()).catch(ignore);
+    } catch {
+      // Sound is a bonus; never block the intro on it.
+    }
+  }, [player]);
+  const stopSound = useCallback(() => {
+    try {
+      player.pause();
+    } catch {
+      // ignore
+    }
+  }, [player]);
 
   const finish = useCallback(() => {
     if (!doneRef.current) {
       doneRef.current = true;
+      stopSound();
       onDone();
     }
-  }, [onDone]);
+  }, [onDone, stopSound]);
 
   const runTimeline = useCallback(
     (from: number, seconds: number) => {
@@ -136,6 +175,7 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
         let checked = false;
 
         startedRef.current = true;
+        playSound();
         runTimeline(0, SPLASH_SECONDS);
 
         const render = () => {
@@ -188,10 +228,11 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
         runLogoOnly();
       }
     },
-    [runLogoOnly, runTimeline],
+    [playSound, runLogoOnly, runTimeline],
   );
 
   const skip = useCallback(() => {
+    stopSound();
     clock.value = withTiming(
       SPLASH_SECONDS,
       { duration: 280, easing: Easing.out(Easing.quad) },
@@ -201,7 +242,7 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
         }
       },
     );
-  }, [clock, finish]);
+  }, [clock, finish, stopSound]);
 
   const containerStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
@@ -230,11 +271,18 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
       {
         scale: interpolate(
           clock.value,
-          [LOGO_FADE_START, LOGO_FADE_END + 0.2],
-          [0.9, 1],
+          [LOGO_FADE_START, LOGO_FADE_END, 4.62, 4.9],
+          [0.9, 1, 1.045, 1],
           "clamp",
         ),
       },
+    ],
+  }));
+
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(clock.value, [4.1, 4.25, 4.95], [0, 0.75, 0], "clamp"),
+    transform: [
+      { scale: interpolate(clock.value, [4.1, 4.95], [0.92, 1.75], "clamp") },
     ],
   }));
 
@@ -260,6 +308,42 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
             />
           </Animated.View>
         ) : null}
+
+        <Svg
+          style={StyleSheet.absoluteFill}
+          width={width}
+          height={height}
+          pointerEvents="none"
+        >
+          <Defs>
+            <RadialGradient id="vignette" cx="50%" cy="50%" r="75%">
+              <Stop offset="0.45" stopColor="#000" stopOpacity="0" />
+              <Stop offset="1" stopColor="#000" stopOpacity="0.5" />
+            </RadialGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width={width}
+            height={height}
+            fill="url(#vignette)"
+          />
+        </Svg>
+
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.ring,
+            {
+              width: logoSize,
+              height: logoSize,
+              borderRadius: logoSize / 2,
+              marginTop: -logoSize / 2,
+              marginLeft: -logoSize / 2,
+            },
+            ringStyle,
+          ]}
+        />
 
         <Animated.View style={[styles.logo, logoStyle]} pointerEvents="none">
           <QuranLogo size={logoSize} />
@@ -293,8 +377,8 @@ const styles = StyleSheet.create({
     width: GLOW,
     height: GLOW,
     borderRadius: GLOW / 2,
-    backgroundColor: "#3E8A63",
-    opacity: 0.25,
+    backgroundColor: "#1F5A43",
+    opacity: 0.32,
   },
   glowInner: {
     position: "absolute",
@@ -304,8 +388,15 @@ const styles = StyleSheet.create({
     width: (GLOW * 2) / 3,
     height: (GLOW * 2) / 3,
     borderRadius: GLOW / 3,
-    backgroundColor: "#4C9C73",
-    opacity: 0.22,
+    backgroundColor: "#2C7557",
+    opacity: 0.24,
+  },
+  ring: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    borderWidth: 3,
+    borderColor: "#E8C872",
   },
   logo: {
     ...StyleSheet.absoluteFillObject,
