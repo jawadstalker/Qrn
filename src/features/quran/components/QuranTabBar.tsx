@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import {
   BookOpen,
+  BookOpenText,
+  Headphones,
   ListOrdered,
   Settings,
   Sprout,
@@ -17,10 +19,10 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 
 const BAR_HEIGHT = 72;
-const HIDDEN_ROUTES = ["/moment"];
+const HIDDEN_ROUTES = ["/moment", "/quiz"];
 
 interface TabSpec {
-  route: "/" | "/memorize" | "/library" | "/settings";
+  route: "/" | "/memorize" | "/tafsir" | "/listen" | "/library" | "/settings";
   labelKey: string;
   icon: LucideIcon;
 }
@@ -28,6 +30,8 @@ interface TabSpec {
 const TABS: readonly TabSpec[] = [
   { route: "/", labelKey: "quran_garden", icon: Sprout },
   { route: "/memorize", labelKey: "quran_memorize", icon: BookOpen },
+  { route: "/tafsir", labelKey: "quran_tafsir", icon: BookOpenText },
+  { route: "/listen", labelKey: "quran_listen", icon: Headphones },
   { route: "/library", labelKey: "quran_library", icon: ListOrdered },
   { route: "/settings", labelKey: "quran_settings", icon: Settings },
 ];
@@ -77,9 +81,10 @@ export function QuranTabBar() {
               }
             }}
           >
-            <Icon size={25} color={color} strokeWidth={active ? 2.3 : 1.8} />
+            <Icon size={23} color={color} strokeWidth={active ? 2.3 : 1.8} />
             <AppText
               variant="caption"
+              numberOfLines={1}
               style={[styles.label, { color }, active && styles.active]}
             >
               {t[tab.labelKey]}
@@ -95,7 +100,7 @@ const styles = StyleSheet.create({
   bar: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,

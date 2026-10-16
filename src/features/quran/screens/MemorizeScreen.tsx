@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight } from "lucide-react-native";
+import { ArrowLeft, ArrowRight, Volume2 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -18,15 +18,19 @@ import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
 import { Rise } from "@/shared/motion/motion";
 import { MushafPage } from "@/features/quran/components/MushafPage";
+import { HizbDot } from "@/features/quran/components/QuranDecor";
 import type { MushafVerse } from "@/features/quran/data/mushafPage1";
 import { getSurah } from "@/features/quran/data/surahs";
 import { pageForAyah } from "@/features/quran/data/mushafPages";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { fill } from "@/features/quran/utils/fill";
 
-type Mode = "full" | "half" | "hidden";
+type Mode = "full" | "half" | "hidden" | "challenge";
 
-const MODES: readonly Mode[] = ["full", "half", "hidden"];
+const MODES: readonly Mode[] = ["full", "half", "hidden", "challenge"];
+/** In challenge mode every word is hidden and you only get a few peeks per verse. */
+const MAX_PEEKS = 3;
 const PADDING = 20;
 const PAPER_PADDING = 14;
 
@@ -48,10 +52,14 @@ function hiddenIndicesFor(
       }
 
       const offset = index - verse.from;
+      // Half mode: later verses are fully hidden, the current verse shows only one word in
+      // three, and verses you passed already keep every other word hidden.
       const hide =
         mode === "hidden" ||
+        mode === "challenge" ||
         verse.ayah > currentAyah ||
-        (verse.ayah === currentAyah && offset % 2 === 1);
+        (verse.ayah === currentAyah && offset % 3 !== 0) ||
+        (verse.ayah < currentAyah && offset % 2 === 1);
 
       if (hide) {
         hidden.add(index);
@@ -72,6 +80,7 @@ export default function MemorizeScreen() {
   const params = useLocalSearchParams<{ ayah?: string }>();
   const { mushaf, currentAyah, recordFor, remember, needsReview } =
     useQuranProgress();
+  const { playAyah, target, playing, toggle } = useRecitation();
   const verses = mushaf.verses;
   const TOTAL_VERSES = verses.length;
   const initial = Number(params.ayah);
@@ -82,6 +91,7 @@ export default function MemorizeScreen() {
   );
   const [mode, setMode] = useState<Mode>("half");
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
+  const [peeks, setPeeks] = useState(0);
   const number = (value: number) => formatNumber(value, language);
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const surah = getSurah(mushaf.surahId);
@@ -98,21 +108,43 @@ export default function MemorizeScreen() {
   const changeMode = useCallback((next: Mode) => {
     setMode(next);
     setRevealed(new Set());
+    setPeeks(0);
   }, []);
 
-  const reveal = useCallback((index: number) => {
-    setRevealed((previous) => new Set(previous).add(index));
-  }, []);
+  const peeksLeft = Math.max(MAX_PEEKS - peeks, 0);
+
+  const reveal = useCallback(
+    (index: number) => {
+      if (mode === "challenge") {
+        if (peeks >= MAX_PEEKS) {
+          return;
+        }
+
+        setPeeks((value) => value + 1);
+      }
+
+      setRevealed((previous) => new Set(previous).add(index));
+    },
+    [mode, peeks],
+  );
 
   const busy = useRef(false);
   const isLast = current >= TOTAL_VERSES;
 
   const goNext = useCallback(() => {
     setRevealed(new Set());
+    setPeeks(0);
     setCurrent((value) => Math.min(value + 1, TOTAL_VERSES));
   }, [TOTAL_VERSES]);
 
   const handleRemembered = useCallback(async () => {
+    // Reading the full text is not a test: hide it first, then confirm from memory.
+    if (mode === "full") {
+      changeMode("challenge");
+
+      return;
+    }
+
     if (busy.current) {
       return;
     }
@@ -123,16 +155,21 @@ export default function MemorizeScreen() {
       const result = await remember(current);
 
       if (result.becameLearned || result.stageChanged) {
-        router.push({ pathname: "/moment", params: { ayah: String(current) } });
+        router.push({
+          pathname: "/moment",
+          params: isLast
+            ? { ayah: String(current), next: "quiz" }
+            : { ayah: String(current) },
+        });
       } else if (isLast) {
-        router.replace("/");
+        router.replace("/quiz");
       }
 
       goNext();
     } finally {
       busy.current = false;
     }
-  }, [current, goNext, isLast, remember, router]);
+  }, [changeMode, current, goNext, isLast, mode, remember, router]);
 
   const handleAgain = useCallback(async () => {
     if (busy.current) {
@@ -153,6 +190,29 @@ export default function MemorizeScreen() {
       busy.current = false;
     }
   }, [current, goNext, isLast, needsReview, router]);
+
+  const hintText =
+    mode === "full"
+      ? t.quran_full_hint
+      : mode === "half"
+        ? t.quran_half_hint
+        : mode === "challenge"
+          ? peeksLeft > 0
+            ? fill(t.quran_peeks_left, { count: number(peeksLeft) })
+            : t.quran_peeks_out
+          : t.quran_tap_hint;
+  const verseIsPlaying =
+    target?.kind === "ayah" &&
+    target.surahId === mushaf.surahId &&
+    target.ayah === current;
+
+  const listenToVerse = () => {
+    if (verseIsPlaying) {
+      toggle();
+    } else {
+      playAyah(mushaf.surahId, current);
+    }
+  };
 
   const pageWidth = width - PADDING * 2 - PAPER_PADDING * 2;
 
@@ -215,7 +275,8 @@ export default function MemorizeScreen() {
                 ]}
               >
                 <AppText
-                  variant="bodySmall"
+                  variant="caption"
+                  numberOfLines={1}
                   style={{
                     color: colors.text,
                     fontWeight: selected ? "800" : "500",
@@ -257,10 +318,30 @@ export default function MemorizeScreen() {
                 textAlign: "center",
               }}
             >
-              {mode === "full" ? t.quran_bubble : t.quran_tap_hint}
+              {hintText}
             </AppText>
           </View>
         </View>
+      </Rise>
+
+      <Rise delay={260}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t.quran_listen_verse}
+          onPress={listenToVerse}
+          style={[
+            styles.listenVerse,
+            { backgroundColor: colors.tintSoft, flexDirection: row },
+          ]}
+        >
+          <Volume2 size={18} color={colors.onTint} />
+          <AppText
+            variant="caption"
+            style={{ color: colors.onTint, fontWeight: "700" }}
+          >
+            {verseIsPlaying && playing ? t.quran_pause : t.quran_listen_verse}
+          </AppText>
+        </Pressable>
       </Rise>
 
       <View style={styles.progress}>
@@ -276,18 +357,16 @@ export default function MemorizeScreen() {
             const isCurrent = verse.ayah === current;
 
             return (
-              <View
+              <HizbDot
                 key={verse.ayah}
-                style={[
-                  styles.dot,
-                  {
-                    backgroundColor: isCurrent
-                      ? colors.highlight
-                      : learned
-                        ? colors.primary
-                        : colors.tint,
-                  },
-                ]}
+                size={isCurrent ? 18 : 14}
+                color={
+                  isCurrent
+                    ? colors.highlight
+                    : learned
+                      ? colors.primary
+                      : colors.tint
+                }
               />
             );
           })}
@@ -312,7 +391,7 @@ export default function MemorizeScreen() {
         </Pressable>
         <View style={styles.primary}>
           <ChunkyButton
-            label={t.quran_knew ?? ""}
+            label={(mode === "full" ? t.quran_test_me : t.quran_knew) ?? ""}
             onPress={() => void handleRemembered()}
           />
         </View>
@@ -382,10 +461,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  listenVerse: {
+    alignSelf: "center",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 20,
   },
   actions: {
     gap: 12,

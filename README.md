@@ -13,6 +13,11 @@ Quran Garden is one of the companion apps of the Neurolia hub. It runs on its ow
 - Surah library with search and filters
 - Persian and English, four themes, optional click sounds, reduce-motion support
 - Progress is stored on the device
+- Harder memorization: half-hidden mode shows one word in three, a "Challenge" mode hides every word and allows only 3 peeks per verse, and "I remembered" first asks you to hide the text and test yourself
+- Final quiz after the last verse: fill the blank, next verse, verse number and meaning questions, with a score, stars and best result per surah
+- Tafsir page: plain-language summary, verse groups with the Arabic text, and lessons (Al-Fatihah and An-Naba)
+- Recitations page: whole-surah audio for all 114 surahs from 5 reciters, a mini player on every screen, and single-verse audio in the memorize screen and the verse of the day
+- More Quranic atmosphere: Basmalah banner, geometric patterns, mosque skyline, lanterns, verse of the day
 
 ## Getting started
 
@@ -63,12 +68,15 @@ assets/
 ## Limits
 
 - Only Al-Fatihah (Mushaf page 1) can be memorized. Other pages need their page font and line layout data.
-- No verse audio yet.
+- Recitations are streamed, so playback needs internet. Reciters and URLs are listed in `src/features/quran/data/reciters.ts`.
+- Tafsir and quiz meaning questions exist only for Al-Fatihah and An-Naba. Add more in `data/tafsir.ts` and `data/quizConcepts.ts`.
 
 ## Fonts and content
 
 - The Quran fonts (`QCF_P001` and `UthmanicHafs`) come from the King Fahd Glorious Quran Printing Complex. Read their [terms of use](http://dm.qurancomplex.gov.sa/copyright-2/) before distributing the app.
-- Surah names come from the [`quran-json`](https://www.npmjs.com/package/quran-json) package.
+- Surah names and the verse text in `data/verseText.ts` come from the [`quran-json`](https://www.npmjs.com/package/quran-json) package (CC BY-SA 4.0). The English translation is Saheeh International via tanzil.net.
+- Recitation audio is served by third-party servers (mp3quran.net, cdn.islamic.app). Check their terms before publishing the app.
+- The tafsir texts and the Persian renderings of the verse of the day are short summaries written for this app, not quotations from a tafsir.
 - Have a qualified person review everything related to the Quran before release.
 
 ## License

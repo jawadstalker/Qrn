@@ -24,7 +24,7 @@ export default function GrowthMomentScreen() {
   const { row, textAlign } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ ayah?: string }>();
+  const params = useLocalSearchParams<{ ayah?: string; next?: string }>();
   const { plant } = useQuranProgress();
   const ayah = Number(params.ayah) || 1;
   const number = (value: number) => formatNumber(value, language);
@@ -33,7 +33,8 @@ export default function GrowthMomentScreen() {
     : "";
   const stageName = t[`quran_stage_${plant.stage.id}`] ?? "";
 
-  const goBack = () => router.replace("/");
+  const goesToQuiz = params.next === "quiz";
+  const goBack = () => router.replace(goesToQuiz ? "/quiz" : "/");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
@@ -124,12 +125,15 @@ export default function GrowthMomentScreen() {
             </AppText>
           </View>
 
-          <ChunkyButton label={t.quran_continue ?? ""} onPress={goBack} />
+          <ChunkyButton
+            label={(goesToQuiz ? t.quran_quiz_start : t.quran_continue) ?? ""}
+            onPress={goBack}
+          />
           <View style={styles.later}>
             <AppText
               variant="bodySmall"
               accessibilityRole="button"
-              onPress={goBack}
+              onPress={() => router.replace("/")}
               style={{ color: colors.textSecondary }}
             >
               {t.quran_back_garden}

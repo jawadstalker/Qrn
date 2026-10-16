@@ -30,6 +30,19 @@ export interface VerseRecord {
 type SurahRecords = Record<number, VerseRecord>;
 type ProgressMap = Record<number, SurahRecords>;
 
+export interface QuizResult {
+  /** Best score ever reached on this surah's quiz. */
+  best: number;
+  /** Number of questions in the quiz that produced `best`. */
+  total: number;
+  lastScore: number;
+  lastTotal: number;
+  lastAt: number;
+  attempts: number;
+}
+
+type QuizMap = Record<number, QuizResult>;
+
 export interface RememberResult {
   becameLearned: boolean;
   stageChanged: boolean;
@@ -62,6 +75,8 @@ interface QuranProgressValue {
   remember: (ayah: number) => Promise<RememberResult>;
   needsReview: (ayah: number) => Promise<void>;
   reset: () => Promise<void>;
+  quizFor: (surahId: number) => QuizResult | undefined;
+  recordQuiz: (surahId: number, score: number, total: number) => Promise<void>;
 }
 
 const QuranProgressContext = createContext<QuranProgressValue | undefined>(
@@ -70,6 +85,7 @@ const QuranProgressContext = createContext<QuranProgressValue | undefined>(
 
 const STORAGE_KEY = "@quran_garden_progress";
 const SURAH_KEY = "@quran_garden_active_surah";
+const QUIZ_KEY = "@quran_garden_quiz";
 
 function parseProgress(raw: string | null): ProgressMap {
   if (!raw) {
@@ -78,6 +94,20 @@ function parseProgress(raw: string | null): ProgressMap {
 
   try {
     const value = JSON.parse(raw) as ProgressMap;
+
+    return value && typeof value === "object" ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+function parseQuiz(raw: string | null): QuizMap {
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const value = JSON.parse(raw) as QuizMap;
 
     return value && typeof value === "object" ? value : {};
   } catch {
@@ -117,7 +147,9 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<ProgressMap>({});
   const [surahId, setSurahId] = useState(DEFAULT_SURAH_ID);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [quiz, setQuiz] = useState<QuizMap>({});
   const progressRef = useRef<ProgressMap>({});
+  const quizRef = useRef<QuizMap>({});
   const surahRef = useRef(DEFAULT_SURAH_ID);
 
   useEffect(() => {
@@ -126,17 +158,21 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     Promise.all([
       AsyncStorage.getItem(STORAGE_KEY),
       AsyncStorage.getItem(SURAH_KEY),
+      AsyncStorage.getItem(QUIZ_KEY),
     ])
-      .then(([raw, storedSurah]) => {
+      .then(([raw, storedSurah, storedQuiz]) => {
         if (!mounted) {
           return;
         }
 
         const parsed = parseProgress(raw);
+        const parsedQuiz = parseQuiz(storedQuiz);
         const id = Number(storedSurah);
 
         progressRef.current = parsed;
         setProgress(parsed);
+        quizRef.current = parsedQuiz;
+        setQuiz(parsedQuiz);
 
         if (getMushafSurah(id)) {
           surahRef.current = id;
@@ -242,7 +278,43 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     [persist],
   );
 
-  const reset = useCallback(() => persist({}), [persist]);
+  const recordQuiz = useCallback(
+    async (id: number, score: number, total: number) => {
+      const previous = quizRef.current[id];
+      const improved =
+        !previous || score / Math.max(total, 1) > previous.best / Math.max(previous.total, 1);
+      const next: QuizMap = {
+        ...quizRef.current,
+        [id]: {
+          best: improved ? score : previous.best,
+          total: improved ? total : previous.total,
+          lastScore: score,
+          lastTotal: total,
+          lastAt: Date.now(),
+          attempts: (previous?.attempts ?? 0) + 1,
+        },
+      };
+
+      quizRef.current = next;
+      setQuiz(next);
+
+      try {
+        await AsyncStorage.setItem(QUIZ_KEY, JSON.stringify(next));
+      } catch (error) {
+        console.error("[QURAN] Failed to save quiz result:", error);
+      }
+    },
+    [],
+  );
+
+  const quizFor = useCallback((id: number) => quiz[id], [quiz]);
+
+  const reset = useCallback(async () => {
+    quizRef.current = {};
+    setQuiz({});
+    AsyncStorage.removeItem(QUIZ_KEY).catch(() => undefined);
+    await persist({});
+  }, [persist]);
 
   const value = useMemo<QuranProgressValue>(
     () => ({
@@ -261,6 +333,8 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
       remember,
       needsReview,
       reset,
+      quizFor,
+      recordQuiz,
     }),
     [
       isLoaded,
@@ -272,6 +346,8 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
       remember,
       needsReview,
       reset,
+      quizFor,
+      recordQuiz,
     ],
   );
 

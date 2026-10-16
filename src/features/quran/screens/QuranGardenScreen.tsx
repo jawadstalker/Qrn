@@ -1,7 +1,23 @@
 import React, { useCallback } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { BookOpen, Droplets, Sprout } from "lucide-react-native";
+import {
+  BookOpen,
+  BookOpenText,
+  Droplets,
+  Headphones,
+  Pause,
+  Play,
+  Sprout,
+  Trophy,
+} from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -9,10 +25,23 @@ import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { ChunkyButton } from "@/shared/components/ui/ChunkyButton";
-import { Rise } from "@/shared/motion/motion";
+import { Float, Rise } from "@/shared/motion/motion";
+import {
+  BasmalaBanner,
+  GOLD,
+  GOLD_DARK,
+  IslamicPattern,
+  Lantern,
+  MosqueSkyline,
+  OrnamentDivider,
+  Sparkle,
+  StarBadge,
+} from "@/features/quran/components/QuranDecor";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
 import { Sun } from "@/features/quran/components/Sun";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { useRecitation } from "@/features/quran/state/RecitationContext";
+import { dailyAyahFor } from "@/features/quran/data/verseText";
 import { getSurah } from "@/features/quran/data/surahs";
 import { fill } from "@/features/quran/utils/fill";
 
@@ -28,9 +57,45 @@ export default function QuranGardenScreen() {
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { plant, learnedCount, dueAyahs, nextNewAyah, mushaf } =
+  const { width } = useWindowDimensions();
+  const { plant, learnedCount, dueAyahs, nextNewAyah, mushaf, quizFor } =
     useQuranProgress();
+  const { target, playing, playAyah, toggle } = useRecitation();
   const surah = getSurah(mushaf.surahId);
+  const daily = React.useMemo(() => dailyAyahFor(new Date()), []);
+  const dailySurah = getSurah(daily.surahId);
+  const dailyPlaying =
+    target?.kind === "ayah" &&
+    target.surahId === daily.surahId &&
+    target.ayah === daily.ayah &&
+    playing;
+  const quiz = quizFor(mushaf.surahId);
+  const cardWidth = width - PADDING * 2;
+  const shortcuts = [
+    {
+      route: "/tafsir" as const,
+      icon: BookOpenText,
+      title: t.quran_quick_tafsir,
+      hint: t.quran_quick_tafsir_hint,
+    },
+    {
+      route: "/listen" as const,
+      icon: Headphones,
+      title: t.quran_quick_listen,
+      hint: t.quran_quick_listen_hint,
+    },
+    {
+      route: "/quiz" as const,
+      icon: Trophy,
+      title: t.quran_quick_quiz,
+      hint: quiz
+        ? fill(t.quran_quiz_best, {
+            score: formatNumber(quiz.best, language),
+            total: formatNumber(quiz.total, language),
+          })
+        : t.quran_quiz_not_taken,
+    },
+  ];
   const number = (value: number) => formatNumber(value, language);
 
   const openMemorize = useCallback(
@@ -93,8 +158,44 @@ export default function QuranGardenScreen() {
         </View>
       </Rise>
 
+      <Rise delay={40}>
+        <BasmalaBanner width={cardWidth} background={colors.primary} />
+      </Rise>
+
       <Rise delay={80}>
         <View style={[styles.plantCard, { backgroundColor: colors.tintSoft }]}>
+          <IslamicPattern
+            width={cardWidth}
+            height={CARD_HEIGHT}
+            color={GOLD_DARK}
+            opacity={0.1}
+          />
+          <View style={styles.skyline} pointerEvents="none">
+            <MosqueSkyline width={cardWidth} color={colors.primary} opacity={0.22} />
+          </View>
+          <View
+            style={[styles.lantern, isRTL ? styles.chipRight : styles.chipLeft]}
+            pointerEvents="none"
+          >
+            <Float amplitude={3} duration={2800}>
+              <Lantern size={24} />
+            </Float>
+          </View>
+          <View style={[styles.sparkle, { top: 96, left: "46%" }]} pointerEvents="none">
+            <Float amplitude={4} duration={2200}>
+              <Sparkle size={12} />
+            </Float>
+          </View>
+          <View style={[styles.sparkle, { top: 190, left: "14%" }]} pointerEvents="none">
+            <Float amplitude={3} duration={3000} delay={600}>
+              <Sparkle size={9} />
+            </Float>
+          </View>
+          <View style={[styles.sparkle, { top: 150, right: "12%" }]} pointerEvents="none">
+            <Float amplitude={5} duration={2600} delay={300}>
+              <Sparkle size={10} />
+            </Float>
+          </View>
           <View
             style={[styles.sun, isRTL ? styles.sunStart : styles.sunEnd]}
             pointerEvents="none"
@@ -142,6 +243,87 @@ export default function QuranGardenScreen() {
               {progressText}
             </AppText>
           </View>
+        </View>
+      </Rise>
+
+      <Rise delay={120}>
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
+          <View style={[styles.cardHeader, { flexDirection: row }]}>
+            <StarBadge size={26} color={GOLD} fillColor={GOLD} />
+            <AppText
+              variant="body"
+              style={{ color: colors.text, fontWeight: "800", flex: 1, textAlign }}
+            >
+              {t.quran_ayah_of_day}
+            </AppText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dailyPlaying ? t.quran_pause : t.quran_play}
+              onPress={() =>
+                dailyPlaying ? toggle() : playAyah(daily.surahId, daily.ayah)
+              }
+              style={[styles.dailyPlay, { backgroundColor: colors.primary }]}
+            >
+              {dailyPlaying ? (
+                <Pause size={18} color={colors.onPrimary} />
+              ) : (
+                <Play size={18} color={colors.onPrimary} />
+              )}
+            </Pressable>
+          </View>
+          <View style={styles.dailyBox}>
+            <Text allowFontScaling={false} style={styles.dailyArabic}>
+              {daily.ar}
+            </Text>
+          </View>
+          <AppText
+            variant="bodySmall"
+            forceEnglish={language === "en"}
+            style={{ color: colors.text, textAlign, lineHeight: 25 }}
+          >
+            {language === "fa" ? daily.fa : daily.en}
+          </AppText>
+          <AppText
+            variant="caption"
+            style={{ color: colors.textSecondary, textAlign }}
+          >
+            {`${language === "fa" ? (dailySurah?.name ?? "") : (dailySurah?.transliteration ?? "")} · ${number(daily.ayah)}`}
+          </AppText>
+        </View>
+      </Rise>
+
+      <Rise delay={140}>
+        <View style={[styles.shortcuts, { flexDirection: row }]}>
+          {shortcuts.map((item) => {
+            const Icon = item.icon;
+
+            return (
+              <Pressable
+                key={item.route}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
+                onPress={() => router.push(item.route)}
+                style={[styles.shortcut, { backgroundColor: colors.surface }]}
+              >
+                <View style={[styles.shortcutIcon, { backgroundColor: colors.tint }]}>
+                  <Icon size={22} color={colors.onTint} />
+                </View>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, fontWeight: "800", textAlign: "center" }}
+                >
+                  {item.title}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  numberOfLines={2}
+                  style={{ color: colors.textSecondary, textAlign: "center" }}
+                >
+                  {item.hint}
+                </AppText>
+              </Pressable>
+            );
+          })}
         </View>
       </Rise>
 
@@ -239,6 +421,8 @@ export default function QuranGardenScreen() {
           {t.quran_gentle}
         </AppText>
       </Rise>
+
+      <OrnamentDivider />
     </ScrollView>
   );
 }
@@ -277,6 +461,62 @@ const styles = StyleSheet.create({
   },
   sunEnd: { right: -SUN_SIZE / 2 + 44 },
   sunStart: { left: -SUN_SIZE / 2 + 44 },
+  skyline: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 34,
+  },
+  lantern: {
+    position: "absolute",
+    top: 54,
+  },
+  sparkle: {
+    position: "absolute",
+  },
+  dailyPlay: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dailyBox: {
+    backgroundColor: "#FFFBEF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: GOLD,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  dailyArabic: {
+    fontFamily: "UthmanicHafs",
+    fontSize: 24,
+    lineHeight: 46,
+    color: "#14110D",
+    textAlign: "center",
+    writingDirection: "rtl",
+    includeFontPadding: false,
+  },
+  shortcuts: {
+    gap: 8,
+  },
+  shortcut: {
+    flex: 1,
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 4,
+  },
+  shortcutIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 2,
+  },
   stageChip: {
     position: "absolute",
     top: 16,
