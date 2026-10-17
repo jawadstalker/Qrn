@@ -1,8 +1,4 @@
-# Quran Garden
 
-A standalone Expo app for memorizing Quran verses with low-pressure review. Every verse you learn grows a leaf on a plant, and verses that survive repeated reviews open flowers.
-
-Quran Garden is one of the companion apps of the Neurolia hub. It runs on its own and does not need Neurolia or any backend.
 
 ## Features
 
