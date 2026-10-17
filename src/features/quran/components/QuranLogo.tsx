@@ -1,134 +1,88 @@
 import React from "react";
-import Svg, {
-  Circle,
-  Defs,
-  G,
-  Line,
-  LinearGradient,
-  Path,
-  Polygon,
-  RadialGradient,
-  Stop,
-} from "react-native-svg";
-import { starPoints } from "@/features/quran/components/QuranDecor";
+import Svg, { Defs, Mask, Path, Polygon, Rect } from "react-native-svg";
 
+/**
+ * Quran Garden mark. One silhouette, the eight-pointed star (rub el hizb), with an open book and
+ * a sprout cut out of it as negative space, so the mark works on any background.
+ * Geometry lives on a 240 grid; the same shapes are in assets/brand/logo-color.svg and logo-mono.svg.
+ */
 const GOLD = "#D9B864";
-const GOLD_LIGHT = "#F6E3A1";
-const CREAM = "#FBF3DC";
-const GREEN_DARK = "#174A34";
-const GREEN = "#1F5C42";
-const INK = "#2A1D0C";
 
-const LINE_ROWS = [101, 110, 119, 128, 137];
-const RAYS = Array.from({ length: 16 }, (_, index) => {
-  const angle = (index * Math.PI) / 8;
-
-  return {
-    x1: 120 + Math.cos(angle) * 27,
-    y1: 50 + Math.sin(angle) * 27,
-    x2: 120 + Math.cos(angle) * (index % 2 === 0 ? 38 : 32),
-    y2: 50 + Math.sin(angle) * (index % 2 === 0 ? 38 : 32),
-  };
-});
+const STAR =
+  "120.00,8.00 152.81,40.80 199.20,40.80 199.20,87.19 232.00,120.00 199.20,152.81 199.20,199.20 152.81,199.20 120.00,232.00 87.19,199.20 40.80,199.20 40.80,152.81 8.00,120.00 40.80,87.19 40.80,40.80 87.19,40.80";
+const STAR_INLINE =
+  "120.00,18.00 149.88,47.87 192.12,47.88 192.13,90.12 222.00,120.00 192.13,149.88 192.12,192.12 149.88,192.13 120.00,222.00 90.12,192.13 47.88,192.12 47.87,149.88 18.00,120.00 47.87,90.12 47.88,47.88 90.12,47.87";
+const WING = "M118,160 C101,149 84,146 68,150 L68,102 C85,97 103,101 118,113 Z";
+const WING_RIGHT =
+  "M 122,160 C 139,149 156,146 172,150 L 172,102 C 155,97 137,101 122,113 Z";
+const STEM =
+  "M118.2,113 C118.2,102 118.4,94 119,86 L121,86 C121.6,94 121.8,102 121.8,113 Z";
+const LEAF = "M118.6,98 C108,99 98,93 94,80 C106,78 116,85 118.6,98 Z";
+const LEAF_RIGHT =
+  "M 121.4,98 C 132,99 142,93 146,80 C 134,78 124,85 121.4,98 Z";
+const LINES = [
+  "M78,114 C88,111 100,113 109,120",
+  "M 162,114 C 152,111 140,113 131,120",
+  "M78,127 C88,124 100,126 109,133",
+  "M 162,127 C 152,124 140,126 131,133",
+];
 
 interface QuranLogoProps {
   size: number;
+  /** Color of the mark. Defaults to the brand gold; pass any color for the one-color version. */
+  color?: string;
 }
 
-/**
- * Flat logo of an open Quran under an 8-pointed star, inside a gold ring.
- * It is where the 3D splash book lands, so keep the book roughly centered and cream/green/gold.
- */
-export function QuranLogo({ size }: QuranLogoProps) {
+export function QuranLogo({ size, color = GOLD }: QuranLogoProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 240 240">
       <Defs>
-        <RadialGradient id="logoGlow" cx="50%" cy="46%" r="50%">
-          <Stop offset="0" stopColor={GOLD_LIGHT} stopOpacity="0.5" />
-          <Stop offset="0.6" stopColor={GOLD} stopOpacity="0.12" />
-          <Stop offset="1" stopColor={GOLD} stopOpacity="0" />
-        </RadialGradient>
-        <LinearGradient id="logoPage" x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#F2E6C3" />
-          <Stop offset="0.85" stopColor={CREAM} />
-          <Stop offset="1" stopColor="#E9DAB0" />
-        </LinearGradient>
-        <LinearGradient id="logoPageRight" x1="1" y1="0" x2="0" y2="0">
-          <Stop offset="0" stopColor="#F2E6C3" />
-          <Stop offset="0.85" stopColor={CREAM} />
-          <Stop offset="1" stopColor="#E9DAB0" />
-        </LinearGradient>
+        <Mask
+          id="quran-logo-mask"
+          maskUnits="userSpaceOnUse"
+          x={0}
+          y={0}
+          width={240}
+          height={240}
+        >
+          <Rect width={240} height={240} fill="#000" />
+          <Polygon
+            points={STAR}
+            fill="#fff"
+            stroke="#fff"
+            strokeWidth={3}
+            strokeLinejoin="round"
+          />
+          <Polygon
+            points={STAR_INLINE}
+            fill="none"
+            stroke="#000"
+            strokeWidth={2.2}
+            strokeLinejoin="round"
+          />
+          <Path d={WING} fill="#000" />
+          <Path d={WING_RIGHT} fill="#000" />
+          <Path d={STEM} fill="#000" />
+          <Path d={LEAF} fill="#000" />
+          <Path d={LEAF_RIGHT} fill="#000" />
+          {LINES.map((d) => (
+            <Path
+              key={d}
+              d={d}
+              fill="none"
+              stroke="#fff"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+            />
+          ))}
+        </Mask>
       </Defs>
-
-      <Circle cx={120} cy={120} r={116} fill="url(#logoGlow)" />
-      <Circle
-        cx={120}
-        cy={120}
-        r={108}
-        fill="none"
-        stroke={GOLD}
-        strokeWidth={3}
+      <Rect
+        width={240}
+        height={240}
+        fill={color}
+        mask="url(#quran-logo-mask)"
       />
-      <Circle
-        cx={120}
-        cy={120}
-        r={101}
-        fill="none"
-        stroke={GOLD}
-        strokeOpacity={0.55}
-        strokeWidth={1}
-      />
-
-      {/* Star and rays */}
-      <G stroke={GOLD} strokeWidth={1.6} strokeLinecap="round" opacity={0.85}>
-        {RAYS.map((ray) => (
-          <Line key={`${ray.x2}-${ray.y2}`} {...ray} />
-        ))}
-      </G>
-      <Polygon
-        points={starPoints(120, 50, 22)}
-        fill={GOLD_LIGHT}
-        stroke={GOLD}
-        strokeWidth={2}
-        strokeLinejoin="round"
-      />
-      <Circle cx={120} cy={50} r={6} fill={GREEN_DARK} />
-
-      {/* Cover under the pages */}
-      <Path
-        d="M26,152 C60,145 98,151 120,168 C142,151 180,145 214,152 L214,166 C180,159 142,165 120,182 C98,165 60,159 26,166 Z"
-        fill={GREEN_DARK}
-        stroke={GOLD}
-        strokeWidth={2.4}
-        strokeLinejoin="round"
-      />
-
-      {/* Pages */}
-      <Path
-        d="M118,164 C100,150 66,144 36,150 L36,84 C66,78 100,84 118,98 Z"
-        fill="url(#logoPage)"
-        stroke={GOLD}
-        strokeWidth={2.4}
-        strokeLinejoin="round"
-      />
-      <Path
-        d="M122,164 C140,150 174,144 204,150 L204,84 C174,78 140,84 122,98 Z"
-        fill="url(#logoPageRight)"
-        stroke={GOLD}
-        strokeWidth={2.4}
-        strokeLinejoin="round"
-      />
-      <Path d="M120,98 L120,170" stroke={GREEN} strokeWidth={3} />
-
-      {/* Text lines */}
-      <G stroke={INK} strokeWidth={2.2} strokeLinecap="round" opacity={0.78}>
-        {LINE_ROWS.map((y) => (
-          <React.Fragment key={y}>
-            <Path d={`M48,${y - 3} Q78,${y - 8} 108,${y + 4}`} fill="none" />
-            <Path d={`M192,${y - 3} Q162,${y - 8} 132,${y + 4}`} fill="none" />
-          </React.Fragment>
-        ))}
-      </G>
     </Svg>
   );
 }

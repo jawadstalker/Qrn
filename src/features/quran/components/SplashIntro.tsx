@@ -57,7 +57,9 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   const startedRef = useRef(false);
   const frameRef = useRef(0);
   const stoppedRef = useRef(false);
-  const logoSize = Math.min(width * 0.74, 320);
+  // The mark is a star; its open book is ~45% of its width. It starts enlarged so the book
+  // matches the 3D book (58% of the screen), then settles to full-star size.
+  const logoSize = Math.min(width * 0.7, 300);
   const player = useAudioPlayer(SPLASH_SOUND);
 
   // Browsers refuse to start audio without a tap and reject play() asynchronously, so the
@@ -268,11 +270,20 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
       "clamp",
     ),
     transform: [
+      // The mark's book sits below its center; start where the 3D book is and settle into place.
+      {
+        translateY: interpolate(
+          clock.value,
+          [LOGO_FADE_START, LOGO_FADE_END + 0.25],
+          [-0.04 * logoSize, 0],
+          "clamp",
+        ),
+      },
       {
         scale: interpolate(
           clock.value,
           [LOGO_FADE_START, LOGO_FADE_END, 4.62, 4.9],
-          [0.9, 1, 1.045, 1],
+          [1.4, 1, 1.045, 1],
           "clamp",
         ),
       },
@@ -280,7 +291,7 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   }));
 
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(clock.value, [4.1, 4.25, 4.95], [0, 0.75, 0], "clamp"),
+    opacity: interpolate(clock.value, [4.1, 4.25, 4.95], [0, 0.3, 0], "clamp"),
     transform: [
       { scale: interpolate(clock.value, [4.1, 4.95], [0.92, 1.75], "clamp") },
     ],
@@ -330,6 +341,7 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
           />
         </Svg>
 
+        {/* A ghost of the mark expands outward when it lands */}
         <Animated.View
           pointerEvents="none"
           style={[
@@ -337,20 +349,22 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
             {
               width: logoSize,
               height: logoSize,
-              borderRadius: logoSize / 2,
               marginTop: -logoSize / 2,
               marginLeft: -logoSize / 2,
             },
             ringStyle,
           ]}
-        />
+        >
+          <QuranLogo size={logoSize} />
+        </Animated.View>
 
         <Animated.View style={[styles.logo, logoStyle]} pointerEvents="none">
           <QuranLogo size={logoSize} />
+          <View style={[styles.rule, { top: height / 2 + logoSize / 2 + 8 }]} />
           <AppText
             variant="h2"
             forcePersian
-            style={[styles.title, { top: height / 2 + logoSize / 2 + 6 }]}
+            style={[styles.title, { top: height / 2 + logoSize / 2 + 20 }]}
           >
             باغ حفظ قرآن
           </AppText>
@@ -395,8 +409,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: "50%",
     left: "50%",
-    borderWidth: 3,
-    borderColor: "#E8C872",
   },
   logo: {
     ...StyleSheet.absoluteFillObject,
@@ -409,6 +421,14 @@ const styles = StyleSheet.create({
     right: 0,
     color: "#FBF3DC",
     textAlign: "center",
-    fontWeight: "800",
+    fontWeight: "600",
+  },
+  rule: {
+    position: "absolute",
+    alignSelf: "center",
+    width: 36,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "#D9B864",
   },
 });
