@@ -19,7 +19,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 
 const BAR_HEIGHT = 72;
-const HIDDEN_ROUTES = ["/moment", "/quiz"];
+const HIDDEN_ROUTES = ["/moment", "/quiz", "/exam-play"];
 
 interface TabSpec {
   route: "/" | "/memorize" | "/tafsir" | "/listen" | "/library" | "/settings";
@@ -62,7 +62,9 @@ export function QuranTabBar() {
       ]}
     >
       {TABS.map((tab) => {
-        const active = pathname === tab.route;
+        const active =
+          pathname === tab.route ||
+          (tab.route === "/memorize" && pathname === "/exam");
         const color = active ? colors.primary : colors.textSecondary;
         const Icon = tab.icon;
 

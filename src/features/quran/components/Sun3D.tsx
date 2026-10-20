@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
-import * as THREE from "three";
+import { createGLRenderer } from "@/features/quran/utils/glRenderer";
 import { createSunScene } from "@/features/quran/utils/sunScene";
 
 interface Sun3DProps {
@@ -25,29 +25,8 @@ export function Sun3D({ size, reducedMotion, onFailure }: Sun3DProps) {
   const handleContextCreate = useCallback(
     (gl: ExpoWebGLRenderingContext) => {
       try {
-        const bufferWidth = gl.drawingBufferWidth;
-        const bufferHeight = gl.drawingBufferHeight;
-        const canvas = {
-          width: bufferWidth,
-          height: bufferHeight,
-          clientWidth: bufferWidth,
-          clientHeight: bufferHeight,
-          style: {},
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          getContext: () => gl,
-        } as unknown as HTMLCanvasElement;
-
-        const renderer = new THREE.WebGLRenderer({
-          canvas,
-          context: gl as unknown as WebGLRenderingContext,
-          antialias: true,
-          alpha: true,
-          premultipliedAlpha: true,
-        });
-        renderer.setPixelRatio(1);
-        renderer.setSize(bufferWidth, bufferHeight, false);
-        renderer.setClearColor(0x000000, 0);
+        const { renderer, width: bufferWidth, height: bufferHeight } =
+          createGLRenderer(gl, { premultipliedAlpha: true });
 
         const sun = createSunScene();
         const startedAt = Date.now();

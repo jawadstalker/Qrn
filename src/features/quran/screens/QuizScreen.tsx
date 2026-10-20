@@ -399,6 +399,18 @@ export default function QuizScreen() {
             ) : null}
             <Pressable
               accessibilityRole="button"
+              onPress={() => router.replace("/exam")}
+              style={[styles.secondary, { backgroundColor: colors.tint }]}
+            >
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.onTint, fontWeight: "800" }}
+              >
+                {t.quran_exam_title}
+              </AppText>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               onPress={goGarden}
               style={styles.later}
             >

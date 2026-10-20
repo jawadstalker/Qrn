@@ -8,7 +8,12 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight, Volume2 } from "lucide-react-native";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ClipboardCheck,
+  Volume2,
+} from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -249,7 +254,14 @@ export default function MemorizeScreen() {
               })}
             </AppText>
           </View>
-          <View style={styles.iconButton} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.quran_exam_open}
+            onPress={() => router.push("/exam")}
+            style={[styles.iconButton, { backgroundColor: colors.surface }]}
+          >
+            <ClipboardCheck size={22} color={colors.text} />
+          </Pressable>
         </View>
       </Rise>
 

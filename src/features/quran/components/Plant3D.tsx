@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import { PanResponder, StyleSheet, View } from "react-native";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
-import * as THREE from "three";
+import { createGLRenderer } from "@/features/quran/utils/glRenderer";
 import { createPlantScene } from "@/features/quran/utils/plantScene";
 
 const ROTATION_PER_PIXEL = 0.012;
@@ -65,28 +65,8 @@ export function Plant3D({
   const handleContextCreate = useCallback(
     (gl: ExpoWebGLRenderingContext) => {
       try {
-        const bufferWidth = gl.drawingBufferWidth;
-        const bufferHeight = gl.drawingBufferHeight;
-        const canvas = {
-          width: bufferWidth,
-          height: bufferHeight,
-          clientWidth: bufferWidth,
-          clientHeight: bufferHeight,
-          style: {},
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          getContext: () => gl,
-        } as unknown as HTMLCanvasElement;
-
-        const renderer = new THREE.WebGLRenderer({
-          canvas,
-          context: gl as unknown as WebGLRenderingContext,
-          antialias: true,
-          alpha: true,
-        });
-        renderer.setPixelRatio(1);
-        renderer.setSize(bufferWidth, bufferHeight, false);
-        renderer.setClearColor(0x000000, 0);
+        const { renderer, width: bufferWidth, height: bufferHeight } =
+          createGLRenderer(gl);
 
         const plant = createPlantScene({
           width: bufferWidth,

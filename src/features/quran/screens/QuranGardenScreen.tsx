@@ -162,8 +162,13 @@ export default function QuranGardenScreen() {
         <BasmalaBanner width={cardWidth} background={colors.primary} />
       </Rise>
 
-      <Rise delay={80}>
-        <View style={[styles.plantCard, { backgroundColor: colors.tintSoft }]}>
+      {/* No <Rise> here: on Android a GLView (TextureView) inside a view with animated
+          opacity/transform renders blank. Keep every ancestor of the GL canvas static. */}
+      <View collapsable={false}>
+        <View
+          collapsable={false}
+          style={[styles.plantCard, { backgroundColor: colors.tintSoft }]}
+        >
           <IslamicPattern
             width={cardWidth}
             height={CARD_HEIGHT}
@@ -244,7 +249,7 @@ export default function QuranGardenScreen() {
             </AppText>
           </View>
         </View>
-      </Rise>
+      </View>
 
       <Rise delay={120}>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>

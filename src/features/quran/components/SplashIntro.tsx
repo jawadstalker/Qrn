@@ -9,7 +9,7 @@ import {
 import { useAudioPlayer } from "expo-audio";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
-import * as THREE from "three";
+import { createGLRenderer } from "@/features/quran/utils/glRenderer";
 import Animated, {
   Easing,
   interpolate,
@@ -145,29 +145,8 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   const handleContextCreate = useCallback(
     (gl: ExpoWebGLRenderingContext) => {
       try {
-        const bufferWidth = gl.drawingBufferWidth;
-        const bufferHeight = gl.drawingBufferHeight;
-        const canvas = {
-          width: bufferWidth,
-          height: bufferHeight,
-          clientWidth: bufferWidth,
-          clientHeight: bufferHeight,
-          style: {},
-          addEventListener: () => undefined,
-          removeEventListener: () => undefined,
-          getContext: () => gl,
-        } as unknown as HTMLCanvasElement;
-        const renderer = new THREE.WebGLRenderer({
-          canvas,
-          context: gl as unknown as WebGLRenderingContext,
-          antialias: true,
-          alpha: true,
-          premultipliedAlpha: true,
-        });
-
-        renderer.setPixelRatio(1);
-        renderer.setSize(bufferWidth, bufferHeight, false);
-        renderer.setClearColor(0x000000, 0);
+        const { renderer, width: bufferWidth, height: bufferHeight } =
+          createGLRenderer(gl, { premultipliedAlpha: true });
 
         const splash = createSplashScene(
           bufferWidth / bufferHeight,
