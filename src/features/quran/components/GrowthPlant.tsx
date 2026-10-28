@@ -4,6 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { USE_3D_PLANT } from "@/features/quran/config";
 import { Plant3D } from "@/features/quran/components/Plant3D";
 import { PlantSvg } from "@/features/quran/components/PlantSvg";
+import { useSplashGate } from "@/features/quran/state/SplashGateContext";
 
 const ASPECT_RATIO = 310 / 240;
 
@@ -21,6 +22,7 @@ export function GrowthPlant({
   hasNewLeaf = false,
 }: GrowthPlantProps) {
   const reduced = useReducedMotion();
+  const splashGateOpen = useSplashGate();
   const [failed, setFailed] = useState(false);
   const height = Math.round(width * ASPECT_RATIO);
   const handleFailure = useCallback(() => setFailed(true), []);
@@ -36,6 +38,11 @@ export function GrowthPlant({
         />
       </View>
     );
+  }
+
+  // Wait for the splash to release the GPU before building the 3D scene.
+  if (!splashGateOpen) {
+    return <View style={{ width, height }} />;
   }
 
   return (

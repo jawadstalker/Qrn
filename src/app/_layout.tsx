@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -20,6 +20,7 @@ import { QuranTabBar } from "@/features/quran/components/QuranTabBar";
 import { SplashIntro } from "@/features/quran/components/SplashIntro";
 import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
+import { SplashGateProvider } from "@/features/quran/state/SplashGateContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -40,6 +41,10 @@ function Shell() {
 
 export default function RootLayout() {
   const [splashDone, setSplashDone] = useState(false);
+  // The splash's 3D book is gone: the garden's own 3D scenes may start now.
+  const [glReleased, setGlReleased] = useState(false);
+  const handleSplashDone = useCallback(() => setSplashDone(true), []);
+  const handleGlReleased = useCallback(() => setGlReleased(true), []);
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -69,13 +74,18 @@ export default function RootLayout() {
         <ThemeProvider>
           <LanguageProvider>
             <SoundProvider>
-              <QuranProgressProvider>
-                <RecitationProvider>
-                  <Shell />
-                </RecitationProvider>
-              </QuranProgressProvider>
+              <SplashGateProvider value={splashDone || glReleased}>
+                <QuranProgressProvider>
+                  <RecitationProvider>
+                    <Shell />
+                  </RecitationProvider>
+                </QuranProgressProvider>
+              </SplashGateProvider>
               {splashDone ? null : (
-                <SplashIntro onDone={() => setSplashDone(true)} />
+                <SplashIntro
+                  onDone={handleSplashDone}
+                  onGlReleased={handleGlReleased}
+                />
               )}
             </SoundProvider>
           </LanguageProvider>

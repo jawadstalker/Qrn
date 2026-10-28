@@ -46,9 +46,14 @@ const SPLASH_SOUND =
 
 interface SplashIntroProps {
   onDone: () => void;
+  /**
+   * Called once the splash no longer needs the GPU/JS thread for the 3D book (it faded out, or
+   * it was never started). The app uses it to start its own 3D scenes only after that point.
+   */
+  onGlReleased?: () => void;
 }
 
-export function SplashIntro({ onDone }: SplashIntroProps) {
+export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const [glActive, setGlActive] = useState(USE_3D_SPLASH && !reduced);
@@ -57,6 +62,10 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   const startedRef = useRef(false);
   const frameRef = useRef(0);
   const stoppedRef = useRef(false);
+  const releasedRef = useRef(false);
+  const onGlReleasedRef = useRef(onGlReleased);
+
+  onGlReleasedRef.current = onGlReleased;
   // The mark is a star; its open book is ~45% of its width. It starts enlarged so the book
   // matches the 3D book (58% of the screen), then settles to full-star size.
   const logoSize = Math.min(width * 0.7, 300);
@@ -87,6 +96,13 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
     }
   }, [player]);
 
+  const release = useCallback(() => {
+    if (!releasedRef.current) {
+      releasedRef.current = true;
+      onGlReleasedRef.current?.();
+    }
+  }, []);
+
   const finish = useCallback(() => {
     if (!doneRef.current) {
       doneRef.current = true;
@@ -114,8 +130,9 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
   // Without the 3D part, start straight on the logo and hold it briefly.
   const runLogoOnly = useCallback(() => {
     setGlActive(false);
+    release();
     runTimeline(LOGO_ONLY_START, LOGO_ONLY_HOLD_SECONDS);
-  }, [runTimeline]);
+  }, [release, runTimeline]);
 
   useEffect(() => {
     if (!glActive && !startedRef.current) {
@@ -138,6 +155,7 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
     (past, previous) => {
       if (past && !previous) {
         runOnJS(setGlActive)(false);
+        runOnJS(release)();
       }
     },
   );
@@ -148,10 +166,26 @@ export function SplashIntro({ onDone }: SplashIntroProps) {
         const { renderer, width: bufferWidth, height: bufferHeight } =
           createGLRenderer(gl, { premultipliedAlpha: true });
 
+        const buildStartedAt = Date.now();
         const splash = createSplashScene(
           bufferWidth / bufferHeight,
           bufferHeight,
         );
+
+        // Compile every shader now, before the clocks start. Otherwise the pages' materials
+        // compile in the middle of the animation, right when the cover opens, and it stutters.
+        try {
+          renderer.compile(splash.scene, splash.camera);
+        } catch {
+          // The first render compiles whatever is missing.
+        }
+
+        if (__DEV__) {
+          console.log(
+            `[SPLASH] scene built and shaders compiled in ${Date.now() - buildStartedAt} ms`,
+          );
+        }
+
         const startedAt = Date.now();
         let checked = false;
 

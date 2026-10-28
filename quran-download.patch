@@ -1,0 +1,426 @@
+diff --git a/app.json b/app.json
+index 785e00f..c1557a1 100644
+--- a/app.json
++++ b/app.json
+@@ -32,6 +32,9 @@
+         "backgroundColor": "#7C5CFF"
+       },
+       "edgeToEdgeEnabled": true,
++      "permissions": [
++        "android.permission.REQUEST_INSTALL_PACKAGES"
++      ],
+       "package": "com.deathstalker_owen.neuroliaclean"
+     },
+ 
+@@ -51,7 +54,8 @@
+   "expo-router",
+   "expo-asset",
+   "expo-font",
+-  "expo-web-browser"
++  "expo-web-browser",
++  "./plugins/withExternalGameQuery"
+ ],
+ 
+     "extra": {
+diff --git a/components/screens/PlusScreen.tsx b/components/screens/PlusScreen.tsx
+index 1a737f0..d4c88b5 100644
+--- a/components/screens/PlusScreen.tsx
++++ b/components/screens/PlusScreen.tsx
+@@ -1,5 +1,7 @@
+-import React from 'react';
++import React, { useState } from 'react';
+ import {
++  Alert,
++  Platform,
+   View,
+   StyleSheet,
+   TouchableOpacity,
+@@ -21,12 +23,23 @@ import {
+ 
+ import { useTheme } from '../../context/ThemeContext';
+ import { useLanguage } from '../../context/LanguageContext';
++import {
++  HOSTED_APPS,
++  downloadApk,
++  installApk,
++  openInstalledApp,
++} from '../../utils/externalApp';
++
++type QuranPhase = 'idle' | 'checking' | 'downloading' | 'installing';
+ 
+ export default function PlusScreen() {
+   const router = useRouter();
+   const { colors, isDark, isAthlete } = useTheme();
+   const { isRTL } = useLanguage();
+ 
++  const [quranPhase, setQuranPhase] = useState<QuranPhase>('idle');
++  const [quranProgress, setQuranProgress] = useState(0);
++
+   // ===== تغییر رنگ آیکون‌ها بر اساس تم =====
+   const getIconColor = () => {
+     if (isAthlete) return '#22C55E'; // سبز برای تم ورزشکار
+@@ -76,6 +89,18 @@ export default function PlusScreen() {
+       poemsDescription: 'حافظه، ادبیات و درک معنا را تقویت کن',
+       sportsTitle: 'ورزش',
+       sportsDescription: 'تقویت عملکرد مغز و بدن با تمرین‌های ورزشی',
++      quranNotInstalledTitle: 'ماژول قرآن نصب نیست',
++      quranNotInstalledMessage:
++        'برای استفاده از این ماژول باید اپ حفظ قرآن دانلود و نصب شود. دانلود شروع شود؟',
++      download: 'دانلود',
++      cancel: 'انصراف',
++      ok: 'باشه',
++      checking: 'در حال بررسی…',
++      downloading: 'در حال دانلود…',
++      installing: 'در حال باز کردن نصب‌کننده…',
++      downloadErrorTitle: 'دانلود ناموفق بود',
++      downloadErrorMessage:
++        'اتصال اینترنت را بررسی کن و دوباره تلاش کن.',
+     },
+     en: {
+       badge: 'Smart Learning',
+@@ -91,6 +116,18 @@ export default function PlusScreen() {
+       poemsDescription: 'Improve memory, literature and understanding',
+       sportsTitle: 'Sports',
+       sportsDescription: 'Improve brain and body performance through sports training',
++      quranNotInstalledTitle: 'Quran module is not installed',
++      quranNotInstalledMessage:
++        'This module is a separate app that needs to be downloaded and installed. Start the download?',
++      download: 'Download',
++      cancel: 'Cancel',
++      ok: 'OK',
++      checking: 'Checking…',
++      downloading: 'Downloading…',
++      installing: 'Opening the installer…',
++      downloadErrorTitle: 'Download failed',
++      downloadErrorMessage:
++        'Check your internet connection and try again.',
+     },
+   };
+ 
+@@ -133,8 +170,81 @@ export default function PlusScreen() {
+ 
+   const ArrowIcon = isRTL ? ChevronLeft : ChevronRight;
+ 
++  const quranBusy = quranPhase !== 'idle';
++
++  const startQuranDownload = async () => {
++    const app = HOSTED_APPS.quran;
++
++    try {
++      setQuranProgress(0);
++      setQuranPhase('downloading');
++
++      const fileUri = await downloadApk(app, setQuranProgress);
++
++      setQuranPhase('installing');
++      await installApk(fileUri);
++    } catch (error) {
++      console.error('Quran module download/install failed:', error);
++
++      Alert.alert(
++        text.downloadErrorTitle,
++        text.downloadErrorMessage,
++        [{ text: text.ok, style: 'cancel' }]
++      );
++    } finally {
++      setQuranPhase('idle');
++      setQuranProgress(0);
++    }
++  };
++
++  const openQuranModule = async () => {
++    if (quranBusy) return;
++
++    // The separate Quran app only exists for Android. Everywhere else
++    // keep using the built-in screen.
++    if (Platform.OS !== 'android') {
++      router.push('/quran' as any);
++      return;
++    }
++
++    setQuranPhase('checking');
++
++    const opened = await openInstalledApp(
++      HOSTED_APPS.quran.packageName
++    );
++
++    if (opened) {
++      setQuranPhase('idle');
++      return;
++    }
++
++    setQuranPhase('idle');
++
++    Alert.alert(
++      text.quranNotInstalledTitle,
++      text.quranNotInstalledMessage,
++      [
++        { text: text.cancel, style: 'cancel' },
++        { text: text.download, onPress: startQuranDownload },
++      ]
++    );
++  };
++
++  const getQuranStatusText = () => {
++    if (quranPhase === 'checking') return text.checking;
++    if (quranPhase === 'installing') return text.installing;
++
++    return `${text.downloading} ${Math.round(quranProgress * 100)}%`;
++  };
++
+   const handleModulePress = (module: (typeof modules)[number]) => {
+     if (!module.enabled || !module.route) return;
++
++    if (module.id === 'quran') {
++      void openQuranModule();
++      return;
++    }
++
+     router.push(module.route as any);
+   };
+ 
+@@ -237,7 +347,10 @@ export default function PlusScreen() {
+                 <TouchableOpacity
+                   key={module.id}
+                   activeOpacity={module.enabled ? 0.85 : 1}
+-                  disabled={!module.enabled}
++                  disabled={
++                    !module.enabled ||
++                    (module.id === 'quran' && quranBusy)
++                  }
+                   onPress={() => handleModulePress(module)}
+                   style={[
+                     styles.moduleCard,
+@@ -291,9 +404,33 @@ export default function PlusScreen() {
+                         },
+                       ]}
+                     >
+-                      {module.description}
++                      {module.id === 'quran' && quranBusy
++                        ? getQuranStatusText()
++                        : module.description}
+                     </Text>
+ 
++                    {module.id === 'quran' &&
++                      quranPhase === 'downloading' && (
++                        <View
++                          style={{
++                            alignSelf: 'stretch',
++                            height: 4,
++                            marginTop: 8,
++                            borderRadius: 2,
++                            overflow: 'hidden',
++                            backgroundColor: moduleBgColor,
++                          }}
++                        >
++                          <View
++                            style={{
++                              height: 4,
++                              width: `${Math.round(quranProgress * 100)}%`,
++                              backgroundColor: moduleIconColor,
++                            }}
++                          />
++                        </View>
++                      )}
++
+                     {!module.enabled && (
+                       <Text
+                         style={[
+diff --git a/plugins/withExternalGameQuery.js b/plugins/withExternalGameQuery.js
+index 1dd52ef..68e645a 100644
+--- a/plugins/withExternalGameQuery.js
++++ b/plugins/withExternalGameQuery.js
+@@ -4,7 +4,16 @@ const { withAndroidManifest } = require('@expo/config-plugins');
+ // PackageManager unless they are declared in <queries>. Without
+ // this, IntentLauncher.openApplication() throws
+ // PackageNotFoundException even when the target app IS installed.
+-const EXTERNAL_GAME_PACKAGE = 'com.IliyaPardazesh.NEUROLIA';
++//
++// Every external app Neurolia needs to open must be listed here.
++// Keep this list in sync with utils/externalGame.ts and
++// utils/externalApp.ts.
++const EXTERNAL_PACKAGES = [
++  // Unity game (NEUROLIA)
++  'com.IliyaPardazesh.NEUROLIA',
++  // Quran Garden module, downloaded from iliyacore.ir
++  'com.deathstalker_owen.qurangarden',
++];
+ 
+ module.exports = function withExternalGameQuery(config) {
+   return withAndroidManifest(config, (config) => {
+@@ -18,16 +27,18 @@ module.exports = function withExternalGameQuery(config) {
+       manifest.queries[0].package = [];
+     }
+ 
+-    const alreadyDeclared = manifest.queries[0].package.some(
+-      (entry) => entry.$['android:name'] === EXTERNAL_GAME_PACKAGE
+-    );
++    for (const packageName of EXTERNAL_PACKAGES) {
++      const alreadyDeclared = manifest.queries[0].package.some(
++        (entry) => entry.$['android:name'] === packageName
++      );
+ 
+-    if (!alreadyDeclared) {
+-      manifest.queries[0].package.push({
+-        $: { 'android:name': EXTERNAL_GAME_PACKAGE },
+-      });
++      if (!alreadyDeclared) {
++        manifest.queries[0].package.push({
++          $: { 'android:name': packageName },
++        });
++      }
+     }
+ 
+     return config;
+   });
+-};
+\ No newline at end of file
++};
+diff --git a/utils/externalApp.ts b/utils/externalApp.ts
+new file mode 100644
+index 0000000..e161a52
+--- /dev/null
++++ b/utils/externalApp.ts
+@@ -0,0 +1,142 @@
++import { Platform } from 'react-native';
++import * as FileSystem from 'expo-file-system';
++import * as IntentLauncher from 'expo-intent-launcher';
++
++/**
++ * Modules that ship as separate Android apps and are downloaded from
++ * our own host instead of GitHub.
++ *
++ * The APK files live in `public_html/apps/` on iliyacore.ir.
++ * The package name must match the `android.package` of the module app,
++ * and it must also be declared in plugins/withExternalGameQuery.js
++ * (otherwise Android 11+ hides the app and "is it installed?" is always
++ * answered with "no").
++ */
++export const HOSTED_APPS = {
++  quran: {
++    packageName: 'com.deathstalker_owen.qurangarden',
++    apkUrl: 'https://iliyacore.ir/apps/quran-garden.apk',
++    fileName: 'quran-garden.apk',
++  },
++} as const;
++
++export type HostedAppId = keyof typeof HOSTED_APPS;
++
++export interface HostedApp {
++  packageName: string;
++  apkUrl: string;
++  fileName: string;
++}
++
++const APK_MIME_TYPE = 'application/vnd.android.package-archive';
++
++// A real APK is a ZIP file: it starts with the bytes "PK\x03\x04",
++// which is "UEsD" in base64. This catches the case where the host
++// answers 200 but sends an HTML error page instead of the file.
++const ZIP_MAGIC_BASE64_PREFIX = 'UEsD';
++
++// Anything smaller than this cannot be a real Expo/React Native APK.
++const MIN_APK_BYTES = 1_000_000;
++
++/**
++ * Opens an already installed app by package name.
++ * Resolves to false when the app is not installed (or not visible
++ * to this app because it is missing from <queries>).
++ */
++export async function openInstalledApp(
++  packageName: string
++): Promise<boolean> {
++  if (Platform.OS !== 'android') {
++    return false;
++  }
++
++  try {
++    // Must be awaited: openApplication returns a Promise, so without
++    // `await` a missing app would never reach the catch block.
++    await IntentLauncher.openApplication(packageName);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * Downloads the APK into the cache directory and returns its file URI.
++ * `onProgress` receives a number between 0 and 1.
++ */
++export async function downloadApk(
++  app: HostedApp,
++  onProgress?: (progress: number) => void
++): Promise<string> {
++  const cacheDir = FileSystem.cacheDirectory;
++
++  if (!cacheDir) {
++    throw new Error('Cache directory is not available');
++  }
++
++  const target = `${cacheDir}${app.fileName}`;
++
++  // Remove any half-downloaded or older copy first.
++  await FileSystem.deleteAsync(target, { idempotent: true });
++
++  const task = FileSystem.createDownloadResumable(
++    app.apkUrl,
++    target,
++    {},
++    (event) => {
++      if (event.totalBytesExpectedToWrite > 0) {
++        onProgress?.(
++          event.totalBytesWritten / event.totalBytesExpectedToWrite
++        );
++      }
++    }
++  );
++
++  const result = await task.downloadAsync();
++
++  if (!result || result.status !== 200) {
++    await FileSystem.deleteAsync(target, { idempotent: true });
++    throw new Error(`Download failed (HTTP ${result?.status ?? 'none'})`);
++  }
++
++  const info = await FileSystem.getInfoAsync(result.uri);
++
++  if (!info.exists || info.size < MIN_APK_BYTES) {
++    await FileSystem.deleteAsync(target, { idempotent: true });
++    throw new Error('Downloaded file is too small to be an APK');
++  }
++
++  const header = await FileSystem.readAsStringAsync(result.uri, {
++    encoding: FileSystem.EncodingType.Base64,
++    position: 0,
++    length: 4,
++  });
++
++  if (!header.startsWith(ZIP_MAGIC_BASE64_PREFIX)) {
++    await FileSystem.deleteAsync(target, { idempotent: true });
++    throw new Error('Downloaded file is not an APK');
++  }
++
++  onProgress?.(1);
++
++  return result.uri;
++}
++
++/**
++ * Hands the downloaded APK to Android's package installer.
++ * The first time, Android asks the user to allow "install unknown apps"
++ * for Neurolia (needs REQUEST_INSTALL_PACKAGES in app.json).
++ */
++export async function installApk(fileUri: string): Promise<void> {
++  const contentUri = await FileSystem.getContentUriAsync(fileUri);
++
++  await IntentLauncher.startActivityAsync(
++    'android.intent.action.VIEW',
++    {
++      data: contentUri,
++      // FLAG_GRANT_READ_URI_PERMISSION
++      flags: 1,
++      type: APK_MIME_TYPE,
++    }
++  );
++}

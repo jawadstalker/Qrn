@@ -4,6 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { USE_3D_PLANT } from "@/features/quran/config";
 import { Sun3D } from "@/features/quran/components/Sun3D";
+import { useSplashGate } from "@/features/quran/state/SplashGateContext";
 
 /** Radius of the flat fallback sun, as a share of the 3D canvas (sphere ≈ 46%). */
 const FLAT_RATIO = 0.46;
@@ -16,6 +17,7 @@ interface SunProps {
 export function Sun({ size }: SunProps) {
   const { colors } = useTheme();
   const reduced = useReducedMotion();
+  const splashGateOpen = useSplashGate();
   const [failed, setFailed] = useState(false);
   const handleFailure = useCallback(() => setFailed(true), []);
 
@@ -42,6 +44,11 @@ export function Sun({ size }: SunProps) {
         />
       </View>
     );
+  }
+
+  // Wait for the splash to release the GPU before building the 3D scene.
+  if (!splashGateOpen) {
+    return <View pointerEvents="none" style={{ width: size, height: size }} />;
   }
 
   return (

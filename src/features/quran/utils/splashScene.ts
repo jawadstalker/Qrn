@@ -227,33 +227,12 @@ function paint(
   return texture;
 }
 
-/** Like paint(), but the callback also gets the pixel column/row. Textures come out upright. */
-function paintPixels(
+/** Wraps raw RGBA bytes in a DataTexture with the filters every texture here uses. */
+function bytesToTexture(
+  data: Uint8Array,
   width: number,
   height: number,
-  pixel: (
-    col: number,
-    row: number,
-    x: number,
-    y: number,
-  ) => readonly [number, number, number],
 ): THREE.DataTexture {
-  const data = new Uint8Array(width * height * 4);
-
-  for (let row = 0; row < height; row += 1) {
-    for (let col = 0; col < width; col += 1) {
-      const x = ((col + 0.5) / width - 0.5) * COVER_W;
-      const y = ((row + 0.5) / height - 0.5) * COVER_H;
-      const [r, g, b] = pixel(col, row, x, y);
-      const at = (row * width + col) * 4;
-
-      data[at] = Math.round(clamp01(r) * 255);
-      data[at + 1] = Math.round(clamp01(g) * 255);
-      data[at + 2] = Math.round(clamp01(b) * 255);
-      data[at + 3] = 255;
-    }
-  }
-
   const texture = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
 
   texture.minFilter = THREE.LinearFilter;
@@ -346,31 +325,80 @@ function decodeMask(mask: PackedMask): Float32Array {
   return out;
 }
 
-/** Cover: deep green leather with a gold-tooled Mushaf design (the ornaments are baked offline). */
+/**
+ * Cover: deep green leather with a gold-tooled Mushaf design (the ornaments are baked offline).
+ *
+ * This runs on the JS thread before the first frame, so the pixel loop works on plain numbers
+ * (no per-pixel arrays) and hoists everything that only depends on the row or the column.
+ * The result is the same image as the old mix3()-based version.
+ */
 function makeCoverTexture(): THREE.DataTexture {
-  const green = rgb(GREEN);
-  const greenDark = rgb(GREEN_DARK);
-  const goldDark: [number, number, number] = [0.7, 0.52, 0.2];
-  const goldLight: [number, number, number] = [1, 0.92, 0.62];
+  const [gr, gg, gb] = rgb(GREEN);
+  const [dr, dg, db] = rgb(GREEN_DARK);
   const ink = decodeMask(COVER_GOLD);
   const { width, height } = COVER_GOLD;
+  const data = new Uint8Array(width * height * 4);
+  const xs = new Float64Array(width);
+  const xRadial = new Float64Array(width);
 
-  return paintPixels(width, height, (col, row, x, y) => {
-    const radial = clamp01(Math.hypot(x / 0.7, y / 0.9));
-    let color = mix3(green, greenDark, smooth(radial) * 0.9);
-    // Leather grain.
-    const grain = 0.5 + 0.5 * Math.cos(x * 210 + Math.sin(y * 90) * 2);
+  for (let col = 0; col < width; col += 1) {
+    xs[col] = ((col + 0.5) / width - 0.5) * COVER_W;
+    xRadial[col] = xs[col]! / 0.7;
+  }
 
-    color = mix3(color, greenDark, 0.1 * grain * hash(col % 7, row % 5));
+  // hash(col % 7, row % 5) only ever takes 35 values.
+  const grainHash = new Float64Array(35);
 
-    // Gold shimmer diagonal across the tooling.
-    const shine = smooth(
-      clamp01(0.5 + 1.1 * (x * 0.6 - y * 0.4) + 0.2 * Math.sin(y * 9)),
-    );
-    const gold = mix3(goldDark, goldLight, shine);
+  for (let r = 0; r < 5; r += 1) {
+    for (let c = 0; c < 7; c += 1) {
+      grainHash[r * 7 + c] = hash(c, r);
+    }
+  }
 
-    return mix3(color, gold, ink[(height - 1 - row) * width + col]);
-  });
+  for (let row = 0; row < height; row += 1) {
+    const y = ((row + 0.5) / height - 0.5) * COVER_H;
+    const yRadial = y / 0.9;
+    const grainPhase = Math.sin(y * 90) * 2;
+    const shineRow = 0.2 * Math.sin(y * 9);
+    const inkRow = (height - 1 - row) * width;
+    const hashRow = (row % 5) * 7;
+
+    for (let col = 0; col < width; col += 1) {
+      const x = xs[col]!;
+      const radial = clamp01(Math.hypot(xRadial[col]!, yRadial));
+      const t = smooth(radial) * 0.9;
+      let r = gr + (dr - gr) * t;
+      let g = gg + (dg - gg) * t;
+      let b = gb + (db - gb) * t;
+
+      // Leather grain.
+      const grain = 0.5 + 0.5 * Math.cos(x * 210 + grainPhase);
+      const f = 0.1 * grain * grainHash[hashRow + (col % 7)]!;
+
+      r += (dr - r) * f;
+      g += (dg - g) * f;
+      b += (db - b) * f;
+
+      // Gold shimmer diagonal across the tooling: goldDark (0.7, 0.52, 0.2) -> goldLight (1, 0.92, 0.62).
+      const shine = smooth(
+        clamp01(0.5 + 1.1 * (x * 0.6 - y * 0.4) + shineRow),
+      );
+      const a = ink[inkRow + col]!;
+
+      r += (0.7 + (1 - 0.7) * shine - r) * a;
+      g += (0.52 + (0.92 - 0.52) * shine - g) * a;
+      b += (0.2 + (0.62 - 0.2) * shine - b) * a;
+
+      const at = (row * width + col) * 4;
+
+      data[at] = Math.round(clamp01(r) * 255);
+      data[at + 1] = Math.round(clamp01(g) * 255);
+      data[at + 2] = Math.round(clamp01(b) * 255);
+      data[at + 3] = 255;
+    }
+  }
+
+  return bytesToTexture(data, width, height);
 }
 
 /** Inner side of the covers: green endpaper with a gold frame, no medallion. */
@@ -396,31 +424,115 @@ function makeEndpaperTexture(): THREE.DataTexture {
   });
 }
 
-/** Cream Mushaf page: gold frame plus real Quran text from a baked ink mask. */
-function makePageTexture(mask: PackedMask, mirror: boolean): THREE.DataTexture {
-  const paper = rgb(CREAM);
-  const paperShade: [number, number, number] = [0.9, 0.82, 0.62];
-  const gold = rgb(GOLD);
-  const inkColor: [number, number, number] = [0.1, 0.07, 0.04];
+/**
+ * Paper and gold frame shared by every Mushaf page (only the ink differs between pages), as
+ * floats, 3 per pixel. The art is symmetric left-right and top-bottom, so only one quarter is
+ * computed and the rest is copied.
+ */
+function makePageBackground(width: number, height: number): Float64Array {
+  const [pr, pg, pb] = rgb(CREAM);
+  const [gr, gg, gb] = rgb(GOLD);
+  const aa = 0.005;
+  const out = new Float64Array(width * height * 3);
+  const halfWidth = Math.ceil(width / 2);
+  const halfHeight = Math.ceil(height / 2);
+
+  for (let row = 0; row < halfHeight; row += 1) {
+    const y = ((row + 0.5) / height - 0.5) * COVER_H;
+    const row2 = height - 1 - row;
+
+    for (let col = 0; col < halfWidth; col += 1) {
+      const x = ((col + 0.5) / width - 0.5) * COVER_W;
+      const k = smooth(clamp01(Math.hypot(x / 0.9, y / 1.2))) * 0.6;
+      // paper (CREAM) -> paperShade (0.9, 0.82, 0.62)
+      let r = pr + (0.9 - pr) * k;
+      let g = pg + (0.82 - pg) * k;
+      let b = pb + (0.62 - pb) * k;
+      const edge = Math.min(
+        COVER_W / 2 - Math.abs(x),
+        COVER_H / 2 - Math.abs(y),
+      );
+      const s1 = stroke(edge - 0.045, 0.006, aa);
+
+      r += (gr - r) * s1;
+      g += (gg - g) * s1;
+      b += (gb - b) * s1;
+
+      const s2 = stroke(edge - 0.065, 0.0025, aa);
+
+      r += (gr - r) * s2;
+      g += (gg - g) * s2;
+      b += (gb - b) * s2;
+
+      const col2 = width - 1 - col;
+
+      // The four mirrored positions (bit 0 flips the column, bit 1 flips the row).
+      for (let corner = 0; corner < 4; corner += 1) {
+        const at =
+          (((corner & 2) !== 0 ? row2 : row) * width +
+            ((corner & 1) !== 0 ? col2 : col)) *
+          3;
+
+        out[at] = r;
+        out[at + 1] = g;
+        out[at + 2] = b;
+      }
+    }
+  }
+
+  return out;
+}
+
+/** Cream Mushaf page: the shared background plus real Quran text from a baked ink mask. */
+function makePageData(mask: PackedMask, background: Float64Array): Uint8Array {
   const ink = decodeMask(mask);
   const { width, height } = mask;
-  const aa = 0.005;
+  const data = new Uint8Array(width * height * 4);
 
-  return paintPixels(width, height, (col, row, x, y) => {
-    const sx = mirror ? width - 1 - col : col;
-    const fx = mirror ? -x : x;
-    let color = mix3(
-      paper,
-      paperShade,
-      smooth(clamp01(Math.hypot(fx / 0.9, y / 1.2))) * 0.6,
-    );
-    const edge = Math.min(COVER_W / 2 - Math.abs(x), COVER_H / 2 - Math.abs(y));
+  for (let row = 0; row < height; row += 1) {
+    const inkRow = (height - 1 - row) * width;
 
-    color = mix3(color, gold, stroke(edge - 0.045, 0.006, aa));
-    color = mix3(color, gold, stroke(edge - 0.065, 0.0025, aa));
+    for (let col = 0; col < width; col += 1) {
+      const a = ink[inkRow + col]! * 0.95;
+      const k = (row * width + col) * 3;
+      const at = (row * width + col) * 4;
+      const r = background[k]!;
+      const g = background[k + 1]!;
+      const b = background[k + 2]!;
 
-    return mix3(color, inkColor, ink[(height - 1 - row) * width + sx] * 0.95);
-  });
+      // inkColor (0.1, 0.07, 0.04)
+      data[at] = Math.round(clamp01(r + (0.1 - r) * a) * 255);
+      data[at + 1] = Math.round(clamp01(g + (0.07 - g) * a) * 255);
+      data[at + 2] = Math.round(clamp01(b + (0.04 - b) * a) * 255);
+      data[at + 3] = 255;
+    }
+  }
+
+  return data;
+}
+
+/**
+ * The back of a flipped page is the same art mirrored left-right. Flipping the finished pixels
+ * is exact and almost free, so nothing is painted twice.
+ */
+function mirrorColumns(
+  data: Uint8Array,
+  width: number,
+  height: number,
+): Uint8Array {
+  const out = new Uint8Array(data.length);
+  const from = new Uint32Array(data.buffer, data.byteOffset, width * height);
+  const to = new Uint32Array(out.buffer, 0, width * height);
+
+  for (let row = 0; row < height; row += 1) {
+    const base = row * width;
+
+    for (let col = 0; col < width; col += 1) {
+      to[base + col] = from[base + width - 1 - col]!;
+    }
+  }
+
+  return out;
 }
 
 const SPARKLE_VERTEX = /* glsl */ `
@@ -585,11 +697,24 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
   /* Materials */
   const coverTexture = makeCoverTexture();
-  const textureA = makePageTexture(PAGE_A, false);
-  const textureB = makePageTexture(PAGE_B, false);
-  const textureC = makePageTexture(PAGE_C, false);
-  const mirroredB = makePageTexture(PAGE_B, true);
-  const mirroredC = makePageTexture(PAGE_C, true);
+  // One shared paper background, three inked pages, and the mirrored backs made by flipping.
+  const pageBackground = makePageBackground(PAGE_A.width, PAGE_A.height);
+  const dataA = makePageData(PAGE_A, pageBackground);
+  const dataB = makePageData(PAGE_B, pageBackground);
+  const dataC = makePageData(PAGE_C, pageBackground);
+  const textureA = bytesToTexture(dataA, PAGE_A.width, PAGE_A.height);
+  const textureB = bytesToTexture(dataB, PAGE_B.width, PAGE_B.height);
+  const textureC = bytesToTexture(dataC, PAGE_C.width, PAGE_C.height);
+  const mirroredB = bytesToTexture(
+    mirrorColumns(dataB, PAGE_B.width, PAGE_B.height),
+    PAGE_B.width,
+    PAGE_B.height,
+  );
+  const mirroredC = bytesToTexture(
+    mirrorColumns(dataC, PAGE_C.width, PAGE_C.height),
+    PAGE_C.width,
+    PAGE_C.height,
+  );
   const coverFace = new THREE.MeshPhongMaterial({
     map: coverTexture,
     shininess: 40,
@@ -1105,7 +1230,10 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       progress.push(p);
       flipped += easeInOutCubic(p);
       landed += p >= 1 ? 1 : 0;
-      layoutPage(page, index, p, t);
+      // Hidden until the cover opens, so no need to lay them out before that (t = 0 sets them up once).
+      if (open > 0.05 || t <= 0) {
+        layoutPage(page, index, p, t);
+      }
       // Unturned pages lie stacked on the block (page 0 shows the first Mushaf page).
       page.meshes.forEach((mesh) => {
         mesh.visible = open > 0.05;
