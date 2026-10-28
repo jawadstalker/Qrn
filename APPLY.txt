@@ -1,0 +1,19 @@
+Extract this zip over the project root (paths are relative to the repo root).
+
+NEW files (safe to extract, nothing of yours is overwritten):
+  src/app/{stages,stage-play,recall,mistakes,report}.tsx
+  src/features/quran/i18n/practice.ts
+  src/features/quran/state/practiceStore.ts
+  src/features/quran/utils/{analytics,hide,mastery,session,stages}.ts
+  src/features/quran/components/{PracticeChrome,QuizQuestionCard}.tsx
+  src/features/quran/screens/{Stages,StagePlay,Recall,Mistakes,Report}Screen.tsx
+
+MODIFIED files (extracting overwrites them; if you changed them too, apply the patch instead):
+  src/features/quran/components/QuranTabBar.tsx
+  src/features/quran/screens/ExamListScreen.tsx
+  src/features/quran/screens/QuizScreen.tsx
+  src/features/quran/utils/quiz.ts
+
+To merge safely instead of overwriting:  git apply --3way modified-files.patch
+(then extract only the new files).  translations.ts / QuranProgressContext.tsx /
+MemorizeScreen.tsx were NOT touched.

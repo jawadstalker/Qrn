@@ -19,7 +19,16 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 
 const BAR_HEIGHT = 72;
-const HIDDEN_ROUTES = ["/moment", "/quiz", "/exam-play"];
+const HIDDEN_ROUTES = [
+  "/moment",
+  "/quiz",
+  "/exam-play",
+  "/stage-play",
+  "/recall",
+  "/session",
+];
+/** Practice pages that live under the Memorize tab. */
+const MEMORIZE_ROUTES = ["/exam", "/stages", "/mistakes", "/report", "/scope"];
 
 interface TabSpec {
   route: "/" | "/memorize" | "/tafsir" | "/listen" | "/library" | "/settings";
@@ -64,7 +73,7 @@ export function QuranTabBar() {
       {TABS.map((tab) => {
         const active =
           pathname === tab.route ||
-          (tab.route === "/memorize" && pathname === "/exam");
+          (tab.route === "/memorize" && MEMORIZE_ROUTES.includes(pathname));
         const color = active ? colors.primary : colors.textSecondary;
         const Icon = tab.icon;
 

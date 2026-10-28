@@ -8,7 +8,16 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft, ArrowRight } from "lucide-react-native";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  Brain,
+  ListChecks,
+  Target,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -18,10 +27,26 @@ import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
 import { PageBanner } from "@/features/quran/components/QuranDecor";
 import { EXAMS } from "@/features/quran/data/exams";
+import { usePT } from "@/features/quran/i18n/practice";
 import { useExamResults } from "@/features/quran/state/useExamResults";
 import { fill } from "@/features/quran/utils/fill";
 
 const PADDING = 20;
+
+interface PracticeLink {
+  route: "/scope" | "/stages" | "/recall" | "/mistakes" | "/report";
+  titleKey: string;
+  hintKey: string;
+  icon: LucideIcon;
+}
+
+const PRACTICE_LINKS: readonly PracticeLink[] = [
+  { route: "/scope", titleKey: "hub_scope", hintKey: "hub_scope_hint", icon: Target },
+  { route: "/stages", titleKey: "hub_stages", hintKey: "hub_stages_hint", icon: ListChecks },
+  { route: "/recall", titleKey: "hub_recall", hintKey: "hub_recall_hint", icon: Brain },
+  { route: "/mistakes", titleKey: "hub_mistakes", hintKey: "hub_mistakes_hint", icon: TriangleAlert },
+  { route: "/report", titleKey: "hub_report", hintKey: "hub_report_hint", icon: BarChart3 },
+];
 
 export default function ExamListScreen() {
   const { colors } = useTheme();
@@ -31,6 +56,7 @@ export default function ExamListScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { resultFor } = useExamResults();
+  const p = usePT();
   const number = (value: number) => formatNumber(value, language);
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
@@ -67,6 +93,41 @@ export default function ExamListScreen() {
           isRTL={isRTL}
         />
       </Rise>
+
+      {PRACTICE_LINKS.map((link, position) => {
+        const Icon = link.icon;
+
+        return (
+          <Rise key={link.route} delay={100 + position * 50}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push(link.route)}
+              style={[
+                styles.card,
+                { backgroundColor: colors.surface, flexDirection: row, gap: 14 },
+              ]}
+            >
+              <View style={[styles.linkIcon, { backgroundColor: colors.tintSoft }]}>
+                <Icon size={24} color={colors.onTint} />
+              </View>
+              <View style={styles.cardText}>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, fontWeight: "800", textAlign }}
+                >
+                  {p(link.titleKey)}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {p(link.hintKey)}
+                </AppText>
+              </View>
+            </Pressable>
+          </Rise>
+        );
+      })}
 
       {EXAMS.map((exam, position) => {
         const result = resultFor(exam.id);
@@ -175,6 +236,13 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 6,
     flexWrap: "wrap",
+  },
+  linkIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
     paddingHorizontal: 12,

@@ -8,8 +8,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
-import * as Haptics from "expo-haptics";
-import { Check, X } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -23,20 +21,29 @@ import {
   PageBanner,
   StarBadge,
 } from "@/features/quran/components/QuranDecor";
+import { QuizQuestionCard } from "@/features/quran/components/QuizQuestionCard";
 import { getSurah } from "@/features/quran/data/surahs";
 import { VERSE_TEXT } from "@/features/quran/data/verseText";
+import {
+  logAnswer,
+  logAttempt,
+} from "@/features/quran/state/practiceStore";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { fill } from "@/features/quran/utils/fill";
 import {
   QUIZ_LENGTH,
   buildQuiz,
   starsFor,
+  type QuizOption,
   type QuizQuestion,
 } from "@/features/quran/utils/quiz";
+import {
+  addToTally,
+  answerLogFor,
+  type KindTallies,
+} from "@/features/quran/utils/session";
 
 const PADDING = 20;
-const GOOD = "#2FB38A";
-const BAD = "#D64545";
 
 type Phase = "intro" | "question" | "result";
 
@@ -58,6 +65,7 @@ export default function QuizScreen() {
   const [picked, setPicked] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [missed, setMissed] = useState<number[]>([]);
+  const [tallies, setTallies] = useState<KindTallies>({});
 
   const best = quizFor(mushaf.surahId);
   const question = questions[index];
@@ -71,23 +79,21 @@ export default function QuizScreen() {
     setPicked(null);
     setScore(0);
     setMissed([]);
+    setTallies({});
     setPhase(built.length > 0 ? "question" : "intro");
   }, [language, mushaf.surahId, t]);
 
   const choose = useCallback(
-    (optionId: string) => {
+    (option: QuizOption) => {
       if (!question || picked !== null) {
         return;
       }
 
-      const right = optionId === question.correctId;
+      const right = option.id === question.correctId;
 
-      setPicked(optionId);
-      void Haptics.notificationAsync(
-        right
-          ? Haptics.NotificationFeedbackType.Success
-          : Haptics.NotificationFeedbackType.Error,
-      );
+      setPicked(option.id);
+      setTallies((previous) => addToTally(previous, question.kind, right));
+      void logAnswer(answerLogFor(mushaf.surahId, question, option));
 
       if (right) {
         setScore((value) => value + 1);
@@ -95,7 +101,7 @@ export default function QuizScreen() {
         setMissed((previous) => [...previous, question.ayah!]);
       }
     },
-    [picked, question],
+    [mushaf.surahId, picked, question],
   );
 
   const next = useCallback(() => {
@@ -107,8 +113,15 @@ export default function QuizScreen() {
     }
 
     void recordQuiz(mushaf.surahId, score, questions.length);
+    void logAttempt({
+      surahId: mushaf.surahId,
+      mode: "quiz",
+      score,
+      total: questions.length,
+      byKind: tallies,
+    });
     setPhase("result");
-  }, [index, mushaf.surahId, questions.length, recordQuiz, score]);
+  }, [index, mushaf.surahId, questions.length, recordQuiz, score, tallies]);
 
   const goGarden = () => router.replace("/");
   const reviewMissed = () => {
@@ -223,127 +236,23 @@ export default function QuizScreen() {
             </View>
           </View>
 
-          <View style={[styles.card, { backgroundColor: colors.surface }]}>
-            <AppText
-              variant="body"
-              style={{ color: colors.text, fontWeight: "800", textAlign }}
-            >
-              {question.prompt}
-            </AppText>
-            {question.arabicPrompt ? (
-              <View style={styles.verseBox}>
-                <Text allowFontScaling={false} style={styles.arabicPrompt}>
-                  {question.arabicPrompt}
-                </Text>
-              </View>
-            ) : null}
-
-            {question.options.map((option) => {
-              const isPicked = picked === option.id;
-              const isRight = option.id === question.correctId;
-              const showRight = answered && isRight;
-              const showWrong = answered && isPicked && !isRight;
-
-              return (
-                <Pressable
-                  key={option.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isPicked, disabled: answered }}
-                  disabled={answered}
-                  onPress={() => choose(option.id)}
-                  style={[
-                    styles.option,
-                    {
-                      flexDirection: option.arabic ? "row-reverse" : row,
-                      backgroundColor: showRight
-                        ? "rgba(47,179,138,0.16)"
-                        : showWrong
-                          ? "rgba(214,69,69,0.14)"
-                          : colors.tintSoft,
-                      borderColor: showRight
-                        ? GOOD
-                        : showWrong
-                          ? BAD
-                          : "transparent",
-                    },
-                  ]}
-                >
-                  {option.arabic ? (
-                    <Text
-                      allowFontScaling={false}
-                      style={[
-                        styles.arabicOption,
-                        // Long verses are smaller so the whole option stays readable.
-                        option.text.length > 40 && styles.arabicOptionLong,
-                        { color: colors.text },
-                      ]}
-                    >
-                      {option.text}
-                    </Text>
-                  ) : (
-                    <AppText
-                      variant="bodySmall"
-                      style={{
-                        color: colors.text,
-                        flex: 1,
-                        textAlign,
-                        fontWeight: isPicked ? "800" : "500",
-                      }}
-                    >
-                      {option.text}
-                    </AppText>
-                  )}
-                  {showRight ? <Check size={22} color={GOOD} /> : null}
-                  {showWrong ? <X size={22} color={BAD} /> : null}
-                </Pressable>
-              );
-            })}
-          </View>
+          <QuizQuestionCard
+            question={question}
+            picked={picked}
+            onPick={choose}
+          />
 
           {answered ? (
-            <Rise>
-              <View
-                style={[
-                  styles.feedback,
-                  {
-                    backgroundColor:
-                      picked === question.correctId
-                        ? "rgba(47,179,138,0.14)"
-                        : colors.highlightTint,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="bodySmall"
-                  style={{ color: colors.text, fontWeight: "800", textAlign }}
-                >
-                  {picked === question.correctId
-                    ? t.quran_quiz_correct
-                    : t.quran_quiz_wrong}
-                </AppText>
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.text, textAlign, lineHeight: 22 }}
-                >
-                  {question.explanation}
-                </AppText>
-                {question.revealVerse ? (
-                  <Text allowFontScaling={false} style={styles.revealVerse}>
-                    {question.revealVerse}
-                  </Text>
-                ) : null}
-              </View>
-              <View style={styles.nextButton}>
-                <ChunkyButton
-                  label={
-                    (index + 1 < questions.length
-                      ? t.quran_quiz_next
-                      : t.quran_quiz_finish) ?? ""
-                  }
-                  onPress={next}
-                />
-              </View>
-            </Rise>
+            <View style={styles.nextButton}>
+              <ChunkyButton
+                label={
+                  (index + 1 < questions.length
+                    ? t.quran_quiz_next
+                    : t.quran_quiz_finish) ?? ""
+                }
+                onPress={next}
+              />
+            </View>
           ) : null}
         </>
       ) : null}
@@ -466,60 +375,6 @@ const styles = StyleSheet.create({
   fill: {
     height: 8,
     borderRadius: 4,
-  },
-  verseBox: {
-    backgroundColor: "#FFFBEF",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GOLD,
-    padding: 14,
-  },
-  arabicPrompt: {
-    fontFamily: "UthmanicHafs",
-    fontSize: 26,
-    lineHeight: 50,
-    color: "#14110D",
-    textAlign: "center",
-    writingDirection: "rtl",
-    includeFontPadding: false,
-  },
-  option: {
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    minHeight: 54,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 18,
-    borderWidth: 2,
-  },
-  arabicOption: {
-    flex: 1,
-    fontFamily: "UthmanicHafs",
-    fontSize: 24,
-    lineHeight: 44,
-    textAlign: "center",
-    writingDirection: "rtl",
-    includeFontPadding: false,
-  },
-  arabicOptionLong: {
-    fontSize: 18,
-    lineHeight: 34,
-  },
-  feedback: {
-    borderRadius: 22,
-    padding: 16,
-    gap: 6,
-  },
-  revealVerse: {
-    fontFamily: "UthmanicHafs",
-    fontSize: 22,
-    lineHeight: 42,
-    color: "#14110D",
-    textAlign: "center",
-    writingDirection: "rtl",
-    includeFontPadding: false,
-    paddingTop: 4,
   },
   nextButton: {
     marginTop: 12,

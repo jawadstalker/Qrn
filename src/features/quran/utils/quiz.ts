@@ -134,12 +134,13 @@ function buildNext(
   ayah: number,
   t: Translate,
   language: Language,
+  lastAyah: number = Number.POSITIVE_INFINITY,
 ): QuizQuestion | undefined {
   const verses = VERSE_TEXT[surahId];
   const current = verses?.[ayah - 1]?.ar;
   const following = verses?.[ayah]?.ar;
 
-  if (!verses || !current || !following) {
+  if (!verses || !current || !following || ayah + 1 > lastAyah) {
     return undefined;
   }
 
@@ -237,11 +238,21 @@ function buildNumber(
  * Builds a mixed quiz for a memorized surah: fill-in-the-blank, "which verse comes next",
  * "which verse number" and a few meaning questions. Returns [] when there is no verse text.
  */
+export interface BuildQuizOptions {
+  /** Only these question kinds are generated (default: all kinds). */
+  kinds?: readonly QuizKind[];
+  /** Only ask about these verses (default: the whole surah). */
+  ayahs?: readonly number[];
+  /** "Next verse" questions never reach past this verse (default: the end of the surah). */
+  lastAyah?: number;
+}
+
 export function buildQuiz(
   surahId: number,
   language: Language,
   t: Translate,
   length: number = QUIZ_LENGTH,
+  options?: BuildQuizOptions,
 ): QuizQuestion[] {
   const verses = VERSE_TEXT[surahId];
 
@@ -250,10 +261,17 @@ export function buildQuiz(
   }
 
   const total = verses.length;
-  const ayahs = shuffle(Array.from({ length: total }, (_, index) => index + 1));
+  const allowedKinds = options?.kinds;
+  const withConcept = !allowedKinds || allowedKinds.includes("concept");
+  const verseKinds = allowedKinds?.filter((kind) => kind !== "concept") ?? [];
+  const scope =
+    options?.ayahs && options.ayahs.length > 0
+      ? options.ayahs.filter((ayah) => ayah >= 1 && ayah <= total)
+      : Array.from({ length: total }, (_, index) => index + 1);
+  const ayahs = shuffle(scope.length > 0 ? scope : [1]);
   const questions: QuizQuestion[] = [];
 
-  const concept = shuffle(conceptQuestionsFor(surahId))
+  const concept = shuffle(withConcept ? conceptQuestionsFor(surahId) : [])
     .slice(0, Math.min(3, Math.floor(length / 2)))
     .map<QuizQuestion>((item) => {
       const options = shuffle([
@@ -280,7 +298,15 @@ export function buildQuiz(
   const plan: QuizKind[] = [];
 
   for (let index = 0; index < wanted; index += 1) {
-    plan.push(index % 5 === 3 ? "next" : index % 5 === 4 ? "number" : "fill");
+    plan.push(
+      verseKinds.length > 0
+        ? verseKinds[index % verseKinds.length]!
+        : index % 5 === 3
+          ? "next"
+          : index % 5 === 4
+            ? "number"
+            : "fill",
+    );
   }
 
   let cursor = 0;
@@ -288,15 +314,15 @@ export function buildQuiz(
   for (const kind of plan) {
     let built: QuizQuestion | undefined;
 
-    for (let tries = 0; tries < total && !built; tries += 1) {
-      const ayah = ayahs[cursor % total]!;
+    for (let tries = 0; tries < ayahs.length && !built; tries += 1) {
+      const ayah = ayahs[cursor % ayahs.length]!;
 
       cursor += 1;
       built =
         kind === "fill"
           ? buildFill(surahId, ayah, t)
           : kind === "next"
-            ? buildNext(surahId, ayah, t, language)
+            ? buildNext(surahId, ayah, t, language, options?.lastAyah)
             : buildNumber(surahId, ayah, t, language);
     }
 

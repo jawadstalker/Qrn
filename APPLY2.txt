@@ -1,0 +1,16 @@
+Update #2 (range, memorized selection, practice + auto-graded exam).
+Requires update #1 (qrn-practice-update.zip) to be applied first.
+
+NEW files:
+  src/app/{scope,session}.tsx
+  src/features/quran/screens/{Scope,Session}Screen.tsx
+  src/features/quran/state/scopeStore.ts
+
+MODIFIED files (also changed in update #1; incremental diff is in incremental.patch):
+  src/features/quran/components/QuranTabBar.tsx
+  src/features/quran/screens/ExamListScreen.tsx
+  src/features/quran/utils/quiz.ts
+  src/features/quran/state/practiceStore.ts
+  src/features/quran/i18n/practice.ts
+
+To merge instead of overwrite:  git apply --3way incremental.patch  (then extract only the new files).
