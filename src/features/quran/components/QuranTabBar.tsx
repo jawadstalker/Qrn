@@ -26,6 +26,7 @@ const HIDDEN_ROUTES = [
   "/stage-play",
   "/recall",
   "/session",
+  "/plan-setup",
 ];
 /** Practice pages that live under the Memorize tab. */
 const MEMORIZE_ROUTES = ["/exam", "/stages", "/mistakes", "/report", "/scope"];

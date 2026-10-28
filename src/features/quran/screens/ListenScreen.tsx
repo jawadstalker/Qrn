@@ -38,6 +38,7 @@ import { RECITERS, getReciter } from "@/features/quran/data/reciters";
 import { SURAHS, getSurah, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
+import { SectionPractice } from "@/features/quran/components/SectionPractice";
 
 const PADDING = 20;
 const SKIP_SECONDS = 10;
@@ -81,6 +82,7 @@ export default function ListenScreen() {
   } = useRecitation();
   const [query, setQuery] = useState("");
   const [barWidth, setBarWidth] = useState(1);
+  const [sectionIndex, setSectionIndex] = useState(0);
   const number = (value: number) => formatNumber(value, language);
   const playingSurahId = target?.kind === "surah" ? target.surahId : undefined;
   const current = playingSurahId ? getSurah(playingSurahId) : undefined;
@@ -416,6 +418,12 @@ export default function ListenScreen() {
               {t.quran_audio_online_note}
             </AppText>
           </View>
+
+          <SectionPractice
+            surahId={activeSurah}
+            selectedIndex={sectionIndex}
+            onSelectSection={(section) => setSectionIndex(section.index)}
+          />
 
           <View
             style={[

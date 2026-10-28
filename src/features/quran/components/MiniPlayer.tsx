@@ -13,6 +13,7 @@ import { getSurah } from "@/features/quran/data/surahs";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { fill } from "@/features/quran/utils/fill";
 import { Crescent, GOLD } from "@/features/quran/components/QuranDecor";
+import { useST } from "@/features/quran/i18n/sections";
 
 /** Screens that show their own audio controls or need full focus. */
 const HIDDEN_ROUTES = ["/listen", "/memorize", "/moment", "/quiz"];
@@ -22,7 +23,9 @@ export function MiniPlayer() {
   const { t, language } = useLanguage();
   const { row, isRTL } = useDirection();
   const pathname = normalizeRoute(usePathname() || "/");
+  const st = useST();
   const {
+    rangeProgress,
     target,
     playing,
     loading,
@@ -46,15 +49,29 @@ export function MiniPlayer() {
           surah: surahName,
           ayah: formatNumber(target.ayah, language),
         })
-      : surahName;
+      : target.kind === "range"
+        ? st("sec_mini_range", {
+            surah: surahName,
+            from: target.from,
+            to: target.to,
+          })
+        : surahName;
   const reciter = getReciter(reciterId);
   const subtitle = failed
     ? t.quran_audio_error
     : loading
       ? t.quran_audio_loading
-      : target.kind === "ayah"
-        ? t.quran_mini_ayah_reciter
-        : isRTL
+      : target.kind === "range"
+        ? rangeProgress
+          ? st("sec_mini_progress", {
+              ayah: rangeProgress.ayah,
+              rep: rangeProgress.rep,
+              reps: rangeProgress.ayahRepeats,
+            })
+          : t.quran_mini_ayah_reciter
+        : target.kind === "ayah"
+          ? t.quran_mini_ayah_reciter
+          : isRTL
           ? reciter.fa
           : reciter.en;
   const ratio = duration > 0 ? Math.min(position / duration, 1) : 0;

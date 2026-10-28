@@ -38,6 +38,7 @@ import {
   StarBadge,
 } from "@/features/quran/components/QuranDecor";
 import { GrowthPlant } from "@/features/quran/components/GrowthPlant";
+import { PlanShortcutCard } from "@/features/quran/components/PlanShortcutCard";
 import { Sun } from "@/features/quran/components/Sun";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
@@ -330,6 +331,10 @@ export default function QuranGardenScreen() {
             );
           })}
         </View>
+      </Rise>
+
+      <Rise delay={150}>
+        <PlanShortcutCard />
       </Rise>
 
       <Rise delay={160}>

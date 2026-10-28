@@ -20,6 +20,7 @@ import {
   isDueForReview,
   type PlantSnapshot,
 } from "@/features/quran/utils/plantGrowth";
+import { clearSectionReps } from "@/features/quran/state/sectionStore";
 
 export interface VerseRecord {
   learnedAt: number;
@@ -72,6 +73,8 @@ interface QuranProgressValue {
   nextNewAyah: number | null;
   currentAyah: number;
   recordFor: (ayah: number) => VerseRecord | undefined;
+  /** Record of any surah's verse (not only the active one). */
+  recordOf: (surahId: number, ayah: number) => VerseRecord | undefined;
   remember: (ayah: number) => Promise<RememberResult>;
   needsReview: (ayah: number) => Promise<void>;
   reset: () => Promise<void>;
@@ -233,6 +236,11 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
 
   const recordFor = useCallback((ayah: number) => records[ayah], [records]);
 
+  const recordOf = useCallback(
+    (id: number, ayah: number) => progress[id]?.[ayah],
+    [progress],
+  );
+
   const remember = useCallback(
     async (ayah: number): Promise<RememberResult> => {
       const target = getMushafSurah(surahRef.current)!;
@@ -313,6 +321,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
     quizRef.current = {};
     setQuiz({});
     AsyncStorage.removeItem(QUIZ_KEY).catch(() => undefined);
+    clearSectionReps().catch(() => undefined);
     await persist({});
   }, [persist]);
 
@@ -330,6 +339,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
       nextNewAyah: stats.nextNewAyah,
       currentAyah: stats.startAyah,
       recordFor,
+      recordOf,
       remember,
       needsReview,
       reset,
@@ -343,6 +353,7 @@ export function QuranProgressProvider({ children }: { children: ReactNode }) {
       statsFor,
       stats,
       recordFor,
+      recordOf,
       remember,
       needsReview,
       reset,

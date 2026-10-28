@@ -22,6 +22,7 @@ import {
 } from "@/features/quran/components/MiniPlant";
 import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { SectionMiniBar } from "@/features/quran/components/SectionMiniBar";
 
 type Filter = "all" | "learning" | "done";
 
@@ -167,6 +168,7 @@ export default function QuranLibraryScreen() {
           >
             {`${item.transliteration} · ${number(item.verses)} ${t.quran_verses_word}`}
           </AppText>
+          {available ? <SectionMiniBar surahId={item.id} /> : null}
         </View>
         <View style={[styles.plantState, !available && styles.soonState]}>
           {available ? <MiniPlant state={state.plant} /> : null}

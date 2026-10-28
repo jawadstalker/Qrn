@@ -19,6 +19,7 @@ import { MiniPlayer } from "@/features/quran/components/MiniPlayer";
 import { QuranTabBar } from "@/features/quran/components/QuranTabBar";
 import { BrandSplash } from "@/features/quran/components/BrandSplash";
 import { SplashIntro } from "@/features/quran/components/SplashIntro";
+import { MemorizationPlanProvider } from "@/features/quran/state/MemorizationPlanContext";
 import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
 
@@ -73,9 +74,11 @@ export default function RootLayout() {
           <LanguageProvider>
             <SoundProvider>
               <QuranProgressProvider>
-                <RecitationProvider>
-                  <Shell />
-                </RecitationProvider>
+                <MemorizationPlanProvider>
+                  <RecitationProvider>
+                    <Shell />
+                  </RecitationProvider>
+                </MemorizationPlanProvider>
               </QuranProgressProvider>
               {splashStage === "done" ? null : (
                 <>

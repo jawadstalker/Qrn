@@ -30,6 +30,9 @@ import { pageForAyah } from "@/features/quran/data/mushafPages";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { fill } from "@/features/quran/utils/fill";
+import { SectionPractice } from "@/features/quran/components/SectionPractice";
+import { useSectionData } from "@/features/quran/state/useSectionInfo";
+import { STATUS_COLORS } from "@/features/quran/utils/sections";
 
 type Mode = "full" | "half" | "hidden" | "challenge";
 
@@ -83,7 +86,7 @@ export default function MemorizeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const params = useLocalSearchParams<{ ayah?: string }>();
-  const { mushaf, currentAyah, recordFor, remember, needsReview } =
+  const { mushaf, currentAyah, remember, needsReview } =
     useQuranProgress();
   const { playAyah, target, playing, toggle } = useRecitation();
   const verses = mushaf.verses;
@@ -102,6 +105,7 @@ export default function MemorizeScreen() {
   const surah = getSurah(mushaf.surahId);
 
   const page = pageForAyah(mushaf, current);
+  const { verseStatus } = useSectionData(mushaf.surahId);
 
   const hidden = useMemo(() => {
     const base = hiddenIndicesFor(page.verses, mode, current);
@@ -365,7 +369,6 @@ export default function MemorizeScreen() {
         </AppText>
         <View style={[styles.dotsRow, { flexDirection: row }]}>
           {verses.map((verse) => {
-            const learned = Boolean(recordFor(verse.ayah));
             const isCurrent = verse.ayah === current;
 
             return (
@@ -375,9 +378,7 @@ export default function MemorizeScreen() {
                 color={
                   isCurrent
                     ? colors.highlight
-                    : learned
-                      ? colors.primary
-                      : colors.tint
+                    : STATUS_COLORS[verseStatus(verse.ayah).status]
                 }
               />
             );
@@ -408,6 +409,16 @@ export default function MemorizeScreen() {
           />
         </View>
       </View>
+
+      <SectionPractice
+        surahId={mushaf.surahId}
+        focusAyah={current}
+        onSelectSection={(section) => {
+          setRevealed(new Set());
+          setPeeks(0);
+          setCurrent(section.from);
+        }}
+      />
     </ScrollView>
   );
 }
