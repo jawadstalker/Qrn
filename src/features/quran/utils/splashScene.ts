@@ -17,10 +17,22 @@ import {
  */
 
 /** Length of the whole intro, including the final fade-out of the overlay. */
-export const SPLASH_SECONDS = 5;
-/** The 3D book fades out between these seconds while the 2D logo fades in. */
-export const GL_FADE_START = 3.65;
-export const GL_FADE_END = 4.25;
+export const SPLASH_SECONDS = 5.7;
+/**
+ * The camera is face-on from this second. From here the book itself flattens: its depth
+ * collapses, the camera dolly-zooms to a near-orthographic view, and the warm lights give way to
+ * flat light, so the lit 3D book turns into the flat 2D one in a single continuous move.
+ * The flat 2D book (SplashIntro) then fades in over it; the two already look alike, so the swap
+ * is invisible. Only once it is opaque does the 3D book fade away.
+ */
+export const FLAT_START = 3.45;
+export const FLATTEN_END = 4.15;
+export const GL_FADE_START = 4.45;
+export const GL_FADE_END = 4.8;
+/** Remaining depth of the book when flat (1 = full thickness). Not 0, so layers keep their order. */
+const FLAT_DEPTH = 0.1;
+/** Field of view of the nearly orthographic camera the splash ends on, in degrees. */
+const FLAT_FOV = 3;
 
 const COVER_W = 1;
 const COVER_H = 1.4;
@@ -141,7 +153,7 @@ const CAMERA_ROLL: readonly Key[] = [
 ];
 const FINAL_FOV = 30;
 /** Share of the screen width the open book fills at the end. */
-const FINAL_WIDTH_SHARE = 0.58;
+export const FINAL_WIDTH_SHARE = 0.58;
 
 /** 0 -> 1 -> 0 over [a, b]. */
 const bump = (t: number, a: number, b: number) =>
@@ -678,7 +690,11 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     (2 * Math.tan((FINAL_FOV * Math.PI) / 360) * aspect);
 
   /* Lights */
-  scene.add(new THREE.AmbientLight(0xfff1d6, 0.5));
+  const ambient = new THREE.AmbientLight(0xfff1d6, 0.5);
+  const warm = new THREE.Color(0xfff1d6);
+  const white = new THREE.Color(0xffffff);
+
+  scene.add(ambient);
 
   const key = new THREE.DirectionalLight(0xfff0d0, 0.55);
 
@@ -1171,13 +1187,23 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     const azimuth = curve(CAMERA_AZIMUTH, t);
     const elevation = curve(CAMERA_ELEVATION, t);
     // Punch-in as the cover opens, a gentle push as the book settles; both end at exactly 1.
-    const distance =
+    const baseDistance =
       curve(CAMERA_DISTANCE, t) *
       finalDistance *
       (1 - 0.07 * bump(t, 1.45, 2.0) - 0.04 * bump(t, 3.0, 3.6));
-    const fov = curve(CAMERA_FOV, t);
+    const baseFov = curve(CAMERA_FOV, t);
+    // 0 -> 1 as the book flattens. The camera pulls back while it zooms in (a dolly zoom), so the
+    // book keeps its size on screen but loses its perspective.
+    const flat = smooth(range(t, FLAT_START, FLATTEN_END));
+    const fov = lerp(baseFov, FLAT_FOV, flat);
+    const distance =
+      (baseDistance * Math.tan((baseFov * Math.PI) / 360)) /
+      Math.tan((fov * Math.PI) / 360);
 
     camera.fov = fov;
+    // Keep the clip planes tight around the book: far away they would otherwise be too coarse.
+    camera.near = flat > 0 ? distance * 0.6 : 0.1;
+    camera.far = flat > 0 ? distance * 1.6 : 60;
     camera.updateProjectionMatrix();
     camera.position.set(
       distance * Math.sin(azimuth) * Math.cos(elevation),
@@ -1217,6 +1243,8 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
     frontCover.rotation.y = -open * Math.PI;
     pivot.position.x = -(COVER_W / 2) * (1 - smooth(open));
+    // Flattening: the book's depth collapses toward the page plane.
+    pivot.scale.z = lerp(1, FLAT_DEPTH, flat);
 
     let flipped = 0;
 
@@ -1275,9 +1303,17 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     const reveal = smooth(range(t, COVER_OPEN_START, COVER_OPEN_END + 0.4));
     const fade = 1 - smooth(range(t, GL_FADE_START, GL_FADE_END));
 
+    // The warm light flattens away before the 2D book arrives, so the 3D pages end up lit
+    // exactly like the flat ones (no glare to fade through).
+    const flatten = 1 - smooth(range(t, 3.0, 3.7));
+
     pointLight.intensity =
-      (0.16 * reveal + 0.5 * bump(t, 1.55, 2.4) + 0.3 * bump(t, 3.45, 4.1)) *
-      fade;
+      (0.16 * reveal * flatten + 0.5 * bump(t, 1.55, 2.4)) * fade;
+    // Flat light: the shaded, specular look gives way to the plain paper and leather colors.
+    ambient.intensity = lerp(0.5, 1, flat);
+    ambient.color.copy(warm).lerp(white, flat);
+    key.intensity = 0.55 * (1 - flat);
+    rim.intensity = 0.4 * (1 - flat);
     root.updateMatrixWorld(true);
     glow.quaternion.copy(camera.quaternion);
     glow.position.set(0, 0, -0.5).applyMatrix4(root.matrixWorld);
@@ -1285,7 +1321,7 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       (0.1 +
         0.26 * reveal +
         0.1 * smooth(range(t, 3, 3.65)) +
-        0.55 * bump(t, 3.45, 4.15)) *
+        0.3 * bump(t, 3.45, 4.3)) *
       fade *
       smooth(range(t, 0.2, 1));
 
@@ -1303,7 +1339,9 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     bokehMaterial.uniforms.uTime!.value = t;
     bokehMaterial.uniforms.uPx!.value =
       height / (2 * Math.tan((fov * Math.PI) / 360));
-    bokehMaterial.uniforms.uOpacity!.value = smooth(range(t, 0.3, 1.2)) * fade;
+    // The bokeh discs sit right in front of the lens, so they go before the clip planes tighten.
+    bokehMaterial.uniforms.uOpacity!.value =
+      smooth(range(t, 0.3, 1.2)) * fade * (1 - smooth(range(t, 3.2, 3.5)));
 
     groundShadow.position.set(
       root.position.x,
@@ -1314,12 +1352,13 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     (groundShadow.material as THREE.MeshBasicMaterial).opacity =
       0.5 * smooth(range(t, 0.2, 1)) * (1 - smooth(range(t, 2.4, 3.2)));
 
-    sparkleMaterial.uniforms.uGather!.value = smooth(range(t, 3.1, 3.9));
+    sparkleMaterial.uniforms.uGather!.value = smooth(range(t, 3.1, 4.0));
     sparkleMaterial.uniforms.uTime!.value = t;
     sparkleMaterial.uniforms.uPx!.value =
       height / (2 * Math.tan((fov * Math.PI) / 360));
+    // The gathered sparkles vanish before the book is flat, so no bright dot is left on the spine.
     sparkleMaterial.uniforms.uOpacity!.value =
-      smooth(range(t, 0.5, 1.4)) * fade;
+      smooth(range(t, 0.5, 1.4)) * fade * (1 - smooth(range(t, 3.7, 4.1)));
   };
 
   const dispose = () => {
