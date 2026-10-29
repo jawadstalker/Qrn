@@ -21,11 +21,7 @@ export interface SurahTafsir {
   lessons: { fa: readonly string[]; en: readonly string[] };
 }
 
-/**
- * Short plain-language summaries written for this app from the widely held views of
- * classical and modern commentators. They are not quotations from any single tafsir.
- * Have a qualified person review them before release.
- */
+
 export const TAFSIR: readonly SurahTafsir[] = [
   {
     surahId: 1,

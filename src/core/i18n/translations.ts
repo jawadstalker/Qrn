@@ -94,8 +94,8 @@ export const translations = {
     quran_tafsir_title: "تفسیر سوره",
     quran_tafsir_sub: "معنی و پیام آیه‌ها به زبان ساده",
     quran_tafsir_lessons: "پیام‌های سوره",
-    quran_tafsir_note:
-      "این متن خلاصه‌ای ساده بر پایهٔ دیدگاه‌های رایج مفسران است، نه نقل مستقیم از یک تفسیر. برای مطالعهٔ دقیق به تفاسیر معتبر مراجعه کن.",
+    // quran_tafsir_note:
+    //   "این متن خلاصه‌ای ساده بر پایهٔ دیدگاه‌های رایج مفسران است، نه نقل مستقیم از یک تفسیر. برای مطالعهٔ دقیق به تفاسیر معتبر مراجعه کن.",
     quran_revelation_meccan: "مکی",
     quran_revelation_medinan: "مدنی",
     quran_listen_surah: "شنیدن سوره",
