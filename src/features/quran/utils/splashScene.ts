@@ -17,7 +17,7 @@ import {
  */
 
 /** Length of the whole intro, including the final fade-out of the overlay. */
-export const SPLASH_SECONDS = 5.7;
+export const SPLASH_SECONDS = 6.7;
 /**
  * The camera is face-on from this second. From here the book itself flattens: its depth
  * collapses, the camera dolly-zooms to a near-orthographic view, and the warm lights give way to
@@ -25,16 +25,30 @@ export const SPLASH_SECONDS = 5.7;
  * The flat 2D book (SplashIntro) then fades in over it; the two already look alike, so the swap
  * is invisible. Only once it is opaque does the 3D book fade away.
  */
-export const FLAT_START = 3.45;
-export const FLATTEN_END = 4.15;
-export const GL_FADE_START = 4.45;
-export const GL_FADE_END = 4.8;
+export const FLAT_START = 4.5;
+export const FLATTEN_END = 5.15;
+export const GL_FADE_START = 5.4;
+export const GL_FADE_END = 5.75;
+/** After the pages are turned, the cover swings shut: this closed cover is the logo. */
+export const CLOSE_START = 3.5;
+export const CLOSE_END = 4.45;
+/** Width of the closed book (cover + spine) in scene units, and its height. */
+export const CLOSED_W = 1.06;
+export const CLOSED_H = 1.4;
+/** Largest share of the screen height the closed book may fill. */
+const CLOSED_HEIGHT_SHARE = 0.6;
+/** Share of the screen width the closed book fills (limited by height on wide screens). */
+export function coverWidthShare(aspect: number): number {
+  return Math.min(0.62, (CLOSED_HEIGHT_SHARE * CLOSED_W) / CLOSED_H / aspect);
+}
 /** Remaining depth of the book when flat (1 = full thickness). Not 0, so layers keep their order. */
 const FLAT_DEPTH = 0.1;
 /** Field of view of the nearly orthographic camera the splash ends on, in degrees. */
 const FLAT_FOV = 3;
 
 const COVER_W = 1;
+/** Center of the closed book (spine + cover) along x, in the book's own frame. */
+const CLOSED_CENTER = (COVER_W - 0.06) / 2;
 const COVER_H = 1.4;
 const COVER_T = 0.03;
 const BLOCK_HALF = 0.115;
@@ -689,6 +703,10 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     FINAL_WIDTH_SHARE /
     (2 * Math.tan((FINAL_FOV * Math.PI) / 360) * aspect);
 
+  // Same for the closed book (cover + spine), as a factor on the camera distance.
+  const closedZoom =
+    CLOSED_W / coverWidthShare(aspect) / (2 / FINAL_WIDTH_SHARE);
+
   /* Lights */
   const ambient = new THREE.AmbientLight(0xfff1d6, 0.5);
   const warm = new THREE.Color(0xfff1d6);
@@ -772,6 +790,8 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
   // BoxGeometry face order: +x, -x, +y, -y, +z, -z
   const coverGeometry = new THREE.BoxGeometry(COVER_W, COVER_H, COVER_T);
+  // The lid: the front cover and every turned page. It swings back over the block to close the book.
+  const lid = new THREE.Group();
   const frontCover = new THREE.Group();
   const frontMesh = new THREE.Mesh(coverGeometry, [
     goldEdge,
@@ -784,7 +804,8 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
   frontMesh.position.set(COVER_W / 2, 0, BLOCK_HALF + COVER_T / 2);
   frontCover.add(frontMesh);
-  pivot.add(frontCover);
+  lid.add(frontCover);
+  pivot.add(lid);
 
   const backMesh = new THREE.Mesh(coverGeometry, [
     goldEdge,
@@ -900,7 +921,7 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
 
     [front, back].forEach((mesh) => {
       mesh.frustumCulled = false;
-      pivot.add(mesh);
+      lid.add(mesh);
     });
     const shadowGeometry = new THREE.PlaneGeometry(1, PAGE_H * 0.98);
 
@@ -924,6 +945,9 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     pages.push({ meshes: [front, back], positions, geometry, tipX: 0, shadow });
   }
 
+  // 0 -> 1 as the book closes: the pages stop breathing.
+  let calm = 0;
+
   /**
    * Lays page `index` out for flip progress p (0 = on the right, 1 = on the left).
    * The page is a soft sheet: the free edge trails behind the hinge (lag), the top and bottom
@@ -938,7 +962,7 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     // Resting pages breathe a little (wind): lift away from their stack, never into it.
     const resting = p <= 0 ? 1 : p >= 1 ? -1 : 0;
     const flutter =
-      resting * 0.07 * (0.5 + 0.5 * Math.sin(t * 5.2 + index * 1.9));
+      resting * 0.07 * (0.5 + 0.5 * Math.sin(t * 5.2 + index * 1.9)) * (1 - calm);
     const ripple = 0.16 * swing + flutter;
     const zRight = BLOCK_HALF - 0.002 - index * PAGE_STEP;
     const zOffset = lerp(zRight, -zRight, smooth(eased));
@@ -1180,6 +1204,30 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
   groundShadow.rotation.x = -Math.PI / 2;
   scene.add(groundShadow);
 
+  /* Impact: when the cover shuts, two gold shock rings roll out from the book */
+  const shockRings = [0, 1].map(() => {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.965, 1, 96),
+      new THREE.MeshBasicMaterial({
+        color: 0xffe9a8,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      }),
+    );
+
+    ring.visible = false;
+    scene.add(ring);
+
+    return ring;
+  });
+  const impactLight = new THREE.PointLight(0xffd98a, 0, 6);
+
+  impactLight.position.set(0, 0, 1.2);
+  scene.add(impactLight);
+
   const update = (seconds: number) => {
     const t = Math.min(Math.max(seconds, 0), SPLASH_SECONDS);
 
@@ -1187,11 +1235,14 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     const azimuth = curve(CAMERA_AZIMUTH, t);
     const elevation = curve(CAMERA_ELEVATION, t);
     // Punch-in as the cover opens, a gentle push as the book settles; both end at exactly 1.
+    const close = easeInOutCubic(range(t, CLOSE_START, CLOSE_END));
     const baseDistance =
       curve(CAMERA_DISTANCE, t) *
       finalDistance *
+      lerp(1, closedZoom, smooth(close)) *
       (1 - 0.07 * bump(t, 1.45, 2.0) - 0.04 * bump(t, 3.0, 3.6));
-    const baseFov = curve(CAMERA_FOV, t);
+    // A small punch when the cover lands.
+    const baseFov = curve(CAMERA_FOV, t) * (1 - 0.05 * bump(t, CLOSE_END - 0.12, CLOSE_END + 0.5));
     // 0 -> 1 as the book flattens. The camera pulls back while it zooms in (a dolly zoom), so the
     // book keeps its size on screen but loses its perspective.
     const flat = smooth(range(t, FLAT_START, FLATTEN_END));
@@ -1242,7 +1293,12 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
     const open = easeInOutCubic(range(t, COVER_OPEN_START, COVER_OPEN_END));
 
     frontCover.rotation.y = -open * Math.PI;
-    pivot.position.x = -(COVER_W / 2) * (1 - smooth(open));
+    // Closed, the book (spine + cover) is centered; open, the spine is.
+    pivot.position.x =
+      -CLOSED_CENTER * (1 - smooth(open) * (1 - smooth(close)));
+    // The turned pages go with the cover: the whole lid swings shut over the block.
+    lid.rotation.y = Math.PI * close;
+    calm = smooth(close);
     // Flattening: the book's depth collapses toward the page plane.
     pivot.scale.z = lerp(1, FLAT_DEPTH, flat);
 
@@ -1299,13 +1355,27 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       }
     });
 
+    /* Impact rings and flash */
+    const glFade = 1 - smooth(range(t, GL_FADE_START, GL_FADE_END));
+    shockRings.forEach((ring, index) => {
+      const p = range(t, CLOSE_END - 0.08 + index * 0.16, CLOSE_END + 0.85 + index * 0.16);
+      const radius = 0.78 + 0.5 * easeOutCubic(p);
+
+      ring.visible = p > 0 && p < 1;
+      ring.scale.set(radius * 0.78, radius, 1);
+      ring.position.set(0, 0, 0.25);
+      (ring.material as THREE.MeshBasicMaterial).opacity =
+        (index === 0 ? 0.55 : 0.3) * Math.pow(1 - p, 1.6) * smooth(range(p, 0, 0.08)) * glFade;
+    });
+    impactLight.intensity = 0.22 * bump(t, CLOSE_END - 0.1, CLOSE_END + 0.4) * glFade;
+
     /* Light and glow swell as the book opens */
     const reveal = smooth(range(t, COVER_OPEN_START, COVER_OPEN_END + 0.4));
     const fade = 1 - smooth(range(t, GL_FADE_START, GL_FADE_END));
 
     // The warm light flattens away before the 2D book arrives, so the 3D pages end up lit
     // exactly like the flat ones (no glare to fade through).
-    const flatten = 1 - smooth(range(t, 3.0, 3.7));
+    const flatten = 1 - smooth(range(t, FLAT_START - 0.45, FLAT_START + 0.25));
 
     pointLight.intensity =
       (0.16 * reveal * flatten + 0.5 * bump(t, 1.55, 2.4)) * fade;
@@ -1321,7 +1391,7 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       (0.1 +
         0.26 * reveal +
         0.1 * smooth(range(t, 3, 3.65)) +
-        0.3 * bump(t, 3.45, 4.3)) *
+        0.3 * bump(t, CLOSE_START, FLAT_START + 0.3)) *
       fade *
       smooth(range(t, 0.2, 1));
 
@@ -1358,7 +1428,9 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
       height / (2 * Math.tan((fov * Math.PI) / 360));
     // The gathered sparkles vanish before the book is flat, so no bright dot is left on the spine.
     sparkleMaterial.uniforms.uOpacity!.value =
-      smooth(range(t, 0.5, 1.4)) * fade * (1 - smooth(range(t, 3.7, 4.1)));
+      smooth(range(t, 0.5, 1.4)) *
+      fade *
+      (1 - smooth(range(t, CLOSE_START, CLOSE_START + 0.5)));
   };
 
   const dispose = () => {

@@ -1,6 +1,9 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { useRouter } from "expo-router";
+import { ChevronLeft, ChevronRight, UserRound } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "@/features/auth/AuthContext";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
 import { useTheme } from "@/core/theme/ThemeContext";
@@ -29,9 +32,12 @@ function Card({ children }: { children: React.ReactNode }) {
 export default function SettingsScreen() {
   const { colors, theme, setTheme } = useTheme();
   const { t, language, setLanguage } = useLanguage();
-  const { row, textAlign } = useDirection();
+  const { row, textAlign, isRTL } = useDirection();
   const { enabled, setEnabled, play } = useSound();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { status, user } = useAuth();
+  const Chevron = isRTL ? ChevronLeft : ChevronRight;
 
   return (
     <ScrollView
@@ -46,6 +52,49 @@ export default function SettingsScreen() {
         >
           {t.quran_settings}
         </AppText>
+      </Rise>
+
+      <Rise delay={40}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            status === "in" ? t.auth_account_card_manage : t.auth_login_cta
+          }
+          onPress={() => {
+            play("select");
+            router.push(status === "in" ? "/account" : "/login");
+          }}
+          style={({ pressed }) => [
+            styles.card,
+            styles.accountCard,
+            {
+              backgroundColor: colors.surface,
+              flexDirection: row,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+        >
+          <View style={[styles.avatar, { backgroundColor: colors.tintSoft }]}>
+            <UserRound size={24} color={colors.onTint} />
+          </View>
+          <View style={styles.switchText}>
+            <AppText
+              variant="body"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
+              {status === "in" ? t.auth_account_title : t.auth_account_card_title}
+            </AppText>
+            <AppText
+              variant="caption"
+              numberOfLines={2}
+              forceEnglish={status === "in"}
+              style={{ color: colors.textSecondary, textAlign }}
+            >
+              {status === "in" && user ? user.email : t.auth_account_card_out}
+            </AppText>
+          </View>
+          <Chevron size={22} color={colors.textTertiary} />
+        </Pressable>
       </Rise>
 
       <Rise delay={80}>
@@ -237,6 +286,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  accountCard: {
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   switchText: {
     flex: 1,

@@ -8,21 +8,10 @@ import {
 } from "react-native";
 import { useAudioPlayer } from "expo-audio";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
-import Svg, {
-  ClipPath,
-  Defs,
-  Ellipse,
-  G,
-  Path,
-  Polygon,
-  RadialGradient,
-  Rect,
-  Stop,
-} from "react-native-svg";
+import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { createGLRenderer } from "@/features/quran/utils/glRenderer";
 import Animated, {
   Easing,
-  type SharedValue,
   interpolate,
   runOnJS,
   useAnimatedReaction,
@@ -32,63 +21,46 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { AppText } from "@/shared/components/ui/AppText";
-import { STAR } from "@/features/quran/components/QuranLogo";
 import {
-  QuranBookMark,
-  type BookLayer,
-} from "@/features/quran/components/QuranBookMark";
+  COVER_MARK_ASPECT,
+  QuranCoverMark,
+} from "@/features/quran/components/QuranCoverMark";
 import { USE_3D_SPLASH } from "@/features/quran/config";
-import { BOOK_ASPECT, BOOK_COLORS } from "@/features/quran/utils/bookMark";
 import {
-  FINAL_WIDTH_SHARE,
   FLATTEN_END,
   GL_FADE_END,
   GL_FADE_START,
   SPLASH_SECONDS,
+  coverWidthShare,
   createSplashScene,
 } from "@/features/quran/utils/splashScene";
 
 /** Deep ink green, so the green-and-gold Quran stands out. Same as the native splash (app.json). */
 const BACKGROUND = "#0C1A16";
 /**
- * 3D -> 2D hand-over. From FLAT_START the camera is face-on, and the flat book (QuranBookMark)
- * sits exactly over the 3D one at the same size. Its layers fade in one at a time, so it looks
- * like the 3D details are flattening in place: leather cover, paper, gold frames, then the text.
- * Only when the flat book is fully opaque does the 3D one fade out underneath it.
- * After that the finishing touches arrive: the star behind the book, a sprout from the spine
- * and the title.
+ * 3D -> 2D hand-over. The book has closed and flattened: from FLATTEN_END the camera is face-on and
+ * orthographic, and the flat cover logo (QuranCoverMark) sits exactly over the 3D cover at the same
+ * size. Same leather, same gold tooling, so the swap is invisible: the logo fades in over the 3D
+ * cover and only when it is opaque does the 3D one fade out underneath it.
+ * After that a glint sweeps across the gold and the title arrives.
  */
-const FLAT_LAYERS: readonly { layer: BookLayer; from: number; to: number }[] = [
-  // Leather border, spine and bands (a frame with the pages cut out, so it hides nothing).
-  { layer: "cover", from: FLATTEN_END - 0.25, to: FLATTEN_END + 0.15 },
-  // Paper, gold frames and text arrive together over the already flat 3D book. The text only
-  // lags slightly, so the 3D text never fades out alone.
-  { layer: "pages", from: FLATTEN_END - 0.15, to: FLATTEN_END + 0.25 },
-  { layer: "frame", from: FLATTEN_END - 0.15, to: FLATTEN_END + 0.25 },
-  { layer: "text", from: FLATTEN_END - 0.15, to: FLATTEN_END + 0.3 },
-];
-const STAR_START = 4.4;
-const STAR_END = 5.1;
-const SPROUT_START = 4.7;
-const SPROUT_END = 5.2;
-const TITLE_START = 4.85;
-const TITLE_END = 5.3;
-/** The text lines write themselves (Skia), and a glint then sweeps over the finished book. */
-const TEXT_START = 4.3;
-const TEXT_END = 5.0;
-const GLINT_START = 5.0;
-const GLINT_END = 5.45;
-const PULSE_START = 4.4;
-const PULSE_END = 5.4;
+const COVER_FADE_START = FLATTEN_END - 0.2;
+const COVER_FADE_END = FLATTEN_END + 0.2;
+const TITLE_START = GL_FADE_END + 0.0;
+const TITLE_END = GL_FADE_END + 0.45;
+const GLINT_START = GL_FADE_END + 0.05;
+const GLINT_END = GL_FADE_END + 0.75;
+const BURST_START = GL_FADE_START - 0.15;
 /** The overlay itself fades out over the last quarter second. */
 const OVERLAY_FADE_START = SPLASH_SECONDS - 0.25;
 /** Where the clock starts when the 3D part is skipped (reduced motion or no WebGL). */
 const LOGO_ONLY_START = FLATTEN_END - 0.3;
 const LOGO_ONLY_HOLD_SECONDS = SPLASH_SECONDS - LOGO_ONLY_START;
-/** The star is a little wider than the book, so its points show above, below and at the sides. */
-const STAR_SCALE = 1.18;
-/** Sprout height as a share of the book width. */
-const SPROUT_SCALE = 0.2;
+/**
+ * The 3D cover measures a hair narrower on screen than its flat grid (edge thickness,
+ * perspective), so the flat logo is scaled to match.
+ */
+const MARK_MATCH = 1.002;
 
 // Whoosh, cover thump, page turns and a soft chime, synthesized to match the timeline.
 const SPLASH_SOUND =
@@ -143,30 +115,6 @@ class FinishBoundary extends React.Component<
   }
 }
 
-function FlatLayer({
-  clock,
-  layer,
-  from,
-  to,
-  bookWidth,
-}: {
-  clock: SharedValue<number>;
-  layer: BookLayer;
-  from: number;
-  to: number;
-  bookWidth: number;
-}) {
-  const style = useAnimatedStyle(() => ({
-    opacity: interpolate(clock.value, [from, to], [0, 1], "clamp"),
-  }));
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, style]}>
-      <QuranBookMark width={bookWidth} layers={[layer]} />
-    </Animated.View>
-  );
-}
-
 export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions();
@@ -180,15 +128,9 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
   const onGlReleasedRef = useRef(onGlReleased);
 
   onGlReleasedRef.current = onGlReleased;
-  // The flat book is laid exactly over the final 3D frame: same center, same width. The 3D
-  // book measures about 1% narrower on screen than its flat grid (edge thickness, perspective).
-  const bookWidth = width * FINAL_WIDTH_SHARE * 0.992;
-  const bookHeight = bookWidth / BOOK_ASPECT;
-  const starSize = bookWidth * STAR_SCALE;
-  const sproutHeight = bookWidth * SPROUT_SCALE;
-  // Half size of the book in the star's own 240 grid.
-  const starBookHalfW = bookWidth / 2 / (starSize / 240);
-  const starBookHalfH = bookHeight / 2 / (starSize / 240);
+  // The flat logo is laid exactly over the final 3D frame: same center, same width.
+  const markWidth = width * coverWidthShare(width / height) * MARK_MATCH;
+  const markHeight = markWidth / COVER_MARK_ASPECT;
   const player = useAudioPlayer(SPLASH_SOUND);
 
   // Browsers refuse to start audio without a tap and reject play() asynchronously, so the
@@ -395,31 +337,54 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
       "clamp",
     ),
   }));
-  const starStyle = useAnimatedStyle(() => {
-    const p = interpolate(clock.value, [STAR_START, STAR_END], [0, 1], "clamp");
+  const coverStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      clock.value,
+      [COVER_FADE_START, COVER_FADE_END],
+      [0, 1],
+      "clamp",
+    ),
+  }));
+  // Cover-shaped echoes ripple outward from the logo, and a warm halo breathes behind it.
+  const useEcho = (delay: number, grow: number) =>
+    useAnimatedStyle(() => {
+      const p = interpolate(
+        clock.value,
+        [BURST_START + delay, BURST_START + delay + 1.1],
+        [0, 1],
+        "clamp",
+      );
 
-    return {
-      opacity: p,
-      transform: [{ scale: 0.86 + 0.14 * (1 - Math.pow(1 - p, 3)) }],
-    };
-  });
-  const sproutStyle = useAnimatedStyle(() => {
+      return {
+        opacity: p <= 0 || p >= 1 ? 0 : 0.5 * Math.pow(1 - p, 1.5),
+        transform: [{ scale: 1 + grow * (1 - Math.pow(1 - p, 3)) }],
+      };
+    });
+  const echoA = useEcho(0, 0.32);
+  const echoB = useEcho(0.18, 0.55);
+  const haloStyle = useAnimatedStyle(() => {
     const p = interpolate(
       clock.value,
-      [SPROUT_START, SPROUT_END],
+      [BURST_START, SPLASH_SECONDS - 0.2],
       [0, 1],
       "clamp",
     );
-    // Grows upward out of the spine (scales from its bottom edge) with a small overshoot.
-    const grow = 1 - Math.pow(1 - p, 3) + 0.06 * Math.sin(Math.PI * p) * p;
 
     return {
-      opacity: Math.min(p * 3, 1),
-      transform: [
-        { translateY: (sproutHeight / 2) * (1 - grow) },
-        { scaleY: grow },
-      ],
+      opacity: 0.85 * Math.sin(Math.PI * Math.pow(p, 0.7)),
+      transform: [{ scale: 0.8 + 0.5 * p }],
     };
+  });
+  // After the hand-over the logo breathes a little.
+  const breatheStyle = useAnimatedStyle(() => {
+    const p = interpolate(
+      clock.value,
+      [GL_FADE_END, SPLASH_SECONDS - 0.2],
+      [0, 1],
+      "clamp",
+    );
+
+    return { transform: [{ scale: 1 + 0.02 * Math.sin(Math.PI * p) }] };
   });
   const titleStyle = useAnimatedStyle(() => ({
     opacity: interpolate(clock.value, [TITLE_START, TITLE_END], [0, 1], "clamp"),
@@ -434,125 +399,6 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
       },
     ],
   }));
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      clock.value,
-      [PULSE_START, PULSE_START + 0.15, PULSE_END],
-      [0, 0.28, 0],
-      "clamp",
-    ),
-    transform: [
-      {
-        scale: interpolate(clock.value, [PULSE_START, PULSE_END], [1, 1.5], "clamp"),
-      },
-    ],
-  }));
-
-  // Layers of the flat book. With Skia the text writes itself on instead of fading in.
-  const flatLayers = SkiaFinish
-    ? FLAT_LAYERS.filter((item) => item.layer !== "text")
-    : FLAT_LAYERS;
-  const svgFinish = (
-    <>
-        {/* The 2D star, behind the book */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.centered,
-            {
-              width: starSize,
-              height: starSize,
-              marginTop: -starSize / 2,
-              marginLeft: -starSize / 2,
-            },
-            starStyle,
-          ]}
-        >
-          <Svg width={starSize} height={starSize} viewBox="0 0 240 240">
-            <Defs>
-              {/* Everything except the book: the star's edges inside the book stay hidden */}
-              <ClipPath id="outside-book">
-                <Path
-                  clipRule="evenodd"
-                  d={`M-10 -10H250V250H-10Z M${120 - starBookHalfW} ${120 - starBookHalfH}h${starBookHalfW * 2}v${starBookHalfH * 2}h${-starBookHalfW * 2}Z`}
-                />
-              </ClipPath>
-            </Defs>
-            <G clipPath="url(#outside-book)">
-              <Polygon
-                points={STAR}
-                fill="none"
-                stroke={BOOK_COLORS.gold}
-                strokeWidth={2.2}
-                strokeLinejoin="round"
-                strokeOpacity={0.85}
-              />
-            </G>
-          </Svg>
-        </Animated.View>
-
-
-        {/* A sprout grows out of the spine */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.centered,
-            {
-              width: sproutHeight * 0.7,
-              height: sproutHeight,
-              // The spine is a hair left of the book's center (97 of 200 units).
-              marginLeft: -(sproutHeight * 0.7) / 2 - bookWidth * 0.015,
-              marginTop: -bookHeight / 2 - sproutHeight + 1,
-            },
-            sproutStyle,
-          ]}
-        >
-          <Svg
-            width={sproutHeight * 0.7}
-            height={sproutHeight}
-            viewBox="0 0 70 100"
-          >
-            <Path
-              d="M34 100 C34 80 35 62 35 44 L36 44 C36 62 37 80 37 100 Z"
-              fill={BOOK_COLORS.gold}
-            />
-            <Path
-              d="M35.5 60 C20 62 6 52 2 30 C20 28 33 40 35.5 60 Z"
-              fill={BOOK_COLORS.gold}
-            />
-            <Path
-              d="M35.5 44 C50 46 63 36 67 14 C50 12 38 24 35.5 44 Z"
-              fill={BOOK_COLORS.gold}
-            />
-            <Ellipse cx={35.5} cy={43} rx={2} ry={2.6} fill={BOOK_COLORS.gold} />
-          </Svg>
-        </Animated.View>
-
-      {SkiaFinish ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.centered,
-            {
-              width: bookWidth,
-              height: bookHeight,
-              marginTop: -bookHeight / 2,
-              marginLeft: -bookWidth / 2,
-            },
-          ]}
-        >
-          <FlatLayer
-            clock={clock}
-            bookWidth={bookWidth}
-            layer="text"
-            from={FLATTEN_END - 0.15}
-            to={FLATTEN_END + 0.3}
-          />
-        </View>
-      ) : null}
-    </>
-  );
-
   return (
     <Animated.View style={[styles.container, containerStyle]}>
       <Pressable
@@ -597,80 +443,93 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
           />
         </Svg>
 
-        {/* A ghost of the book expands outward when it lands */}
         <Animated.View
           pointerEvents="none"
           style={[
             styles.centered,
             {
-              width: bookWidth,
-              height: bookHeight,
-              marginTop: -bookHeight / 2,
-              marginLeft: -bookWidth / 2,
+              width: markWidth * 2.2,
+              height: markWidth * 2.2,
+              marginTop: -markWidth * 1.1,
+              marginLeft: -markWidth * 1.1,
             },
-            ringStyle,
+            haloStyle,
           ]}
         >
-          <QuranBookMark width={bookWidth} layers={["frame"]} />
+          <Svg width={markWidth * 2.2} height={markWidth * 2.2}>
+            <Defs>
+              <RadialGradient id="halo" cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor="#F2D27A" stopOpacity="0.55" />
+                <Stop offset="0.45" stopColor="#D9B864" stopOpacity="0.18" />
+                <Stop offset="1" stopColor="#D9B864" stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#halo)" />
+          </Svg>
         </Animated.View>
 
-        {/* The flat book: its layers fade in over the 3D book, in the same place */}
-        <View
+        {[echoA, echoB].map((style, index) => (
+          <Animated.View
+            key={index}
+            pointerEvents="none"
+            style={[
+              styles.centered,
+              styles.echo,
+              {
+                width: markWidth,
+                height: markHeight,
+                marginTop: -markHeight / 2,
+                marginLeft: -markWidth / 2,
+              },
+              style,
+            ]}
+          />
+        ))}
+
+        {/* The flat logo (the closed cover): fades in over the 3D cover, in the same place */}
+        <Animated.View
           pointerEvents="none"
           style={[
             styles.centered,
             {
-              width: bookWidth,
-              height: bookHeight,
-              marginTop: -bookHeight / 2,
-              marginLeft: -bookWidth / 2,
+              width: markWidth,
+              height: markHeight,
+              marginTop: -markHeight / 2,
+              marginLeft: -markWidth / 2,
             },
+            coverStyle,
           ]}
         >
-          {flatLayers.map((item) => (
-            <FlatLayer
-              key={item.layer}
-              clock={clock}
-              bookWidth={bookWidth}
-              {...item}
-            />
-          ))}
-        </View>
+          <Animated.View style={breatheStyle}>
+            <QuranCoverMark width={markWidth} />
+          </Animated.View>
+        </Animated.View>
 
         {SkiaFinish ? (
-          <FinishBoundary fallback={svgFinish}>
+          <FinishBoundary fallback={null}>
             <SkiaFinish
               clock={clock}
               width={width}
               height={height}
-              bookWidth={bookWidth}
-              starSize={starSize}
-              sproutHeight={sproutHeight}
+              markWidth={markWidth}
               times={{
-                textStart: TEXT_START,
-                textEnd: TEXT_END,
-                starStart: STAR_START,
-                starEnd: STAR_END,
-                sproutStart: SPROUT_START,
-                sproutEnd: SPROUT_END,
                 glintStart: GLINT_START,
                 glintEnd: GLINT_END,
+                burstStart: BURST_START,
               }}
             />
           </FinishBoundary>
-        ) : (
-          svgFinish
-        )}
+        ) : null}
 
         <Animated.View
           style={[StyleSheet.absoluteFill, titleStyle]}
           pointerEvents="none"
         >
-          <View style={[styles.rule, { top: height / 2 + starSize / 2 + 8 }]} />
+          <View style={[styles.rule, { top: height / 2 + markHeight / 2 + 22 }]} />
           <AppText
             variant="h2"
             forcePersian
-            style={[styles.title, { top: height / 2 + starSize / 2 + 20 }]}
+            style={[styles.title, { top: height / 2 + markHeight / 2 + 34 }]}
           >
             باغ حفظ قرآن
           </AppText>
@@ -723,6 +582,14 @@ const styles = StyleSheet.create({
     color: "#FBF3DC",
     textAlign: "center",
     fontWeight: "600",
+    textShadowColor: "rgba(242, 210, 122, 0.55)",
+    textShadowRadius: 14,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  echo: {
+    borderWidth: 1.5,
+    borderColor: "#E8C877",
+    borderRadius: 4,
   },
   rule: {
     position: "absolute",

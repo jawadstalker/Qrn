@@ -12,6 +12,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
 import { LanguageProvider } from "@/core/i18n/LanguageContext";
 import { ThemeProvider, useTheme } from "@/core/theme/ThemeContext";
 import { SoundProvider } from "@/shared/audio/SoundContext";
@@ -24,6 +25,13 @@ import { QuranProgressProvider } from "@/features/quran/state/QuranProgressConte
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/** Remounts the data providers when a sync replaced local data, so they read the new values. */
+function DataGate({ children }: { children: React.ReactNode }) {
+  const { dataEpoch } = useAuth();
+
+  return <React.Fragment key={dataEpoch}>{children}</React.Fragment>;
+}
 
 function Shell() {
   const { colors, isDark } = useTheme();
@@ -73,13 +81,17 @@ export default function RootLayout() {
         <ThemeProvider>
           <LanguageProvider>
             <SoundProvider>
-              <QuranProgressProvider>
-                <MemorizationPlanProvider>
-                  <RecitationProvider>
-                    <Shell />
-                  </RecitationProvider>
-                </MemorizationPlanProvider>
-              </QuranProgressProvider>
+              <AuthProvider>
+                <DataGate>
+                  <QuranProgressProvider>
+                    <MemorizationPlanProvider>
+                      <RecitationProvider>
+                        <Shell />
+                      </RecitationProvider>
+                    </MemorizationPlanProvider>
+                  </QuranProgressProvider>
+                </DataGate>
+              </AuthProvider>
               {splashStage === "done" ? null : (
                 <>
                   <BrandSplash

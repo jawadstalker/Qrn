@@ -72,6 +72,15 @@ function pick(value: number, allowed: readonly number[], fallback: number) {
   return allowed.includes(value) ? value : fallback;
 }
 
+/** Forgets the in-memory copy and reads the stored data again (used after a sync pulled new data). */
+export function reloadSectionStore(): Promise<void> {
+  loading = null;
+  // Start from defaults so old in-memory values are not merged into the reloaded data.
+  state = { loaded: false, sectionSize: DEFAULT_SECTION_SIZE, repeat: DEFAULT_REPEAT, reps: {} };
+
+  return load();
+}
+
 function load(): Promise<void> {
   if (!loading) {
     loading = AsyncStorage.getItem(STORAGE_KEY)

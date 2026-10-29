@@ -86,6 +86,15 @@ async function persist() {
   }
 }
 
+/** Forgets the in-memory copy and reads the stored data again (used after a sync pulled new data). */
+export function reloadPracticeStore(): Promise<void> {
+  loading = null;
+  // Start from defaults so old in-memory values are not merged into the reloaded data.
+  state = { loaded: false, attempts: [], mistakes: {}, ayahStats: {} };
+
+  return load();
+}
+
 function load(): Promise<void> {
   if (!loading) {
     loading = AsyncStorage.getItem(STORAGE_KEY)

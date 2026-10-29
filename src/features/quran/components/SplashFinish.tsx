@@ -2,52 +2,54 @@ import React, { useMemo } from "react";
 import { StyleSheet } from "react-native";
 import {
   Canvas,
-  Circle,
   Group,
   LinearGradient,
-  Path,
+  Points,
   Rect,
   Skia,
   vec,
 } from "@shopify/react-native-skia";
 import { useDerivedValue, type SharedValue } from "react-native-reanimated";
-import { STAR } from "@/features/quran/components/QuranLogo";
 import {
-  BOOK_ASPECT,
-  BOOK_COLORS as C,
-  BOOK_W,
-  CARTOUCHE,
-  LEFT_TEXT,
-  RIGHT_TEXT,
-} from "@/features/quran/utils/bookMark";
+  COVER_ART_HEIGHT,
+  COVER_ART_PATH,
+  COVER_ART_WIDTH,
+} from "@/features/quran/data/coverArt";
+import {
+  COVER_MARK_ASPECT,
+  COVER_MARK_WIDTH,
+  SPINE_WIDTH,
+} from "@/features/quran/components/QuranCoverMark";
 
 /**
- * The GPU (Skia) half of the 2D finish. Everything here is drawn as vector paths that are traced
- * on, instead of fading in:
- *   - the text lines write themselves right to left, line by line,
- *   - the gold star is drawn around the book,
- *   - a sprout grows out of the spine,
- *   - a soft glint sweeps across the finished book.
- * It runs on the UI thread, driven by the splash clock, and draws on top of the flat book.
+ * The GPU (Skia) half of the 2D finish: light sweeps across the finished cover. It runs on the UI
+ * thread, driven by the splash clock, on top of the flat cover logo.
+ *   - a soft sheen crosses the whole cover,
+ *   - a brighter one crosses only the gold tooling (the gold catches the light).
  */
 export interface SplashFinishTimes {
-  textStart: number;
-  textEnd: number;
-  starStart: number;
-  starEnd: number;
-  sproutStart: number;
-  sproutEnd: number;
   glintStart: number;
   glintEnd: number;
+  /** Gold sparks burst out of the cover from this second. */
+  burstStart: number;
 }
+
+const SPARKS = 72;
+/** Deterministic pseudo-random in 0..1. */
+const rand = (index: number, salt: number) => {
+  "worklet";
+
+  const x = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453;
+
+  return x - Math.floor(x);
+};
 
 interface SplashFinishProps {
   clock: SharedValue<number>;
   width: number;
   height: number;
-  bookWidth: number;
-  starSize: number;
-  sproutHeight: number;
+  /** Width of the flat cover mark (spine + cover) on screen. */
+  markWidth: number;
   times: SplashFinishTimes;
 }
 
@@ -56,238 +58,160 @@ const clamp01 = (value: number) => {
 
   return Math.min(Math.max(value, 0), 1);
 };
-const easeOut = (x: number) => {
-  "worklet";
-
-  return 1 - Math.pow(1 - x, 3);
-};
-const easeInOut = (x: number) => {
-  "worklet";
-
-  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-};
-
-/** "x,y x,y ..." polygon points -> a closed SVG path. */
-function polygonPath(points: string): string {
-  const pairs = points.trim().split(/\s+/);
-
-  return `M${pairs.join("L")}Z`.replace(/,/g, " ");
-}
-
-const SPROUT_STEM = "M35.5 100 C35 80 35.5 62 35.5 44";
-const SPROUT_LEAF_LEFT = "M35.5 60 C20 62 6 52 2 30 C20 28 33 40 35.5 60 Z";
-const SPROUT_LEAF_RIGHT = "M35.5 44 C50 46 63 36 67 14 C50 12 38 24 35.5 44 Z";
 
 export function SplashFinish({
   clock,
   width,
   height,
-  bookWidth,
-  starSize,
-  sproutHeight,
+  markWidth,
   times,
 }: SplashFinishProps) {
-  const unit = bookWidth / BOOK_W;
-  const bookHeight = bookWidth / BOOK_ASPECT;
-  const left = (width - bookWidth) / 2;
-  const top = (height - bookHeight) / 2;
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const sproutScale = sproutHeight / 100;
+  const scale = markWidth / COVER_MARK_WIDTH;
+  const markHeight = markWidth / COVER_MARK_ASPECT;
+  const left = (width - markWidth) / 2;
+  const top = (height - markHeight) / 2;
+  const artCenterX = COVER_ART_WIDTH / 2;
+  const artCenterY = COVER_ART_HEIGHT / 2;
 
-  const starPath = useMemo(() => polygonPath(STAR), []);
-  const titleBar = useMemo(
-    () =>
-      `M${CARTOUCHE.x + 22} ${CARTOUCHE.y + CARTOUCHE.height / 2}h28`,
+  const artPath = useMemo(
+    () => Skia.Path.MakeFromSVGString(COVER_ART_PATH),
     [],
   );
+  const markClip = useMemo(
+    () => Skia.XYWHRect(left, top, markWidth, markHeight),
+    [left, top, markWidth, markHeight],
+  );
 
-  /* Progress values, all computed on the UI thread from the splash clock. */
-  const text = useDerivedValue(() =>
-    easeInOut(
-      clamp01(
-        (clock.value - times.textStart) / (times.textEnd - times.textStart),
-      ),
-    ),
-  );
-  const rings = useDerivedValue(() =>
-    clamp01((clock.value - times.textEnd + 0.1) / 0.3),
-  );
-  const star = useDerivedValue(() =>
-    easeInOut(
-      clamp01(
-        (clock.value - times.starStart) / (times.starEnd - times.starStart),
-      ),
-    ),
-  );
-  const stem = useDerivedValue(() =>
-    easeOut(
-      clamp01(
-        (clock.value - times.sproutStart) /
-          ((times.sproutEnd - times.sproutStart) * 0.6),
-      ),
-    ),
-  );
-  const leaf = useDerivedValue(() =>
-    easeOut(
-      clamp01(
-        (clock.value - (times.sproutStart + (times.sproutEnd - times.sproutStart) * 0.45)) /
-          ((times.sproutEnd - times.sproutStart) * 0.55),
-      ),
-    ),
-  );
-  const leafLeftTransform = useDerivedValue(() => [
-    { translateX: 35.5 },
-    { translateY: 60 },
-    { scale: leaf.value },
-    { translateX: -35.5 },
-    { translateY: -60 },
-  ]);
-  const leafRightTransform = useDerivedValue(() => [
-    { translateX: 35.5 },
-    { translateY: 44 },
-    { scale: leaf.value },
-    { translateX: -35.5 },
-    { translateY: -44 },
-  ]);
   const glint = useDerivedValue(() =>
     clamp01(
       (clock.value - times.glintStart) / (times.glintEnd - times.glintStart),
     ),
   );
-  const glintTransform = useDerivedValue(() => [
-    { translateX: (glint.value * 1.6 - 0.8) * bookWidth },
+  // Sheen over the whole mark (screen pixels).
+  const sheenTransform = useDerivedValue(() => [
+    { translateX: (glint.value * 1.6 - 0.8) * markWidth },
     { rotate: -0.32 },
   ]);
-  const glintOpacity = useDerivedValue(() =>
-    Math.sin(Math.PI * glint.value),
+  const sheenOpacity = useDerivedValue(() => Math.sin(Math.PI * glint.value));
+  // Brighter light on the gold only (cover grid units), a little behind the sheen.
+  const goldTransform = useDerivedValue(() => [
+    { translateX: (glint.value * 1.7 - 0.85) * COVER_ART_WIDTH },
+    { rotate: -0.32 },
+  ]);
+  const goldOpacity = useDerivedValue(
+    () => 0.9 * Math.sin(Math.PI * clamp01(glint.value * 1.1 - 0.05)),
   );
 
-  const bookClip = useMemo(
-    () => Skia.XYWHRect(left, top, bookWidth, bookHeight),
-    [left, top, bookWidth, bookHeight],
-  );
+  /* Sparks: a burst from the cover that slows down and drifts, then twinkles out. */
+  const burstAge = useDerivedValue(() => Math.max(clock.value - times.burstStart, 0));
+  const sparkPoints = (fine: boolean) => {
+    "worklet";
+
+    const out: { x: number; y: number }[] = [];
+    const age = burstAge.value;
+
+    for (let i = fine ? 1 : 0; i < SPARKS; i += 2) {
+      const angle = rand(i, 1) * Math.PI * 2;
+      const speed = 0.35 + rand(i, 2) * 0.9;
+      const delay = rand(i, 3) * 0.35;
+      const a = Math.max(age - delay, 0);
+      // Decelerating travel: distance = v * (1 - e^(-k a)) / k
+      const travel = (speed * (1 - Math.exp(-2.4 * a))) / 2.4;
+      const drift = 0.04 * a * a;
+
+      out.push({
+        x: width / 2 + Math.cos(angle) * travel * markWidth * 1.3,
+        y: height / 2 + Math.sin(angle) * travel * markWidth * 1.3 - drift * markWidth,
+      });
+    }
+
+    return out;
+  };
+  const sparksBig = useDerivedValue(() => sparkPoints(false));
+  const sparksFine = useDerivedValue(() => sparkPoints(true));
+  const sparkOpacity = useDerivedValue(() => {
+    const age = burstAge.value;
+
+    return age <= 0 ? 0 : Math.max(0, 1 - age / 1.6) * (0.75 + 0.25 * Math.sin(age * 38));
+  });
 
   return (
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Star, traced around the book (its edges that fall inside the book stay hidden) */}
-      <Group clip={bookClip} invertClip>
-      <Group
-        transform={[
-          { translateX: centerX - starSize / 2 },
-          { translateY: centerY - starSize / 2 },
-          { scale: starSize / 240 },
-        ]}
-      >
-        <Path
-          path={starPath}
-          style="stroke"
-          strokeWidth={2.2}
-          strokeJoin="round"
-          strokeCap="round"
-          color={C.gold}
-          opacity={0.85}
-          start={0}
-          end={star}
-        />
-      </Group>
-      </Group>
-
-      {/* The text writes itself onto the flat pages (units of the 200 x 140 book grid) */}
-      <Group
-        transform={[
-          { translateX: left },
-          { translateY: top },
-          { scale: unit },
-        ]}
-      >
-        {[RIGHT_TEXT, LEFT_TEXT].map((layout, index) => (
-          <React.Fragment key={index}>
-            <Path
-              path={layout.words}
-              style="stroke"
-              strokeWidth={1.15}
-              strokeCap="round"
-              color={C.ink}
-              opacity={0.62}
-              start={0}
-              end={text}
-            />
-            <Group opacity={rings}>
-              {layout.markers.map(([x, y]) => (
-                <React.Fragment key={`${x}-${y}`}>
-                  <Circle cx={x} cy={y} r={1.5} color={C.cream} />
-                  <Circle
-                    cx={x}
-                    cy={y}
-                    r={1.5}
-                    style="stroke"
-                    strokeWidth={0.55}
-                    color={C.goldDark}
-                  />
-                </React.Fragment>
-              ))}
-            </Group>
-          </React.Fragment>
-        ))}
-        <Path
-          path={titleBar}
-          style="stroke"
-          strokeWidth={2.6}
-          strokeCap="round"
-          color={C.ink}
-          opacity={0.8}
-          start={0}
-          end={text}
-        />
-      </Group>
-
-      {/* Sprout: the stem is drawn upward, then the leaves unfold */}
-      <Group
-        transform={[
-          { translateX: centerX - bookWidth * 0.015 - 35.5 * sproutScale },
-          { translateY: top + 1 - sproutHeight },
-          { scale: sproutScale },
-        ]}
-      >
-        <Path
-          path={SPROUT_STEM}
-          style="stroke"
-          strokeWidth={1.7}
-          strokeCap="round"
-          color={C.gold}
-          start={0}
-          end={stem}
-        />
-        <Group transform={leafLeftTransform}>
-          <Path path={SPROUT_LEAF_LEFT} color={C.gold} opacity={leaf} />
-        </Group>
-        <Group transform={leafRightTransform}>
-          <Path path={SPROUT_LEAF_RIGHT} color={C.gold} opacity={leaf} />
-        </Group>
-      </Group>
-
-      {/* A soft glint sweeps over the finished book */}
-      <Group clip={bookClip} opacity={glintOpacity}>
-        <Group transform={glintTransform} origin={vec(centerX, centerY)}>
+      <Points
+        points={sparksBig}
+        mode="points"
+        style="stroke"
+        strokeWidth={4}
+        strokeCap="round"
+        color="#FFE9A8"
+        opacity={sparkOpacity}
+      />
+      <Points
+        points={sparksFine}
+        mode="points"
+        style="stroke"
+        strokeWidth={2}
+        strokeCap="round"
+        color="#FFF6D6"
+        opacity={sparkOpacity}
+      />
+      <Group clip={markClip} opacity={sheenOpacity}>
+        <Group
+          transform={sheenTransform}
+          origin={vec(width / 2, height / 2)}
+        >
           <Rect
-            x={centerX - bookWidth * 0.12}
-            y={top - bookHeight * 0.4}
-            width={bookWidth * 0.24}
-            height={bookHeight * 1.8}
+            x={width / 2 - markWidth * 0.12}
+            y={top - markHeight * 0.4}
+            width={markWidth * 0.24}
+            height={markHeight * 1.8}
           >
             <LinearGradient
-              start={vec(centerX - bookWidth * 0.12, 0)}
-              end={vec(centerX + bookWidth * 0.12, 0)}
+              start={vec(width / 2 - markWidth * 0.12, 0)}
+              end={vec(width / 2 + markWidth * 0.12, 0)}
               colors={[
                 "rgba(255,244,205,0)",
-                "rgba(255,244,205,0.34)",
+                "rgba(255,244,205,0.22)",
                 "rgba(255,244,205,0)",
               ]}
             />
           </Rect>
         </Group>
       </Group>
+
+      {artPath ? (
+        <Group
+          transform={[
+            { translateX: left + SPINE_WIDTH * scale },
+            { translateY: top },
+            { scale },
+          ]}
+          clip={artPath}
+        >
+          <Group
+            opacity={goldOpacity}
+            transform={goldTransform}
+            origin={vec(artCenterX, artCenterY)}
+          >
+            <Rect
+              x={artCenterX - COVER_ART_WIDTH * 0.1}
+              y={-COVER_ART_HEIGHT * 0.4}
+              width={COVER_ART_WIDTH * 0.2}
+              height={COVER_ART_HEIGHT * 1.8}
+            >
+              <LinearGradient
+                start={vec(artCenterX - COVER_ART_WIDTH * 0.1, 0)}
+                end={vec(artCenterX + COVER_ART_WIDTH * 0.1, 0)}
+                colors={[
+                  "rgba(255,250,225,0)",
+                  "rgba(255,250,225,0.95)",
+                  "rgba(255,250,225,0)",
+                ]}
+              />
+            </Rect>
+          </Group>
+        </Group>
+      ) : null}
     </Canvas>
   );
 }

@@ -82,6 +82,22 @@ async function persist() {
   }
 }
 
+/** Forgets the in-memory copy and reads the stored data again (used after a sync pulled new data). */
+export function reloadScopeStore(): Promise<void> {
+  loading = null;
+  // Start from defaults so old in-memory values are not merged into the reloaded data.
+  state = {
+    loaded: false,
+    surahId: SCOPE_SURAHS[SCOPE_SURAHS.length - 1] ?? 1,
+    ranges: {},
+    selected: {},
+    questionCount: 8,
+    passPercent: 70,
+  };
+
+  return load();
+}
+
 function load(): Promise<void> {
   if (!loading) {
     loading = AsyncStorage.getItem(STORAGE_KEY)

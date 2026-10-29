@@ -1,0 +1,10 @@
+# Route everything to index.php and keep the Authorization header (needed on cPanel/FastCGI).
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
+
+<FilesMatch "^(config(\.sample)?\.php|schema\.mysql\.sql)$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

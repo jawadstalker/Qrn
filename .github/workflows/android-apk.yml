@@ -39,6 +39,9 @@ jobs:
 
       - name: Build release APK
         working-directory: android
+        env:
+          # Server address for login/sync. Set it in GitHub: Settings > Secrets and variables > Actions > Variables > API_URL
+          EXPO_PUBLIC_API_URL: ${{ vars.API_URL }}
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon
