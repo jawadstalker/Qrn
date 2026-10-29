@@ -45,10 +45,6 @@ import {
   surahLabel,
 } from "@/features/quran/plan/export/exportData";
 import {
-  exportPlanExcel,
-  exportPlanPdf,
-} from "@/features/quran/plan/export/exportPlan";
-import {
   formatSegments,
   nextSessionFrom,
   sessionOn,
@@ -172,6 +168,10 @@ export default function PlanScreen() {
     setMessage(null);
 
     try {
+      // Loaded on demand so the plan screen opens even if a native module is missing.
+      const { exportPlanExcel, exportPlanPdf } = await import(
+        "@/features/quran/plan/export/exportPlan"
+      );
       const doc = buildExportDoc({
         config: plan.config,
         sessions: built.sessions,

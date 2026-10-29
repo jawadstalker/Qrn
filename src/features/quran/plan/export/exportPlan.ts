@@ -1,8 +1,5 @@
 import { Platform } from "react-native";
 import { Asset } from "expo-asset";
-import * as FileSystem from "expo-file-system";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
 import { buildPlanHtml } from "@/features/quran/plan/export/buildHtml";
 import { buildSheets } from "@/features/quran/plan/export/buildSheets";
 import type { ExportDoc } from "@/features/quran/plan/export/exportData";
@@ -13,6 +10,44 @@ import {
 } from "@/features/quran/plan/export/xlsx";
 
 export type ExportResult = "shared" | "saved" | "unavailable";
+
+type FileSystemModule = typeof import("expo-file-system");
+type PrintModule = typeof import("expo-print");
+type SharingModule = typeof import("expo-sharing");
+
+/**
+ * The native modules are loaded only when an export is started. A build made before they were
+ * added would otherwise fail while the plan screen itself loads, and the screen would not open.
+ */
+async function loadFileSystem(): Promise<FileSystemModule | null> {
+  try {
+    return await import("expo-file-system");
+  } catch (error) {
+    console.warn("[PLAN] expo-file-system is not available in this build:", error);
+
+    return null;
+  }
+}
+
+async function loadPrint(): Promise<PrintModule | null> {
+  try {
+    return await import("expo-print");
+  } catch (error) {
+    console.warn("[PLAN] expo-print is not available in this build:", error);
+
+    return null;
+  }
+}
+
+async function loadSharing(): Promise<SharingModule | null> {
+  try {
+    return await import("expo-sharing");
+  } catch (error) {
+    console.warn("[PLAN] expo-sharing is not available in this build:", error);
+
+    return null;
+  }
+}
 
 const PDF_MIME = "application/pdf";
 const XLSX_UTI = "org.openxmlformats.spreadsheetml.sheet";
@@ -26,6 +61,14 @@ async function loadFontBase64(): Promise<string | null> {
   }
 
   try {
+    const FileSystem = await loadFileSystem();
+
+    if (!FileSystem) {
+      cachedFont = null;
+
+      return cachedFont;
+    }
+
     const asset = Asset.fromModule(
       require("../../../../../assets/fonts/Estedad-Medium.ttf"),
     );
@@ -56,7 +99,9 @@ async function share(
   uti: string,
   title: string,
 ): Promise<ExportResult> {
-  if (!(await Sharing.isAvailableAsync())) {
+  const Sharing = await loadSharing();
+
+  if (!Sharing || !(await Sharing.isAvailableAsync())) {
     return "unavailable";
   }
 
@@ -82,6 +127,12 @@ export async function exportPlanPdf(
   doc: ExportDoc,
   baseName: string,
 ): Promise<ExportResult> {
+  const Print = await loadPrint();
+
+  if (!Print) {
+    return "unavailable";
+  }
+
   const html = buildPlanHtml(doc, (await loadFontBase64()) ?? undefined);
 
   if (Platform.OS === "web") {
@@ -90,7 +141,13 @@ export async function exportPlanPdf(
     return "saved";
   }
 
+  const FileSystem = await loadFileSystem();
   const printed = await Print.printToFileAsync({ html });
+
+  if (!FileSystem) {
+    return share(printed.uri, PDF_MIME, "com.adobe.pdf", doc.title);
+  }
+
   const target = `${FileSystem.cacheDirectory}${fileName(baseName, "pdf")}`;
   let uri = printed.uri;
 
@@ -117,6 +174,12 @@ export async function exportPlanExcel(
     downloadOnWeb(await buildXlsxBytes(sheets), name, XLSX_MIME);
 
     return "saved";
+  }
+
+  const FileSystem = await loadFileSystem();
+
+  if (!FileSystem) {
+    return "unavailable";
   }
 
   const uri = `${FileSystem.cacheDirectory}${name}`;
