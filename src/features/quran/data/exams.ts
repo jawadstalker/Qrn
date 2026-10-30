@@ -1,4 +1,5 @@
 import type { Localized } from "@/features/quran/data/tafsir";
+import { JUZ30_EXAMS } from "@/features/quran/data/juz30/exams";
 
 export interface ExamQuestion {
   id: string;
@@ -328,6 +329,7 @@ const NABA_TAFSIR: readonly ExamQuestion[] = [
   },
 ];
 
+/** The app covers Juz 30 only: the hand-written An-Naba exams followed by one pair per other surah. */
 export const EXAMS: readonly Exam[] = [
   {
     id: "hamd-memorize",
@@ -365,7 +367,8 @@ export const EXAMS: readonly Exam[] = [
     },
     questions: NABA_TAFSIR,
   },
-];
+  ...JUZ30_EXAMS,
+].filter((exam) => exam.surahId >= 78);
 
 export function getExam(id: string | undefined): Exam | undefined {
   return EXAMS.find((exam) => exam.id === id);

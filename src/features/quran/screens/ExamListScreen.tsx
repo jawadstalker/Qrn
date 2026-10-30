@@ -133,7 +133,7 @@ export default function ExamListScreen() {
         const result = resultFor(exam.id);
 
         return (
-          <Rise key={exam.id} delay={120 + position * 60}>
+          <Rise key={exam.id} delay={120 + Math.min(position, 8) * 60}>
             <Pressable
               accessibilityRole="button"
               onPress={() =>

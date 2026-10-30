@@ -1,4 +1,5 @@
 import type { Localized } from "@/features/quran/data/tafsir";
+import { JUZ30_CONCEPT_QUESTIONS } from "@/features/quran/data/juz30/conceptBank";
 
 export interface ConceptQuestion {
   id: string;
@@ -10,7 +11,7 @@ export interface ConceptQuestion {
 }
 
 /** Meaning questions that mirror the plain-language tafsir pages. */
-export const CONCEPT_QUESTIONS: readonly ConceptQuestion[] = [
+const CORE_CONCEPT_QUESTIONS: readonly ConceptQuestion[] = [
   {
     id: "naba-theme",
     surahId: 78,
@@ -194,6 +195,12 @@ export const CONCEPT_QUESTIONS: readonly ConceptQuestion[] = [
       en: "“Ihdina as-sirat al-mustaqim” asks to be guided to, and kept firm on, the straight path.",
     },
   },
+];
+
+/** An-Naba (hand-written) plus the other Juz 30 surahs (juz30/conceptBank.ts). */
+export const CONCEPT_QUESTIONS: readonly ConceptQuestion[] = [
+  ...CORE_CONCEPT_QUESTIONS,
+  ...JUZ30_CONCEPT_QUESTIONS,
 ];
 
 export function conceptQuestionsFor(surahId: number): ConceptQuestion[] {
