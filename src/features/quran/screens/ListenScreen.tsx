@@ -35,7 +35,7 @@ import {
   StarBadge,
 } from "@/features/quran/components/QuranDecor";
 import { RECITERS, getReciter } from "@/features/quran/data/reciters";
-import { SURAHS, getSurah, type SurahInfo } from "@/features/quran/data/surahs";
+import { JUZ30_SURAHS, getSurah, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { SectionPractice } from "@/features/quran/components/SectionPractice";
@@ -94,7 +94,7 @@ export default function ListenScreen() {
   const data = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    return SURAHS.filter(
+    return JUZ30_SURAHS.filter(
       (surah) =>
         !normalized ||
         surah.name.includes(normalized) ||

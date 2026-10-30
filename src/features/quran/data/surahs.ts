@@ -125,3 +125,10 @@ export const SURAHS: readonly SurahInfo[] = [
 export function getSurah(id: number): SurahInfo | undefined {
   return SURAHS.find((surah) => surah.id === id);
 }
+
+/** The app covers Juz 30 only: surahs 78 (An-Naba) to 114 (An-Nas). */
+export const JUZ30_FIRST_SURAH = 78;
+
+export const JUZ30_SURAHS: readonly SurahInfo[] = SURAHS.filter(
+  (surah) => surah.id >= JUZ30_FIRST_SURAH,
+);

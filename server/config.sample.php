@@ -11,7 +11,7 @@ return [
     // Limits (per window).
     'login_max_failures' => 8,      // per email+IP
     'login_window_seconds' => 900,
-    'register_max_per_ip' => 15,
+    'register_max_per_ip' => 100,   // mobile carriers put many users behind one IP; 15 would block real people
     'register_window_seconds' => 3600,
     // Max size of one synced value (bytes) and number of keys per user.
     'sync_max_value_bytes' => 1048576,

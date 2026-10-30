@@ -1,10 +1,15 @@
 # Route everything to index.php and keep the Authorization header (needed on cPanel/FastCGI).
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Internal folders are never served directly.
+RewriteRule ^(src|tests)(/|$) - [F]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
 
-<FilesMatch "^(config(\.sample)?\.php|schema\.mysql\.sql)$">
+# Secrets, SQL, docs and PHP error logs (cPanel writes "error_log" next to the script).
+<FilesMatch "^(config(\.sample)?\.php|error_log|.*\.log|.*\.sql|README.*\.md)$">
   Require all denied
 </FilesMatch>
 Options -Indexes

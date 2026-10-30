@@ -1,0 +1,76 @@
+diff --git a/app.json b/app.json
+index 76f99c0..67dc5c4 100644
+--- a/app.json
++++ b/app.json
+@@ -23,7 +23,13 @@
+         "backgroundColor": "#2F6B4F"
+       },
+       "edgeToEdgeEnabled": true,
+-      "package": "com.deathstalker_owen.qurangarden"
++      "package": "com.deathstalker_owen.qurangarden",
++      "versionCode": 1,
++      "blockedPermissions": [
++        "android.permission.SYSTEM_ALERT_WINDOW",
++        "android.permission.READ_EXTERNAL_STORAGE",
++        "android.permission.WRITE_EXTERNAL_STORAGE"
++      ]
+     },
+     "web": {
+       "favicon": "./assets/icon.png"
+diff --git a/package.json b/package.json
+index 42d42b5..7b81085 100644
+--- a/package.json
++++ b/package.json
+@@ -20,14 +20,18 @@
+     "expo-audio": "~0.4.9",
+     "expo-build-properties": "~0.14.8",
+     "expo-constants": "~17.1.8",
++    "expo-file-system": "~18.1.11",
+     "expo-font": "~13.3.2",
+     "expo-gl": "~15.1.7",
+     "expo-haptics": "~14.1.4",
+     "expo-linking": "~7.1.7",
++    "expo-print": "~14.1.4",
+     "expo-router": "~5.1.11",
++    "expo-sharing": "~13.1.5",
+     "expo-splash-screen": "~0.30.10",
+     "expo-status-bar": "~2.2.3",
+     "expo-system-ui": "~5.0.11",
++    "jszip": "^3.10.2",
+     "lucide-react-native": "^1.28.0",
+     "query-string": "^7.1.3",
+     "react": "19.0.0",
+diff --git a/server/.htaccess b/server/.htaccess
+index 25f7b61..5efc061 100644
+--- a/server/.htaccess
++++ b/server/.htaccess
+@@ -1,10 +1,15 @@
+ # Route everything to index.php and keep the Authorization header (needed on cPanel/FastCGI).
+ RewriteEngine On
+ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
++
++# Internal folders are never served directly.
++RewriteRule ^(src|tests)(/|$) - [F]
++
+ RewriteCond %{REQUEST_FILENAME} !-f
+ RewriteRule ^ index.php [L]
+ 
+-<FilesMatch "^(config(\.sample)?\.php|schema\.mysql\.sql)$">
++# Secrets, SQL, docs and PHP error logs (cPanel writes "error_log" next to the script).
++<FilesMatch "^(config(\.sample)?\.php|error_log|.*\.log|.*\.sql|README.*\.md)$">
+   Require all denied
+ </FilesMatch>
+ Options -Indexes
+diff --git a/server/config.sample.php b/server/config.sample.php
+index d62d891..c3a8b58 100644
+--- a/server/config.sample.php
++++ b/server/config.sample.php
+@@ -11,7 +11,7 @@ return [
+     // Limits (per window).
+     'login_max_failures' => 8,      // per email+IP
+     'login_window_seconds' => 900,
+-    'register_max_per_ip' => 15,
++    'register_max_per_ip' => 100,   // mobile carriers put many users behind one IP; 15 would block real people
+     'register_window_seconds' => 3600,
+     // Max size of one synced value (bytes) and number of keys per user.
+     'sync_max_value_bytes' => 1048576,

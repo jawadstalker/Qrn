@@ -31,7 +31,7 @@ export const SCOPE_SURAHS: readonly number[] = Object.keys(VERSE_TEXT)
 
 let state: ScopeState = {
   loaded: false,
-  surahId: SCOPE_SURAHS[SCOPE_SURAHS.length - 1] ?? 1,
+  surahId: SCOPE_SURAHS.includes(78) ? 78 : (SCOPE_SURAHS[0] ?? 1),
   ranges: {},
   selected: {},
   questionCount: 8,
@@ -59,9 +59,7 @@ export function selectionOf(current: ScopeState, surahId: number): number[] {
   const stored = current.selected[surahId];
   const all = Array.from({ length: to - from + 1 }, (_, index) => from + index);
 
-  return stored
-    ? all.filter((ayah) => stored.includes(ayah))
-    : all;
+  return stored ? all.filter((ayah) => stored.includes(ayah)) : all;
 }
 
 function emit(next: ScopeState) {
@@ -80,22 +78,6 @@ async function persist() {
   } catch (error) {
     console.error("[QURAN] Failed to save scope:", error);
   }
-}
-
-/** Forgets the in-memory copy and reads the stored data again (used after a sync pulled new data). */
-export function reloadScopeStore(): Promise<void> {
-  loading = null;
-  // Start from defaults so old in-memory values are not merged into the reloaded data.
-  state = {
-    loaded: false,
-    surahId: SCOPE_SURAHS[SCOPE_SURAHS.length - 1] ?? 1,
-    ranges: {},
-    selected: {},
-    questionCount: 8,
-    passPercent: 70,
-  };
-
-  return load();
 }
 
 function load(): Promise<void> {

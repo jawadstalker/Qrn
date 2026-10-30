@@ -16,7 +16,7 @@ import { useLanguage } from "@/core/i18n/LanguageContext";
 import { formatNumber } from "@/core/i18n/format";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
-import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
+import { JUZ30_SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { fill } from "@/features/quran/utils/fill";
 
 interface SurahPickerModalProps {
@@ -54,10 +54,10 @@ export function SurahPickerModal({
     const normalized = query.trim().toLowerCase();
 
     if (!normalized) {
-      return SURAHS;
+      return JUZ30_SURAHS;
     }
 
-    return SURAHS.filter(
+    return JUZ30_SURAHS.filter(
       (surah) =>
         surah.name.includes(normalized) ||
         surah.transliteration.toLowerCase().includes(normalized) ||

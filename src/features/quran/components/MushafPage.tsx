@@ -1,9 +1,16 @@
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import {
   cellText,
   type MushafPageData,
 } from "@/features/quran/data/mushafPages";
+import { useMushafFont } from "@/features/quran/utils/qcf4Fonts";
 
 const LINE_HEIGHT_RATIO = 1.41;
 const GLYPH_LINE_HEIGHT_RATIO = 1.7;
@@ -20,6 +27,8 @@ const CREAM = "#FFFBEF";
 
 const FRAME_INSET = 12;
 const BISMILLAH_WIDTH_RATIO = 0.46;
+/** The bismillah glyphs always come from the QCF_BSML font (2048 units per em). */
+const BISMILLAH_UNITS_PER_EM = 2048;
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
 function toArabicDigits(value: number): string {
@@ -44,6 +53,7 @@ export function MushafPage({
   accessibilityLabel,
 }: MushafPageProps) {
   const { frame, surahHeader } = page;
+  const fontReady = useMushafFont(page.fontFamily);
   const innerWidth = frame ? width - FRAME_INSET * 2 : width;
 
   const { markers, verseByIndex } = useMemo(() => {
@@ -62,7 +72,7 @@ export function MushafPage({
   }, [page]);
 
   const fontSize = useMemo(() => {
-    const widest = Math.max(
+    const widestShown = Math.max(
       ...page.lines
         .filter((line) => line.alignment === "justify")
         .map((line) =>
@@ -71,13 +81,21 @@ export function MushafPage({
             .reduce((sum, advance) => sum + advance, 0),
         ),
     );
+    const widest =
+      page.referenceWidth ??
+      (Number.isFinite(widestShown) && widestShown > 0
+        ? widestShown
+        : page.advances.reduce((sum, advance) => sum + advance, 0));
 
     return (innerWidth * page.unitsPerEm) / widest;
   }, [page, innerWidth]);
 
-  const lineHeight = fontSize * LINE_HEIGHT_RATIO;
+  const lineRatio = page.lineHeightRatio ?? LINE_HEIGHT_RATIO;
+  const lineHeight = fontSize * lineRatio;
+  const glyphLineHeight =
+    fontSize * lineRatio * (GLYPH_LINE_HEIGHT_RATIO / LINE_HEIGHT_RATIO);
 
-  const lines = page.lines.map((line) => (
+  const lineViews = page.lines.map((line) => (
     <View
       key={line.from}
       style={[
@@ -103,7 +121,7 @@ export function MushafPage({
               {
                 fontFamily: page.fontFamily,
                 fontSize,
-                lineHeight: fontSize * GLYPH_LINE_HEIGHT_RATIO,
+                lineHeight: glyphLineHeight,
                 color: highlighted ? HIGHLIGHT : INK,
               },
               hidden && {
@@ -133,6 +151,18 @@ export function MushafPage({
     </View>
   ));
 
+  // Page fonts load on demand; keep the layout stable and show a spinner until the glyphs exist.
+  const lines = (
+    <View>
+      <View style={{ opacity: fontReady ? 1 : 0 }}>{lineViews}</View>
+      {fontReady ? null : (
+        <View style={styles.loading} pointerEvents="none">
+          <ActivityIndicator color={GOLD_DARK} />
+        </View>
+      )}
+    </View>
+  );
+
   if (!frame) {
     return (
       <View
@@ -152,7 +182,8 @@ export function MushafPage({
       0,
     ) ?? 1;
   const bismillahSize =
-    (innerWidth * BISMILLAH_WIDTH_RATIO * page.unitsPerEm) / bismillahAdvance;
+    (innerWidth * BISMILLAH_WIDTH_RATIO * BISMILLAH_UNITS_PER_EM) /
+    bismillahAdvance;
   const medallion = Math.max(innerWidth * 0.17, 44);
 
   return (
@@ -256,6 +287,11 @@ export function MushafPage({
 }
 
 const styles = StyleSheet.create({
+  loading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   line: {
     flexDirection: "row-reverse",
     alignItems: "center",

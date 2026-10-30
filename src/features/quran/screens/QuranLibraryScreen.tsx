@@ -20,7 +20,7 @@ import {
   MiniPlant,
   type MiniPlantState,
 } from "@/features/quran/components/MiniPlant";
-import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
+import { JUZ30_SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { SectionMiniBar } from "@/features/quran/components/SectionMiniBar";
 
@@ -52,7 +52,7 @@ export default function QuranLibraryScreen() {
   const rowStates = useMemo(() => {
     const map = new Map<number, RowState & { startAyah: number }>();
 
-    SURAHS.forEach((surah) => {
+    JUZ30_SURAHS.forEach((surah) => {
       const stats = statsFor(surah.id);
 
       if (!stats) {
@@ -90,7 +90,7 @@ export default function QuranLibraryScreen() {
   const data = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    return SURAHS.filter((surah) => {
+    return JUZ30_SURAHS.filter((surah) => {
       const matchesQuery =
         !normalized ||
         surah.name.includes(normalized) ||
