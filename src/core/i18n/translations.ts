@@ -58,11 +58,15 @@ export const translations = {
     quran_state_seed: "دانه",
     quran_soon: "به‌زودی",
     quran_moment_title: "آیهٔ {ayah} حفظ شد",
-    quran_moment_sub: "یک برگ تازه روی نهالت درآمد",
+    quran_moment_sub: "گلت یک قدم به شکوفهٔ بعدی نزدیک‌تر شد",
+    quran_moment_sub_leaf: "یک برگ تازه روی گلت درآمد",
+    quran_moment_sub_blossom: "یک شکوفهٔ تازه روی گلت باز شد",
     quran_moment_note:
-      "هر برگ یعنی یک آیهٔ یادگرفته. گل وقتی باز می‌شود که چند بار مرور کنی و در خاطرت بماند.",
+      "هر شکوفه یعنی یک‌سوم از سوره را حفظ کرده‌ای. سه شکوفه که باز شود، گلت کامل است.",
     quran_continue: "ادامه",
     quran_back_garden: "بازگشت به باغ",
+    quran_back_home: "بازگشت به خانه",
+    quran_marker_hint: "برگ و شکوفه‌هایی که با حفظ این آیه‌ها به گلت اضافه می‌شوند",
     app_quran: "باغ حفظ قرآن",
     app_quran_description:
       "آیات را با مرور کم‌فشار حفظ کن و ببین گیاهت با هر آیه رشد می‌کند.",
@@ -377,11 +381,16 @@ export const translations = {
     quran_state_seed: "Seed",
     quran_soon: "Coming soon",
     quran_moment_title: "Verse {ayah} memorized",
-    quran_moment_sub: "A new leaf grew on your plant",
+    quran_moment_sub: "Your flower is one step closer to the next blossom",
+    quran_moment_sub_leaf: "A new leaf grew on your flower",
+    quran_moment_sub_blossom: "A new blossom opened on your flower",
     quran_moment_note:
-      "Each leaf is a verse you learned. A flower opens when you review it several times and it stays with you.",
+      "Each blossom means another third of the surah is memorized. When all three are open, your flower is complete.",
     quran_continue: "Continue",
     quran_back_garden: "Back to garden",
+    quran_back_home: "Back to home",
+    quran_marker_hint:
+      "The leaves and blossoms these verses will add to your flower",
     app_quran: "Quran Garden",
     app_quran_description:
       "Memorize verses with low-pressure review and watch your plant grow with every verse.",

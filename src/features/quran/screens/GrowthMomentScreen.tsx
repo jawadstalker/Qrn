@@ -34,7 +34,22 @@ export default function GrowthMomentScreen() {
   const stageName = t[`quran_stage_${plant.stage.id}`] ?? "";
 
   const goesToQuiz = params.next === "quiz";
-  const goBack = () => router.replace(goesToQuiz ? "/quiz" : "/");
+  const subText = plant.newBlossom
+    ? t.quran_moment_sub_blossom
+    : plant.newLeaf
+      ? t.quran_moment_sub_leaf
+      : t.quran_moment_sub;
+  // "Continue" goes back to the memorize page (the next verse is already there).
+  const goContinue = () => {
+    if (goesToQuiz) {
+      router.replace("/quiz");
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/memorize");
+    }
+  };
+  const goHome = () => router.replace("/");
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
@@ -56,7 +71,8 @@ export default function GrowthMomentScreen() {
               width={PLANT_WIDTH}
               leaves={Math.max(plant.leaves, 1)}
               flowers={plant.flowers}
-              hasNewLeaf
+              hasNewLeaf={plant.newLeaf}
+              newBlossom={plant.newBlossom}
             />
           </View>
         </View>
@@ -82,7 +98,7 @@ export default function GrowthMomentScreen() {
               variant="bodySmall"
               style={{ color: colors.textSecondary, textAlign }}
             >
-              {t.quran_moment_sub}
+              {subText}
             </AppText>
           </View>
 
@@ -127,16 +143,16 @@ export default function GrowthMomentScreen() {
 
           <ChunkyButton
             label={(goesToQuiz ? t.quran_quiz_start : t.quran_continue) ?? ""}
-            onPress={goBack}
+            onPress={goContinue}
           />
           <View style={styles.later}>
             <AppText
               variant="bodySmall"
               accessibilityRole="button"
-              onPress={() => router.replace("/")}
+              onPress={goHome}
               style={{ color: colors.textSecondary }}
             >
-              {t.quran_back_garden}
+              {t.quran_back_home}
             </AppText>
           </View>
         </Rise>

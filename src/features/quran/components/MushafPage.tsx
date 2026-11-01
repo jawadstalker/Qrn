@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, type RefObject } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,6 +17,8 @@ const GLYPH_LINE_HEIGHT_RATIO = 1.7;
 const CENTER_GAP_RATIO = 0.35;
 const INK = "#14110D";
 const HIGHLIGHT = "#C9302C";
+/** The verse being recited right now: clearly different from ink and from the red study highlight. */
+const RECITING = "#1565C0";
 const BLUR = "rgba(20,40,30,0.5)";
 
 const GOLD = "#B8934A";
@@ -39,6 +41,10 @@ interface MushafPageProps {
   page: MushafPageData;
   width: number;
   highlightAyah: number;
+  /** The verse currently being recited (audio), shown in its own color. */
+  recitingAyah?: number;
+  /** Receives the first line of the reciting verse so the screen can scroll to it. */
+  recitingLineRef?: RefObject<View | null>;
   hiddenIndices: ReadonlySet<number>;
   onRevealWord: (index: number) => void;
   accessibilityLabel: string;
@@ -48,6 +54,8 @@ export function MushafPage({
   page,
   width,
   highlightAyah,
+  recitingAyah,
+  recitingLineRef,
   hiddenIndices,
   onRevealWord,
   accessibilityLabel,
@@ -95,9 +103,25 @@ export function MushafPage({
   const glyphLineHeight =
     fontSize * lineRatio * (GLYPH_LINE_HEIGHT_RATIO / LINE_HEIGHT_RATIO);
 
+  // The first line that holds a word of the reciting verse.
+  const recitingLineFrom =
+    recitingAyah === undefined
+      ? undefined
+      : page.lines.find((line) => {
+          for (let index = line.from; index < line.to; index += 1) {
+            if (verseByIndex[index] === recitingAyah) {
+              return true;
+            }
+          }
+
+          return false;
+        })?.from;
+
   const lineViews = page.lines.map((line) => (
     <View
       key={line.from}
+      ref={line.from === recitingLineFrom ? recitingLineRef : undefined}
+      collapsable={false}
       style={[
         styles.line,
         {
@@ -111,6 +135,8 @@ export function MushafPage({
       {Array.from({ length: line.to - line.from }, (_, offset) => {
         const index = line.from + offset;
         const hidden = hiddenIndices.has(index) && !markers.has(index);
+        const reciting =
+          recitingAyah !== undefined && verseByIndex[index] === recitingAyah;
         const highlighted = verseByIndex[index] === highlightAyah;
         const glyph = (
           <Text
@@ -122,13 +148,17 @@ export function MushafPage({
                 fontFamily: page.fontFamily,
                 fontSize,
                 lineHeight: glyphLineHeight,
-                color: highlighted ? HIGHLIGHT : INK,
+                color: reciting ? RECITING : highlighted ? HIGHLIGHT : INK,
               },
               hidden && {
                 color: "transparent",
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 9,
-                textShadowColor: highlighted ? "rgba(201,48,44,0.5)" : BLUR,
+                textShadowColor: reciting
+                  ? "rgba(21,101,192,0.5)"
+                  : highlighted
+                    ? "rgba(201,48,44,0.5)"
+                    : BLUR,
               },
             ]}
           >

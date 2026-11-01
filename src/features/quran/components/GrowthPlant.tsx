@@ -13,6 +13,7 @@ interface GrowthPlantProps {
   leaves: number;
   flowers: number;
   hasNewLeaf?: boolean;
+  newBlossom?: boolean;
 }
 
 export function GrowthPlant({
@@ -20,6 +21,7 @@ export function GrowthPlant({
   leaves,
   flowers,
   hasNewLeaf = false,
+  newBlossom = false,
 }: GrowthPlantProps) {
   const reduced = useReducedMotion();
   const splashGateOpen = useSplashGate();
@@ -35,6 +37,7 @@ export function GrowthPlant({
           leaves={leaves}
           flowers={flowers}
           hasNewLeaf={hasNewLeaf}
+          newBlossom={newBlossom}
         />
       </View>
     );
@@ -47,12 +50,13 @@ export function GrowthPlant({
 
   return (
     <Plant3D
-      key={`${leaves}-${flowers}-${hasNewLeaf}`}
+      key={`${leaves}-${flowers}-${hasNewLeaf}-${newBlossom}`}
       width={width}
       height={height}
       leaves={leaves}
       flowers={flowers}
       hasNewLeaf={hasNewLeaf}
+      newBlossom={newBlossom}
       reducedMotion={reduced}
       onFailure={handleFailure}
     />

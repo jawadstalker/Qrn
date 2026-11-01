@@ -6,6 +6,8 @@ export interface PlantSceneOptions {
   leaves: number;
   flowers: number;
   hasNewLeaf: boolean;
+  /** The newest blossom was just earned: it gets a glow. */
+  newBlossom?: boolean;
   reducedMotion: boolean;
 }
 
@@ -34,6 +36,22 @@ interface FlowerPart {
   baseScale: number;
   branch?: THREE.Mesh;
 }
+
+/**
+ * The three blossoms sit on the stem, in the order they open: bottom, middle,
+ * top. `at` is the place on the stem (0..1); `dx`/`dy`/`dz` is a short stalk
+ * from there (the top blossom has none and sits on the tip).
+ */
+const BLOSSOM_SLOTS = [
+  { at: 0.3, dx: 0.4, dy: 0.12, dz: 0.06, scale: 0.62 },
+  { at: 0.58, dx: -0.4, dy: 0.14, dz: -0.05, scale: 0.74 },
+  { at: 1, dx: 0, dy: 0, dz: 0, scale: 1 },
+] as const;
+/** Where the (at most three) leaves sit along the stem. */
+const LEAF_AT = [0.12, 0.42, 0.72] as const;
+/** The pot drops in first when something new was added to the plant. */
+const ENTRY_SECONDS = 0.7;
+const POT_DROP = 1.8;
 
 const STEM_BASE_Y = 0.66;
 const LEAF_BASE_COLOR = 0x2f6b4f;
@@ -180,7 +198,17 @@ function createFlower(scale: number): FlowerPart {
 }
 
 export function createPlantScene(options: PlantSceneOptions): PlantScene {
-  const { width, height, leaves, flowers, hasNewLeaf, reducedMotion } = options;
+  const {
+    width,
+    height,
+    leaves,
+    flowers,
+    hasNewLeaf,
+    newBlossom = false,
+    reducedMotion,
+  } = options;
+  const entrance = hasNewLeaf || newBlossom;
+  const entry = entrance && !reducedMotion ? ENTRY_SECONDS : 0;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 50);
   camera.position.set(0, 1.45, 6.2);
@@ -202,7 +230,9 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
     new THREE.Vector2(0.68, 0.7),
     new THREE.Vector2(0.58, 0.7),
   ];
-  root.add(
+  const potGroup = new THREE.Group();
+  root.add(potGroup);
+  potGroup.add(
     new THREE.Mesh(
       new THREE.LatheGeometry(potProfile, 40),
       solidMaterial(0xc98b5e),
@@ -215,7 +245,7 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
   );
   soil.rotation.x = -Math.PI / 2;
   soil.position.y = STEM_BASE_Y;
-  root.add(soil);
+  potGroup.add(soil);
 
   const stemPoints = [
     new THREE.Vector3(0, STEM_BASE_Y, 0),
@@ -244,9 +274,9 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
   const leafParts: LeafPart[] = [];
 
   for (let index = 0; index < leaves; index += 1) {
-    const position = 0.12 + (0.78 * index) / Math.max(leaves - 1, 1);
+    const position = LEAF_AT[index % LEAF_AT.length]!;
     const isNew = hasNewLeaf && index === leaves - 1;
-    const size = 0.92 - 0.045 * index;
+    const size = 0.9 - 0.06 * index;
     const tipColor = isNew
       ? NEW_LEAF_TIP_COLOR
       : LEAF_TIP_COLORS[index % LEAF_TIP_COLORS.length]!;
@@ -275,22 +305,31 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
   const flowerParts: FlowerPart[] = [];
   const tip = curve.getPoint(1);
 
-  for (let index = 0; index < flowers; index += 1) {
-    const flower = createFlower(index === 0 ? 1 : 0.7);
-    flower.start = 2.1 + 0.4 * index;
+  const flowerCount = Math.min(flowers, BLOSSOM_SLOTS.length);
 
-    if (index === 0) {
+  for (let index = 0; index < flowerCount; index += 1) {
+    const slot = BLOSSOM_SLOTS[index]!;
+    const isTop = index === BLOSSOM_SLOTS.length - 1;
+    const flower = createFlower(slot.scale);
+    // Bottom blossom opens first, then the middle one, then the top.
+    flower.start = 1.7 + 0.45 * index;
+
+    if (isTop) {
       flower.group.position.set(tip.x, tip.y + 0.04, tip.z);
     } else {
-      const origin = curve.getPoint(0.55);
+      const origin = curve.getPoint(slot.at);
       const end = new THREE.Vector3(
-        origin.x + 0.55,
-        origin.y + 0.5,
-        origin.z + 0.08,
+        origin.x + slot.dx,
+        origin.y + slot.dy,
+        origin.z + slot.dz,
       );
       const branchCurve = new THREE.CatmullRomCurve3([
         origin.clone(),
-        new THREE.Vector3(origin.x + 0.2, origin.y + 0.2, origin.z + 0.05),
+        new THREE.Vector3(
+          origin.x + slot.dx * 0.4,
+          origin.y + slot.dy * 0.2,
+          origin.z + slot.dz * 0.5,
+        ),
         end,
       ]);
       flower.branch = new THREE.Mesh(
@@ -306,9 +345,9 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
   }
 
   let glow: THREE.Mesh | null = null;
-  const firstFlower = flowerParts[0];
+  const newestFlower = flowerParts[flowerParts.length - 1];
 
-  if (hasNewLeaf && firstFlower) {
+  if (newBlossom && newestFlower) {
     glow = new THREE.Mesh(
       new THREE.CircleGeometry(0.75, 40),
       new THREE.MeshBasicMaterial({
@@ -319,13 +358,22 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
         blending: THREE.AdditiveBlending,
       }),
     );
-    glow.position.copy(firstFlower.group.position);
+    glow.position.copy(newestFlower.group.position);
     glow.position.z -= 0.08;
     root.add(glow);
   }
 
   const update = (seconds: number, userRotation: number, dragging: boolean) => {
-    const t = reducedMotion ? 99 : seconds;
+    const t = reducedMotion ? 99 : seconds - entry;
+
+    // Pot: drops in and settles with a little bounce, before the plant grows.
+    const drop = entry
+      ? 1 - easeBack(clamp(seconds / (entry * 0.9), 0, 1))
+      : 0;
+    potGroup.position.y = drop * POT_DROP;
+    potGroup.scale.setScalar(
+      entry ? Math.max(0.001, easeOut(clamp(seconds / 0.3, 0, 1))) : 1,
+    );
 
     stemGroup.scale.y = Math.max(easeOut(clamp((t - 0.2) / 1.5, 0, 1)), 0.001);
 
@@ -353,7 +401,10 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
 
       if (flower.branch) {
         flower.branch.scale.setScalar(
-          Math.max(0.001, easeOut(clamp((t - 1.6) / 0.6, 0, 1))),
+          Math.max(
+            0.001,
+            easeOut(clamp((t - (flower.start - 0.5)) / 0.5, 0, 1)),
+          ),
         );
       }
     });
@@ -363,8 +414,10 @@ export function createPlantScene(options: PlantSceneOptions): PlantScene {
         0.5 + 0.25 * Math.sin(t * 2.2);
     }
 
-    root.rotation.z = Math.sin(t * 1.1) * 0.025;
-    root.rotation.y = userRotation + (dragging ? 0 : Math.sin(t * 0.5) * 0.3);
+    const sway = Math.max(t, 0);
+
+    root.rotation.z = Math.sin(sway * 1.1) * 0.025;
+    root.rotation.y = userRotation + (dragging ? 0 : Math.sin(sway * 0.5) * 0.3);
   };
 
   const dispose = () => {

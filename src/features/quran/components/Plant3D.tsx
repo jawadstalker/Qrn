@@ -12,6 +12,7 @@ interface Plant3DProps {
   leaves: number;
   flowers: number;
   hasNewLeaf?: boolean;
+  newBlossom?: boolean;
   reducedMotion: boolean;
   onFailure: () => void;
 }
@@ -22,6 +23,7 @@ export function Plant3D({
   leaves,
   flowers,
   hasNewLeaf = false,
+  newBlossom = false,
   reducedMotion,
   onFailure,
 }: Plant3DProps) {
@@ -74,6 +76,7 @@ export function Plant3D({
           leaves,
           flowers,
           hasNewLeaf,
+          newBlossom,
           reducedMotion,
         });
         const startedAt = Date.now();
@@ -107,7 +110,7 @@ export function Plant3D({
         onFailure();
       }
     },
-    [flowers, hasNewLeaf, leaves, onFailure, reducedMotion],
+    [flowers, hasNewLeaf, leaves, newBlossom, onFailure, reducedMotion],
   );
 
   return (

@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Pressable,
   ScrollView,
@@ -12,6 +18,8 @@ import {
   ArrowLeft,
   ArrowRight,
   ClipboardCheck,
+  Flower2,
+  Leaf,
   Volume2,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +38,7 @@ import { pageForAyah } from "@/features/quran/data/mushafPages";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { fill } from "@/features/quran/utils/fill";
+import { growthMarkers } from "@/features/quran/utils/plantGrowth";
 import { SectionPractice } from "@/features/quran/components/SectionPractice";
 import { useSectionData } from "@/features/quran/state/useSectionInfo";
 import { STATUS_COLORS } from "@/features/quran/utils/sections";
@@ -41,6 +50,8 @@ const MODES: readonly Mode[] = ["full", "half", "hidden", "challenge"];
 const MAX_PEEKS = 3;
 const PADDING = 20;
 const PAPER_PADDING = 14;
+const BLOSSOM_COLOR = "#E0708F";
+const LEAF_COLOR = "#3F8A63";
 
 function hiddenIndicesFor(
   verses: readonly MushafVerse[],
@@ -84,11 +95,15 @@ export default function MemorizeScreen() {
   const { row, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height: windowHeight } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const recitingLine = useRef<View>(null);
   const params = useLocalSearchParams<{ ayah?: string }>();
-  const { mushaf, currentAyah, remember, needsReview } =
+  const { mushaf, currentAyah, remember, needsReview, recordFor, learnedCount } =
     useQuranProgress();
-  const { playAyah, target, playing, toggle } = useRecitation();
+  const { playAyah, target, playing, loading, rangeProgress, toggle } =
+    useRecitation();
   const verses = mushaf.verses;
   const TOTAL_VERSES = verses.length;
   const initial = Number(params.ayah);
@@ -97,6 +112,16 @@ export default function MemorizeScreen() {
       ? initial
       : currentAyah,
   );
+  // Stars of the verses that will add a leaf or a blossom to the flower once learned.
+  const markers = useMemo(
+    () =>
+      growthMarkers(
+        verses.map((verse) => verse.ayah).filter((ayah) => !recordFor(ayah)),
+        learnedCount,
+        verses.length,
+      ),
+    [learnedCount, recordFor, verses],
+  );
   const [mode, setMode] = useState<Mode>("half");
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
   const [peeks, setPeeks] = useState(0);
@@ -104,7 +129,53 @@ export default function MemorizeScreen() {
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const surah = getSurah(mushaf.surahId);
 
-  const page = pageForAyah(mushaf, current);
+  // The verse whose audio is playing (single verse or inside a section/range playback).
+  const recitingAyah = useMemo(() => {
+    if (
+      !target ||
+      target.surahId !== mushaf.surahId ||
+      !(playing || loading)
+    ) {
+      return undefined;
+    }
+
+    if (target.kind === "ayah") {
+      return target.ayah;
+    }
+
+    return target.kind === "range"
+      ? (rangeProgress?.ayah ?? target.from)
+      : undefined;
+  }, [loading, mushaf.surahId, playing, rangeProgress?.ayah, target]);
+
+  // Show the page of the verse being recited, so it is never off the screen.
+  const page = pageForAyah(mushaf, recitingAyah ?? current);
+
+  // Bring the reciting verse into view: the player settings sit far below the page,
+  // so without this the user has to scroll up after every verse.
+  useEffect(() => {
+    if (recitingAyah === undefined) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      recitingLine.current?.measureInWindow((_x, y, _width, lineHeight) => {
+        const top = insets.top + 72;
+        const bottom = windowHeight * 0.55;
+
+        if (y >= top && y + lineHeight <= bottom) {
+          return;
+        }
+
+        scrollRef.current?.scrollTo({
+          y: Math.max(scrollY.current + y - top, 0),
+          animated: true,
+        });
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [recitingAyah, page.pageNumber, insets.top, windowHeight]);
   const { verseStatus } = useSectionData(mushaf.surahId);
 
   const hidden = useMemo(() => {
@@ -227,12 +298,17 @@ export default function MemorizeScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
         { paddingTop: insets.top + 16, paddingHorizontal: PADDING },
       ]}
       showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={(event) => {
+        scrollY.current = event.nativeEvent.contentOffset.y;
+      }}
     >
       <Rise>
         <View style={[styles.header, { flexDirection: row }]}>
@@ -313,6 +389,8 @@ export default function MemorizeScreen() {
             page={page}
             width={pageWidth}
             highlightAyah={current}
+            recitingAyah={recitingAyah}
+            recitingLineRef={recitingLine}
             hiddenIndices={hidden}
             onRevealWord={reveal}
             accessibilityLabel={fill(t.quran_page_label, {
@@ -370,20 +448,37 @@ export default function MemorizeScreen() {
         <View style={[styles.dotsRow, { flexDirection: row }]}>
           {verses.map((verse) => {
             const isCurrent = verse.ayah === current;
+            const marker = markers.get(verse.ayah);
 
             return (
-              <HizbDot
-                key={verse.ayah}
-                size={isCurrent ? 18 : 14}
-                color={
-                  isCurrent
-                    ? colors.highlight
-                    : STATUS_COLORS[verseStatus(verse.ayah).status]
-                }
-              />
+              <View key={verse.ayah} style={styles.dotCell}>
+                {marker === "blossom" ? (
+                  <Flower2 size={14} color={BLOSSOM_COLOR} strokeWidth={2.4} />
+                ) : marker === "leaf" ? (
+                  <Leaf size={12} color={LEAF_COLOR} strokeWidth={2.4} />
+                ) : (
+                  <View style={styles.markerSpace} />
+                )}
+                <HizbDot
+                  size={isCurrent ? 18 : 14}
+                  color={
+                    isCurrent
+                      ? colors.highlight
+                      : STATUS_COLORS[verseStatus(verse.ayah).status]
+                  }
+                />
+              </View>
             );
           })}
         </View>
+        {markers.size > 0 ? (
+          <AppText
+            variant="caption"
+            style={{ color: colors.textSecondary, textAlign: "center" }}
+          >
+            {t.quran_marker_hint}
+          </AppText>
+        ) : null}
       </View>
 
       <View style={[styles.actions, { flexDirection: row }]}>
@@ -478,8 +573,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  dotsRow: {
+  dotCell: {
     alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 2,
+  },
+  markerSpace: {
+    height: 14,
+  },
+  dotsRow: {
+    alignItems: "flex-end",
     justifyContent: "center",
     flexWrap: "wrap",
     gap: 6,

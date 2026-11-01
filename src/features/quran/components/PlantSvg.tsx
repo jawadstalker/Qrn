@@ -19,7 +19,15 @@ const STEM_PATH = "M120 242 C 114 205, 128 170, 121 132 S 116 70, 124 34";
 const LEAF_PATH = "M0 0 C 10 -16 34 -20 50 -6 C 40 10 14 14 0 0 Z";
 const LEAF_COLORS = ["#3F8A63", "#5DAA7F", "#2F6B4F", "#6DB88D"];
 const NEW_LEAF_COLOR = "#8FD1A8";
-const LEAF_POSITIONS = [0.1, 0.2, 0.3, 0.42, 0.54, 0.66, 0.78, 0.88];
+const LEAF_POSITIONS = [0.1, 0.42, 0.74];
+/** Blossoms in the order they open: bottom, middle (short stalks), then the top tip. */
+const BLOSSOM_SLOTS = [
+  { at: 0.3, dx: 36, dy: -12, size: 0.62 },
+  { at: 0.6, dx: -38, dy: -14, size: 0.74 },
+] as const;
+const TOP_BLOSSOM = { x: 124, y: 32, size: 1 } as const;
+/** When something new was added, the pot drops in first and the rest waits for it. */
+const ENTRY_MS = 700;
 const POP_SPRING = { damping: 9, stiffness: 150, mass: 0.7 };
 
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -100,11 +108,13 @@ function Leaf({
   position,
   isNew,
   reduced,
+  lead,
 }: {
   index: number;
   position: Point;
   isNew: boolean;
   reduced: boolean;
+  lead: number;
 }) {
   const progress = useSharedValue(reduced ? 1 : 0);
   const side = index % 2 === 0 ? 1 : -1;
@@ -112,9 +122,12 @@ function Leaf({
 
   useEffect(() => {
     if (!reduced) {
-      progress.value = withDelay(500 + index * 160, withSpring(1, POP_SPRING));
+      progress.value = withDelay(
+        lead + 500 + index * 160,
+        withSpring(1, POP_SPRING),
+      );
     }
-  }, [index, progress, reduced]);
+  }, [index, lead, progress, reduced]);
 
   const animatedProps = useAnimatedProps(() => ({
     scale: Math.max(progress.value, 0.001),
@@ -195,6 +208,7 @@ interface PlantSvgProps {
   leaves: number;
   flowers: number;
   hasNewLeaf?: boolean;
+  newBlossom?: boolean;
 }
 
 export function PlantSvg({
@@ -202,10 +216,13 @@ export function PlantSvg({
   leaves,
   flowers,
   hasNewLeaf = false,
+  newBlossom = false,
 }: PlantSvgProps) {
   const reduced = useReducedMotion();
+  const lead = !reduced && (hasNewLeaf || newBlossom) ? ENTRY_MS : 0;
   const draw = useSharedValue(reduced ? 0 : STEM_LENGTH);
   const sway = useSharedValue(0);
+  const potDrop = useSharedValue(lead > 0 ? -90 : 0);
   const height = (width * VIEW_HEIGHT) / VIEW_WIDTH;
   const count = Math.min(leaves, LEAF_POSITIONS.length);
 
@@ -214,8 +231,12 @@ export function PlantSvg({
       return;
     }
 
+    if (lead > 0) {
+      potDrop.value = withSpring(0, { damping: 9, stiffness: 120, mass: 0.8 });
+    }
+
     draw.value = withDelay(
-      200,
+      lead + 200,
       withTiming(0, { duration: 1500, easing: Easing.out(Easing.cubic) }),
     );
     sway.value = withRepeat(
@@ -226,13 +247,16 @@ export function PlantSvg({
       -1,
       true,
     );
-  }, [draw, reduced, sway]);
+  }, [draw, lead, potDrop, reduced, sway]);
 
+  const potProps = useAnimatedProps(() => ({ y: potDrop.value }));
   const stemProps = useAnimatedProps(() => ({ strokeDashoffset: draw.value }));
   const swayStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${sway.value * 1.6}deg` }],
   }));
-  const branch = pointAt(0.48);
+  const sideCount = Math.min(Math.max(flowers, 0), BLOSSOM_SLOTS.length);
+  const sideSlots = BLOSSOM_SLOTS.slice(0, sideCount);
+  const showTop = flowers >= BLOSSOM_SLOTS.length + 1;
 
   return (
     <Animated.View style={[{ width, height }, swayStyle]}>
@@ -241,12 +265,14 @@ export function PlantSvg({
         height={height}
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
       >
-        <Path
-          d="M72 252 L168 252 L158 296 Q157 300 153 300 L87 300 Q83 300 82 296 Z"
-          fill="#C98B5E"
-        />
-        <Rect x={64} y={238} width={112} height={18} rx={7} fill="#B97A4F" />
-        <Ellipse cx={120} cy={241} rx={50} ry={6} fill="#5E4230" />
+        <AnimatedG animatedProps={potProps}>
+          <Path
+            d="M72 252 L168 252 L158 296 Q157 300 153 300 L87 300 Q83 300 82 296 Z"
+            fill="#C98B5E"
+          />
+          <Rect x={64} y={238} width={112} height={18} rx={7} fill="#B97A4F" />
+          <Ellipse cx={120} cy={241} rx={50} ry={6} fill="#5E4230" />
+        </AnimatedG>
         <AnimatedPath
           d={STEM_PATH}
           stroke="#2F6B4F"
@@ -256,15 +282,20 @@ export function PlantSvg({
           animatedProps={stemProps}
           fill="none"
         />
-        {flowers > 1 ? (
-          <Path
-            d={`M${branch.x} ${branch.y} C ${branch.x + 20} ${branch.y - 14}, ${branch.x + 40} ${branch.y - 24}, ${branch.x + 54} ${branch.y - 30}`}
-            stroke="#2F6B4F"
-            strokeWidth={4}
-            strokeLinecap="round"
-            fill="none"
-          />
-        ) : null}
+        {sideSlots.map((slot, index) => {
+          const start = pointAt(slot.at);
+
+          return (
+            <Path
+              key={`stalk-${index}`}
+              d={`M${start.x} ${start.y} C ${start.x + slot.dx * 0.4} ${start.y + slot.dy * 0.1}, ${start.x + slot.dx * 0.75} ${start.y + slot.dy * 0.7}, ${start.x + slot.dx} ${start.y + slot.dy}`}
+              stroke="#2F6B4F"
+              strokeWidth={4}
+              strokeLinecap="round"
+              fill="none"
+            />
+          );
+        })}
         {Array.from({ length: count }, (_, index) => (
           <Leaf
             key={index}
@@ -272,17 +303,29 @@ export function PlantSvg({
             position={pointAt(LEAF_POSITIONS[index]!)}
             isNew={hasNewLeaf && index === count - 1}
             reduced={reduced}
+            lead={lead}
           />
         ))}
-        {flowers >= 1 ? (
-          <Flower x={124} y={32} size={1} delay={1900} reduced={reduced} />
-        ) : null}
-        {flowers >= 2 ? (
+        {sideSlots.map((slot, index) => {
+          const start = pointAt(slot.at);
+
+          return (
+            <Flower
+              key={`blossom-${index}`}
+              x={start.x + slot.dx}
+              y={start.y + slot.dy}
+              size={slot.size}
+              delay={lead + 1500 + index * 350}
+              reduced={reduced}
+            />
+          );
+        })}
+        {showTop ? (
           <Flower
-            x={branch.x + 54}
-            y={branch.y - 30}
-            size={0.72}
-            delay={2200}
+            x={TOP_BLOSSOM.x}
+            y={TOP_BLOSSOM.y}
+            size={TOP_BLOSSOM.size}
+            delay={lead + 1500 + BLOSSOM_SLOTS.length * 350}
             reduced={reduced}
           />
         ) : null}
