@@ -95,7 +95,7 @@ export default function SessionScreen() {
   const startExam = useCallback(() => {
     const count = Math.min(scope.questionCount, Math.max(ayahs.length * 3, 3));
     const built = buildQuiz(surahId, language, t, count, {
-      kinds: ["fill", "next", "number"],
+      kinds: ["order", "next", "number", "page", "line"],
       ayahs,
       lastAyah: range.to,
     });

@@ -8,6 +8,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
 import { GOLD } from "@/features/quran/components/QuranDecor";
+import { ArrangeQuestion } from "@/features/quran/components/ArrangeQuestion";
 import { usePT } from "@/features/quran/i18n/practice";
 import type {
   QuizOption,
@@ -77,6 +78,17 @@ export function QuizQuestionCard({
   const correctOption = question.options.find(
     (option) => option.id === question.correctId,
   );
+
+  if (question.kind === "order" && question.arrange) {
+    return (
+      <ArrangeQuestion
+        key={question.uid}
+        question={question}
+        picked={picked}
+        onPick={onPick}
+      />
+    );
+  }
 
   return (
     <>

@@ -3,8 +3,13 @@ import { VERSE_TEXT } from "@/features/quran/data/verseText";
 import type { Language } from "@/core/types/index";
 import { formatNumber } from "@/core/i18n/format";
 import { fill } from "@/features/quran/utils/fill";
+import {
+  LINES_PER_PAGE,
+  pageBounds,
+  verseLocation,
+} from "@/features/quran/data/verseLocations";
 
-export type QuizKind = "fill" | "next" | "number" | "concept";
+export type QuizKind = "order" | "next" | "number" | "page" | "line" | "concept";
 
 export interface QuizOption {
   id: string;
@@ -13,8 +18,20 @@ export interface QuizOption {
   arabic: boolean;
 }
 
+/** A word-arranging question: the learner puts the shuffled words back in verse order. */
+export interface QuizArrange {
+  /** Words in the correct order. */
+  words: string[];
+  /** The same words, shuffled, each with its own id. */
+  bank: { id: string; text: string }[];
+  /** True when only the beginning of a long verse is asked. */
+  partial: boolean;
+}
+
 export interface QuizQuestion {
   id: string;
+  /** Unique per built question (React key); `id` stays stable across rounds for the mistake history. */
+  uid: string;
   kind: QuizKind;
   /** Instruction line (localized). */
   prompt: string;
@@ -28,11 +45,23 @@ export interface QuizQuestion {
   ayah?: number;
   /** Full Arabic verse revealed after answering. */
   revealVerse?: string;
+  /** Present for "order" questions. */
+  arrange?: QuizArrange;
 }
 
 export const QUIZ_LENGTH = 8;
-const BLANK = "_______";
 const OPTION_COUNT = 4;
+/** Verses longer than this are asked by their first words only. */
+const ORDER_MAX_WORDS = 8;
+const ORDER_MIN_WORDS = 3;
+
+let uidCounter = 0;
+
+function nextUid(): string {
+  uidCounter += 1;
+
+  return `q${uidCounter}`;
+}
 
 type Translate = Record<string, string>;
 
@@ -54,78 +83,68 @@ function pickOthers<T>(pool: readonly T[], count: number): T[] {
   return shuffle(pool).slice(0, count);
 }
 
-/** Letters only, so words that differ by marks alone are not offered as two options. */
-function skeleton(word: string): string {
-  return word.replace(/[ً-ٰٟۖ-ۭـ]/g, "");
-}
-
+/** Words of a verse; stop-sign tokens that hold no letter are glued to the word before them. */
 function wordsOf(verse: string): string[] {
-  return verse.split(" ").filter((word) => word.length > 0);
+  const words: string[] = [];
+
+  verse
+    .split(" ")
+    .filter((word) => word.length > 0)
+    .forEach((word) => {
+      if (!/[ء-يٱ-ۓ]/.test(word) && words.length > 0) {
+        words[words.length - 1] += ` ${word}`;
+      } else {
+        words.push(word);
+      }
+    });
+
+  return words;
 }
 
-function buildFill(
+function buildOrder(
   surahId: number,
   ayah: number,
   t: Translate,
+  language: Language,
 ): QuizQuestion | undefined {
-  const verses = VERSE_TEXT[surahId];
-  const verse = verses?.[ayah - 1]?.ar;
+  const verse = VERSE_TEXT[surahId]?.[ayah - 1]?.ar;
 
-  if (!verses || !verse) {
+  if (!verse) {
     return undefined;
   }
 
-  const words = wordsOf(verse);
-  const candidates = words
-    .map((word, index) => ({ word, index }))
-    .filter(({ word }) => skeleton(word).length >= 3);
+  const all = wordsOf(verse);
 
-  if (words.length < 3 || candidates.length === 0) {
+  if (all.length < ORDER_MIN_WORDS) {
     return undefined;
   }
 
-  const target = candidates[Math.floor(Math.random() * candidates.length)]!;
-  const targetSkeleton = skeleton(target.word);
-  const pool = new Map<string, string>();
+  const partial = all.length > ORDER_MAX_WORDS;
+  const words = partial ? all.slice(0, ORDER_MAX_WORDS) : all;
+  let bank = shuffle(words.map((text, index) => ({ id: `w${index}`, text })));
 
-  verses.forEach((item) => {
-    wordsOf(item.ar).forEach((word) => {
-      const letters = skeleton(word);
+  // A shuffle that happens to keep the verse order would be a free answer.
+  for (let tries = 0; tries < 5; tries += 1) {
+    if (bank.some((item, index) => item.text !== words[index])) {
+      break;
+    }
 
-      if (letters.length >= 3 && letters !== targetSkeleton) {
-        pool.set(letters, word);
-      }
-    });
-  });
-
-  const wrong = pickOthers(Array.from(pool.values()), OPTION_COUNT - 1);
-
-  if (wrong.length < OPTION_COUNT - 1) {
-    return undefined;
+    bank = shuffle(bank);
   }
-
-  const blanked = words
-    .map((word, index) => (index === target.index ? BLANK : word))
-    .join(" ");
-  const options = shuffle([
-    { id: "correct", text: target.word, arabic: true },
-    ...wrong.map((word, index) => ({
-      id: `wrong-${index}`,
-      text: word,
-      arabic: true,
-    })),
-  ]);
 
   return {
-    id: `fill-${ayah}`,
-    kind: "fill",
-    prompt: t.quran_quiz_fill ?? "",
-    arabicPrompt: blanked,
-    options,
+    id: `order-${ayah}`,
+    uid: nextUid(),
+    kind: "order",
+    prompt: fill(partial ? t.quran_quiz_order_partial : t.quran_quiz_order, {
+      ayah: formatNumber(ayah, language),
+    }),
+    options: [{ id: "correct", text: words.join(" "), arabic: true }],
     correctId: "correct",
-    explanation: t.quran_quiz_explain_fill ?? "",
+    explanation: t.quran_quiz_explain_order ?? "",
     ayah,
     revealVerse: verse,
+    arrange: { words, bank, partial },
   };
 }
 
@@ -146,7 +165,15 @@ function buildNext(
 
   const others = verses
     .map((item, index) => ({ text: item.ar, ayah: index + 1 }))
-    .filter((item) => item.ayah !== ayah && item.ayah !== ayah + 1);
+    .filter(
+      (item) =>
+        item.ayah !== ayah && item.ayah !== ayah + 1 && item.text !== following,
+    )
+    // Repeated verses (e.g. the refrain of Ar-Rahman-style surahs) must not appear twice as options.
+    .filter(
+      (item, index, list) =>
+        list.findIndex((other) => other.text === item.text) === index,
+    );
 
   if (others.length < OPTION_COUNT - 1) {
     return undefined;
@@ -168,6 +195,7 @@ function buildNext(
 
   return {
     id: `next-${ayah}`,
+    uid: nextUid(),
     kind: "next",
     prompt: t.quran_quiz_next_prompt ?? "",
     arabicPrompt: current,
@@ -222,6 +250,7 @@ function buildNumber(
 
   return {
     id: `number-${ayah}`,
+    uid: nextUid(),
     kind: "number",
     prompt: t.quran_quiz_number_prompt ?? "",
     arabicPrompt: verse,
@@ -234,9 +263,122 @@ function buildNumber(
   };
 }
 
+/** Correct number plus close-by wrong ones (min..max inclusive), topped up at random when the range is tight. */
+function nearbyNumbers(correct: number, min: number, max: number): number[] {
+  const numbers = new Set<number>([correct]);
+
+  for (const offset of shuffle([-4, -3, -2, -1, 1, 2, 3, 4])) {
+    const value = correct + offset;
+
+    if (value >= min && value <= max) {
+      numbers.add(value);
+    }
+
+    if (numbers.size === OPTION_COUNT) {
+      break;
+    }
+  }
+
+  for (const value of shuffle(
+    Array.from({ length: max - min + 1 }, (_, index) => min + index),
+  )) {
+    if (numbers.size >= OPTION_COUNT) {
+      break;
+    }
+
+    numbers.add(value);
+  }
+
+  return Array.from(numbers);
+}
+
+function numberOptions(
+  numbers: readonly number[],
+  correct: number,
+  language: Language,
+): QuizOption[] {
+  return shuffle(
+    numbers.map((value) => ({
+      id: value === correct ? "correct" : `wrong-${value}`,
+      text: formatNumber(value, language),
+      arabic: false,
+    })),
+  );
+}
+
+function buildPage(
+  surahId: number,
+  ayah: number,
+  t: Translate,
+  language: Language,
+): QuizQuestion | undefined {
+  const verse = VERSE_TEXT[surahId]?.[ayah - 1]?.ar;
+  const location = verseLocation(surahId, ayah);
+
+  if (!verse || !location) {
+    return undefined;
+  }
+
+  const { min, max } = pageBounds();
+  const numbers = nearbyNumbers(location.page, min, max);
+
+  if (numbers.length < OPTION_COUNT) {
+    return undefined;
+  }
+
+  return {
+    id: `page-${ayah}`,
+    uid: nextUid(),
+    kind: "page",
+    prompt: t.quran_quiz_page_prompt ?? "",
+    arabicPrompt: verse,
+    options: numberOptions(numbers, location.page, language),
+    correctId: "correct",
+    explanation: fill(t.quran_quiz_explain_page, {
+      page: formatNumber(location.page, language),
+      line: formatNumber(location.line, language),
+    }),
+    ayah,
+  };
+}
+
+function buildLine(
+  surahId: number,
+  ayah: number,
+  t: Translate,
+  language: Language,
+): QuizQuestion | undefined {
+  const verse = VERSE_TEXT[surahId]?.[ayah - 1]?.ar;
+  const location = verseLocation(surahId, ayah);
+
+  if (!verse || !location) {
+    return undefined;
+  }
+
+  const numbers = nearbyNumbers(location.line, 1, LINES_PER_PAGE);
+
+  return {
+    id: `line-${ayah}`,
+    uid: nextUid(),
+    kind: "line",
+    prompt: fill(t.quran_quiz_line_prompt, {
+      page: formatNumber(location.page, language),
+    }),
+    arabicPrompt: verse,
+    options: numberOptions(numbers, location.line, language),
+    correctId: "correct",
+    explanation: fill(t.quran_quiz_explain_page, {
+      page: formatNumber(location.page, language),
+      line: formatNumber(location.line, language),
+    }),
+    ayah,
+  };
+}
+
 /**
- * Builds a mixed quiz for a memorized surah: fill-in-the-blank, "which verse comes next",
- * "which verse number" and a few meaning questions. Returns [] when there is no verse text.
+ * Builds a mixed quiz for a memorized surah: arrange the words of a verse, "which verse comes next",
+ * "which verse number", "which page", "which line" and a few meaning questions.
+ * Returns [] when there is no verse text.
  */
 export interface BuildQuizOptions {
   /** Only these question kinds are generated (default: all kinds). */
@@ -285,6 +427,7 @@ export function buildQuiz(
 
       return {
         id: `concept-${item.id}`,
+        uid: nextUid(),
         kind: "concept",
         prompt: item.prompt[language],
         options,
@@ -294,18 +437,22 @@ export function buildQuiz(
     });
 
   const wanted = length - concept.length;
-  // Roughly: 3 of 5 fill-in-the-blank, then "next verse" and "verse number".
+  // Default mix: two word-arranging questions, then "next verse", verse number, page and line.
+  const defaultPlan: readonly QuizKind[] = [
+    "order",
+    "next",
+    "order",
+    "number",
+    "page",
+    "line",
+  ];
   const plan: QuizKind[] = [];
 
   for (let index = 0; index < wanted; index += 1) {
     plan.push(
       verseKinds.length > 0
         ? verseKinds[index % verseKinds.length]!
-        : index % 5 === 3
-          ? "next"
-          : index % 5 === 4
-            ? "number"
-            : "fill",
+        : defaultPlan[index % defaultPlan.length]!,
     );
   }
 
@@ -319,11 +466,15 @@ export function buildQuiz(
 
       cursor += 1;
       built =
-        kind === "fill"
-          ? buildFill(surahId, ayah, t)
+        kind === "order"
+          ? buildOrder(surahId, ayah, t, language)
           : kind === "next"
             ? buildNext(surahId, ayah, t, language, options?.lastAyah)
-            : buildNumber(surahId, ayah, t, language);
+            : kind === "page"
+              ? buildPage(surahId, ayah, t, language)
+              : kind === "line"
+                ? buildLine(surahId, ayah, t, language)
+                : buildNumber(surahId, ayah, t, language);
     }
 
     if (built) {

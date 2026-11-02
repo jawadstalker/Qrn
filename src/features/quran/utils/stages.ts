@@ -14,11 +14,11 @@ export interface StageSpec {
 }
 
 export const STAGES: readonly StageSpec[] = [
-  { id: 1, kinds: ["fill", "number"], length: 6, pass: 0.7, recall: false },
-  { id: 2, kinds: ["fill", "next"], length: 8, pass: 0.75, recall: false },
+  { id: 1, kinds: ["order", "number"], length: 6, pass: 0.7, recall: false },
+  { id: 2, kinds: ["order", "next", "page"], length: 8, pass: 0.75, recall: false },
   {
     id: 3,
-    kinds: ["fill", "next", "number", "concept"],
+    kinds: ["order", "next", "number", "page", "line", "concept"],
     length: 10,
     pass: 0.8,
     recall: false,

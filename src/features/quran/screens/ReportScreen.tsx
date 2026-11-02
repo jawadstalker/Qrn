@@ -35,9 +35,11 @@ import {
 } from "@/features/quran/utils/mastery";
 
 const KINDS: readonly PracticeKind[] = [
-  "fill",
+  "order",
   "next",
   "number",
+  "page",
+  "line",
   "concept",
   "recall",
 ];

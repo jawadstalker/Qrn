@@ -1,7 +1,16 @@
 import { useEffect, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type PracticeKind = "fill" | "next" | "number" | "concept" | "recall";
+/** "fill" is no longer asked; it stays so older saved results still load. */
+export type PracticeKind =
+  | "fill"
+  | "order"
+  | "next"
+  | "number"
+  | "page"
+  | "line"
+  | "concept"
+  | "recall";
 export type PracticeMode = "quiz" | "stage" | "recall" | "exam";
 
 export interface KindTally {
