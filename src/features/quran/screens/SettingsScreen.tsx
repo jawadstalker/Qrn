@@ -20,6 +20,7 @@ import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
 import { GUIDE_UI } from "@/features/guide/guideContent";
 import { useGuide } from "@/features/guide/GuideContext";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const SWATCH_SIZE = 44;
 const LANGUAGES: readonly { id: Language; label: string }[] = [
@@ -49,9 +50,11 @@ export default function SettingsScreen() {
   const { pagesEnabled, setPagesEnabled, resetPageGuides, start } = useGuide();
   const [guidesReset, setGuidesReset] = useState(false);
   const guideText = GUIDE_UI[language];
+  const guideScroll = useGuideScroll();
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
       showsVerticalScrollIndicator={false}
@@ -66,292 +69,302 @@ export default function SettingsScreen() {
       </Rise>
 
       <Rise delay={40}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            status === "in" ? t.auth_account_card_manage : t.auth_login_cta
-          }
-          onPress={() => {
-            play("select");
-            router.push(status === "in" ? "/account" : "/login");
-          }}
-          style={({ pressed }) => [
-            styles.card,
-            styles.accountCard,
-            {
-              backgroundColor: colors.surface,
-              flexDirection: row,
-              opacity: pressed ? 0.85 : 1,
-            },
-          ]}
-        >
-          <View style={[styles.avatar, { backgroundColor: colors.tintSoft }]}>
-            <UserRound size={24} color={colors.onTint} />
-          </View>
-          <View style={styles.switchText}>
-            <AppText
-              variant="body"
-              style={{ color: colors.text, textAlign, fontWeight: "800" }}
-            >
-              {status === "in" ? t.auth_account_title : t.auth_account_card_title}
-            </AppText>
-            <AppText
-              variant="caption"
-              numberOfLines={2}
-              forceEnglish={status === "in"}
-              style={{ color: colors.textSecondary, textAlign }}
-            >
-              {status === "in" && user ? user.email : t.auth_account_card_out}
-            </AppText>
-          </View>
-          <Chevron size={22} color={colors.textTertiary} />
-        </Pressable>
-      </Rise>
-
-      <Rise delay={80}>
-        <Card>
-          <AppText
-            variant="body"
-            style={{ color: colors.text, textAlign, fontWeight: "800" }}
-          >
-            {t.theme}
-          </AppText>
-          <View style={[styles.swatches, { flexDirection: row }]}>
-            {THEME_ORDER.map((mode) => {
-              const selected = theme === mode;
-
-              return (
-                <Pressable
-                  key={mode}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={t[`theme_${mode}`]}
-                  onPress={() => {
-                    play("select");
-                    void setTheme(mode);
-                  }}
-                  style={styles.swatchItem}
-                >
-                  <View
-                    style={[
-                      styles.swatchRing,
-                      {
-                        borderColor: selected
-                          ? Colors[mode].primary
-                          : "transparent",
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.swatch,
-                        { backgroundColor: Colors[mode].primary },
-                      ]}
-                    />
-                  </View>
-                  <AppText
-                    variant="caption"
-                    style={{
-                      color: colors.text,
-                      fontWeight: selected ? "800" : "500",
-                    }}
-                  >
-                    {t[`theme_${mode}`]}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Card>
-      </Rise>
-
-      <Rise delay={160}>
-        <Card>
-          <AppText
-            variant="body"
-            style={{ color: colors.text, textAlign, fontWeight: "800" }}
-          >
-            {t.language}
-          </AppText>
-          <View
-            style={[
-              styles.segmented,
-              { backgroundColor: colors.track, flexDirection: row },
+        <GuideTarget id="settings.account">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              status === "in" ? t.auth_account_card_manage : t.auth_login_cta
+            }
+            onPress={() => {
+              play("select");
+              router.push(status === "in" ? "/account" : "/login");
+            }}
+            style={({ pressed }) => [
+              styles.card,
+              styles.accountCard,
+              {
+                backgroundColor: colors.surface,
+                flexDirection: row,
+                opacity: pressed ? 0.85 : 1,
+              },
             ]}
           >
-            {LANGUAGES.map((item) => {
-              const selected = language === item.id;
-
-              return (
-                <Pressable
-                  key={item.id}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    play("select");
-                    void setLanguage(item.id);
-                  }}
-                  style={[
-                    styles.segment,
-                    selected && { backgroundColor: colors.surface },
-                  ]}
-                >
-                  <AppText
-                    variant="bodySmall"
-                    style={{
-                      color: colors.text,
-                      fontWeight: selected ? "800" : "500",
-                    }}
-                  >
-                    {item.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Card>
-      </Rise>
-
-      <Rise delay={240}>
-        <Card>
-          <View style={[styles.switchRow, { flexDirection: row }]}>
+            <View style={[styles.avatar, { backgroundColor: colors.tintSoft }]}>
+              <UserRound size={24} color={colors.onTint} />
+            </View>
             <View style={styles.switchText}>
               <AppText
                 variant="body"
                 style={{ color: colors.text, textAlign, fontWeight: "800" }}
               >
-                {t.sound_effects}
+                {status === "in" ? t.auth_account_title : t.auth_account_card_title}
               </AppText>
               <AppText
                 variant="caption"
+                numberOfLines={2}
+                forceEnglish={status === "in"}
                 style={{ color: colors.textSecondary, textAlign }}
               >
-                {t.sound_effects_hint}
+                {status === "in" && user ? user.email : t.auth_account_card_out}
               </AppText>
             </View>
-            <Switch
-              value={enabled}
-              onValueChange={(next) => {
-                setEnabled(next);
-                if (next) {
-                  play("select");
-                }
-              }}
-              accessibilityLabel={t.sound_effects}
-              trackColor={{ true: colors.primary, false: colors.track }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </Card>
+            <Chevron size={22} color={colors.textTertiary} />
+          </Pressable>
+        </GuideTarget>
+      </Rise>
+
+      <Rise delay={80}>
+        <GuideTarget id="settings.theme">
+          <Card>
+            <AppText
+              variant="body"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
+              {t.theme}
+            </AppText>
+            <View style={[styles.swatches, { flexDirection: row }]}>
+              {THEME_ORDER.map((mode) => {
+                const selected = theme === mode;
+
+                return (
+                  <Pressable
+                    key={mode}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={t[`theme_${mode}`]}
+                    onPress={() => {
+                      play("select");
+                      void setTheme(mode);
+                    }}
+                    style={styles.swatchItem}
+                  >
+                    <View
+                      style={[
+                        styles.swatchRing,
+                        {
+                          borderColor: selected
+                            ? Colors[mode].primary
+                            : "transparent",
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.swatch,
+                          { backgroundColor: Colors[mode].primary },
+                        ]}
+                      />
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={{
+                        color: colors.text,
+                        fontWeight: selected ? "800" : "500",
+                      }}
+                    >
+                      {t[`theme_${mode}`]}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Card>
+        </GuideTarget>
+      </Rise>
+
+      <Rise delay={160}>
+        <GuideTarget id="settings.language">
+          <Card>
+            <AppText
+              variant="body"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
+              {t.language}
+            </AppText>
+            <View
+              style={[
+                styles.segmented,
+                { backgroundColor: colors.track, flexDirection: row },
+              ]}
+            >
+              {LANGUAGES.map((item) => {
+                const selected = language === item.id;
+
+                return (
+                  <Pressable
+                    key={item.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      play("select");
+                      void setLanguage(item.id);
+                    }}
+                    style={[
+                      styles.segment,
+                      selected && { backgroundColor: colors.surface },
+                    ]}
+                  >
+                    <AppText
+                      variant="bodySmall"
+                      style={{
+                        color: colors.text,
+                        fontWeight: selected ? "800" : "500",
+                      }}
+                    >
+                      {item.label}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Card>
+        </GuideTarget>
+      </Rise>
+
+      <Rise delay={240}>
+        <GuideTarget id="settings.sound">
+          <Card>
+            <View style={[styles.switchRow, { flexDirection: row }]}>
+              <View style={styles.switchText}>
+                <AppText
+                  variant="body"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {t.sound_effects}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {t.sound_effects_hint}
+                </AppText>
+              </View>
+              <Switch
+                value={enabled}
+                onValueChange={(next) => {
+                  setEnabled(next);
+                  if (next) {
+                    play("select");
+                  }
+                }}
+                accessibilityLabel={t.sound_effects}
+                trackColor={{ true: colors.primary, false: colors.track }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </Card>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={320}>
-        <Card>
-          <AppText
-            variant="body"
-            style={{ color: colors.text, textAlign, fontWeight: "800" }}
-          >
-            {guideText.settingsTitle}
-          </AppText>
-          <View style={[styles.switchRow, { flexDirection: row }]}>
-            <View style={styles.switchText}>
-              <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, textAlign, fontWeight: "800" }}
-              >
-                {guideText.pagesTitle}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {guideText.pagesHint}
-              </AppText>
-            </View>
-            <Switch
-              value={pagesEnabled}
-              onValueChange={(next) => {
-                setPagesEnabled(next);
-                setGuidesReset(false);
-                if (next) {
-                  play("select");
-                }
-              }}
-              accessibilityLabel={guideText.pagesTitle}
-              trackColor={{ true: colors.primary, false: colors.track }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={guideText.replayTitle}
-            onPress={() => {
-              play("select");
-              start("tour");
-            }}
-            style={({ pressed }) => [
-              styles.guideRow,
-              { flexDirection: row, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <View
-              style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
+        <GuideTarget id="settings.guide">
+          <Card>
+            <AppText
+              variant="body"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
             >
-              <CircleHelp size={20} color={colors.onTint} />
-            </View>
-            <View style={styles.switchText}>
-              <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, textAlign, fontWeight: "800" }}
-              >
-                {guideText.replayTitle}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {guideText.replayHint}
-              </AppText>
-            </View>
-            <Chevron size={20} color={colors.textTertiary} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={guideText.resetTitle}
-            onPress={() => {
-              play("select");
-              resetPageGuides();
-              setGuidesReset(true);
-            }}
-            style={({ pressed }) => [
-              styles.guideRow,
-              { flexDirection: row, opacity: pressed ? 0.7 : 1 },
-            ]}
-          >
-            <View
-              style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
-            >
-              <RotateCcw size={20} color={colors.onTint} />
-            </View>
-            <View style={styles.switchText}>
-              <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, textAlign, fontWeight: "800" }}
-              >
-                {guideText.resetTitle}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{
-                  color: guidesReset ? colors.success : colors.textSecondary,
-                  textAlign,
+              {guideText.settingsTitle}
+            </AppText>
+            <View style={[styles.switchRow, { flexDirection: row }]}>
+              <View style={styles.switchText}>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {guideText.pagesTitle}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {guideText.pagesHint}
+                </AppText>
+              </View>
+              <Switch
+                value={pagesEnabled}
+                onValueChange={(next) => {
+                  setPagesEnabled(next);
+                  setGuidesReset(false);
+                  if (next) {
+                    play("select");
+                  }
                 }}
-              >
-                {guidesReset ? guideText.resetDone : guideText.resetHint}
-              </AppText>
+                accessibilityLabel={guideText.pagesTitle}
+                trackColor={{ true: colors.primary, false: colors.track }}
+                thumbColor="#FFFFFF"
+              />
             </View>
-          </Pressable>
-        </Card>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={guideText.replayTitle}
+              onPress={() => {
+                play("select");
+                start("tour");
+              }}
+              style={({ pressed }) => [
+                styles.guideRow,
+                { flexDirection: row, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <View
+                style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
+              >
+                <CircleHelp size={20} color={colors.onTint} />
+              </View>
+              <View style={styles.switchText}>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {guideText.replayTitle}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {guideText.replayHint}
+                </AppText>
+              </View>
+              <Chevron size={20} color={colors.textTertiary} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={guideText.resetTitle}
+              onPress={() => {
+                play("select");
+                resetPageGuides();
+                setGuidesReset(true);
+              }}
+              style={({ pressed }) => [
+                styles.guideRow,
+                { flexDirection: row, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <View
+                style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
+              >
+                <RotateCcw size={20} color={colors.onTint} />
+              </View>
+              <View style={styles.switchText}>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {guideText.resetTitle}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{
+                    color: guidesReset ? colors.success : colors.textSecondary,
+                    textAlign,
+                  }}
+                >
+                  {guidesReset ? guideText.resetDone : guideText.resetHint}
+                </AppText>
+              </View>
+            </Pressable>
+          </Card>
+        </GuideTarget>
       </Rise>
     </ScrollView>
   );

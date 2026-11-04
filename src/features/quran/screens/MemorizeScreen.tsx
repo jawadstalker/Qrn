@@ -42,6 +42,7 @@ import { growthMarkers } from "@/features/quran/utils/plantGrowth";
 import { SectionPractice } from "@/features/quran/components/SectionPractice";
 import { useSectionData } from "@/features/quran/state/useSectionInfo";
 import { STATUS_COLORS } from "@/features/quran/utils/sections";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 type Mode = "full" | "half" | "hidden" | "challenge";
 
@@ -98,6 +99,7 @@ export default function MemorizeScreen() {
   const { width, height: windowHeight } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(0);
+  const guideScroll = useGuideScroll(scrollRef);
   const recitingLine = useRef<View>(null);
   const params = useLocalSearchParams<{ ayah?: string }>();
   const { mushaf, currentAyah, remember, needsReview, recordFor, learnedCount } =
@@ -308,6 +310,7 @@ export default function MemorizeScreen() {
       scrollEventThrottle={16}
       onScroll={(event) => {
         scrollY.current = event.nativeEvent.contentOffset.y;
+        guideScroll.onScroll(event);
       }}
     >
       <Rise>
@@ -334,71 +337,77 @@ export default function MemorizeScreen() {
               })}
             </AppText>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t.quran_exam_open}
-            onPress={() => router.push("/exam")}
-            style={[styles.iconButton, { backgroundColor: colors.surface }]}
-          >
-            <ClipboardCheck size={22} color={colors.text} />
-          </Pressable>
+          <GuideTarget id="memorize.exam">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t.quran_exam_open}
+              onPress={() => router.push("/exam")}
+              style={[styles.iconButton, { backgroundColor: colors.surface }]}
+            >
+              <ClipboardCheck size={22} color={colors.text} />
+            </Pressable>
+          </GuideTarget>
         </View>
       </Rise>
 
       <Rise delay={80}>
-        <View
-          style={[
-            styles.segmented,
-            { backgroundColor: colors.tintSoft, flexDirection: row },
-          ]}
-        >
-          {MODES.map((item) => {
-            const selected = item === mode;
+        <GuideTarget id="memorize.modes">
+          <View
+            style={[
+              styles.segmented,
+              { backgroundColor: colors.tintSoft, flexDirection: row },
+            ]}
+          >
+            {MODES.map((item) => {
+              const selected = item === mode;
 
-            return (
-              <Pressable
-                key={item}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => changeMode(item)}
-                style={[
-                  styles.segment,
-                  selected && { backgroundColor: colors.surface },
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  numberOfLines={1}
-                  style={{
-                    color: colors.text,
-                    fontWeight: selected ? "800" : "500",
-                  }}
+              return (
+                <Pressable
+                  key={item}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => changeMode(item)}
+                  style={[
+                    styles.segment,
+                    selected && { backgroundColor: colors.surface },
+                  ]}
                 >
-                  {t[`quran_mode_${item}`]}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <AppText
+                    variant="caption"
+                    numberOfLines={1}
+                    style={{
+                      color: colors.text,
+                      fontWeight: selected ? "800" : "500",
+                    }}
+                  >
+                    {t[`quran_mode_${item}`]}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={160}>
-        <View style={[styles.paper, { padding: PAPER_PADDING }]}>
-          <MushafPage
-            key={page.pageNumber}
-            page={page}
-            width={pageWidth}
-            highlightAyah={current}
-            recitingAyah={recitingAyah}
-            recitingLineRef={recitingLine}
-            hiddenIndices={hidden}
-            onRevealWord={reveal}
-            accessibilityLabel={fill(t.quran_page_label, {
-              page: number(page.pageNumber),
-              surah: surah?.transliteration ?? "",
-            })}
-          />
-        </View>
+        <GuideTarget id="memorize.page">
+          <View style={[styles.paper, { padding: PAPER_PADDING }]}>
+            <MushafPage
+              key={page.pageNumber}
+              page={page}
+              width={pageWidth}
+              highlightAyah={current}
+              recitingAyah={recitingAyah}
+              recitingLineRef={recitingLine}
+              hiddenIndices={hidden}
+              onRevealWord={reveal}
+              accessibilityLabel={fill(t.quran_page_label, {
+                page: number(page.pageNumber),
+                surah: surah?.transliteration ?? "",
+              })}
+            />
+          </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={220}>
@@ -419,101 +428,109 @@ export default function MemorizeScreen() {
       </Rise>
 
       <Rise delay={260}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t.quran_listen_verse}
-          onPress={listenToVerse}
-          style={[
-            styles.listenVerse,
-            { backgroundColor: colors.tintSoft, flexDirection: row },
-          ]}
-        >
-          <Volume2 size={18} color={colors.onTint} />
-          <AppText
-            variant="caption"
-            style={{ color: colors.onTint, fontWeight: "700" }}
+        <GuideTarget id="memorize.listen">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.quran_listen_verse}
+            onPress={listenToVerse}
+            style={[
+              styles.listenVerse,
+              { backgroundColor: colors.tintSoft, flexDirection: row },
+            ]}
           >
-            {verseIsPlaying && playing ? t.quran_pause : t.quran_listen_verse}
-          </AppText>
-        </Pressable>
+            <Volume2 size={18} color={colors.onTint} />
+            <AppText
+              variant="caption"
+              style={{ color: colors.onTint, fontWeight: "700" }}
+            >
+              {verseIsPlaying && playing ? t.quran_pause : t.quran_listen_verse}
+            </AppText>
+          </Pressable>
+        </GuideTarget>
       </Rise>
 
-      <View style={styles.progress}>
-        <AppText variant="caption" style={{ color: colors.textSecondary }}>
-          {fill(t.quran_verse_of, {
-            ayah: number(current),
-            total: number(TOTAL_VERSES),
-          })}
-        </AppText>
-        <View style={[styles.dotsRow, { flexDirection: row }]}>
-          {verses.map((verse) => {
-            const isCurrent = verse.ayah === current;
-            const marker = markers.get(verse.ayah);
-
-            return (
-              <View key={verse.ayah} style={styles.dotCell}>
-                {marker === "blossom" ? (
-                  <Flower2 size={14} color={BLOSSOM_COLOR} strokeWidth={2.4} />
-                ) : marker === "leaf" ? (
-                  <Leaf size={12} color={LEAF_COLOR} strokeWidth={2.4} />
-                ) : (
-                  <View style={styles.markerSpace} />
-                )}
-                <HizbDot
-                  size={isCurrent ? 18 : 14}
-                  color={
-                    isCurrent
-                      ? colors.highlight
-                      : STATUS_COLORS[verseStatus(verse.ayah).status]
-                  }
-                />
-              </View>
-            );
-          })}
-        </View>
-        {markers.size > 0 ? (
-          <AppText
-            variant="caption"
-            style={{ color: colors.textSecondary, textAlign: "center" }}
-          >
-            {t.quran_marker_hint}
+      <GuideTarget id="memorize.dots">
+        <View style={styles.progress}>
+          <AppText variant="caption" style={{ color: colors.textSecondary }}>
+            {fill(t.quran_verse_of, {
+              ayah: number(current),
+              total: number(TOTAL_VERSES),
+            })}
           </AppText>
-        ) : null}
-      </View>
+          <View style={[styles.dotsRow, { flexDirection: row }]}>
+            {verses.map((verse) => {
+              const isCurrent = verse.ayah === current;
+              const marker = markers.get(verse.ayah);
 
-      <View style={[styles.actions, { flexDirection: row }]}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void handleAgain()}
-          style={[
-            styles.secondary,
-            { backgroundColor: colors.surface, shadowColor: colors.tint },
-          ]}
-        >
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "700" }}
-          >
-            {t.quran_again}
-          </AppText>
-        </Pressable>
-        <View style={styles.primary}>
-          <ChunkyButton
-            label={(mode === "full" ? t.quran_test_me : t.quran_knew) ?? ""}
-            onPress={() => void handleRemembered()}
-          />
+              return (
+                <View key={verse.ayah} style={styles.dotCell}>
+                  {marker === "blossom" ? (
+                    <Flower2 size={14} color={BLOSSOM_COLOR} strokeWidth={2.4} />
+                  ) : marker === "leaf" ? (
+                    <Leaf size={12} color={LEAF_COLOR} strokeWidth={2.4} />
+                  ) : (
+                    <View style={styles.markerSpace} />
+                  )}
+                  <HizbDot
+                    size={isCurrent ? 18 : 14}
+                    color={
+                      isCurrent
+                        ? colors.highlight
+                        : STATUS_COLORS[verseStatus(verse.ayah).status]
+                    }
+                  />
+                </View>
+              );
+            })}
+          </View>
+          {markers.size > 0 ? (
+            <AppText
+              variant="caption"
+              style={{ color: colors.textSecondary, textAlign: "center" }}
+            >
+              {t.quran_marker_hint}
+            </AppText>
+          ) : null}
         </View>
-      </View>
+      </GuideTarget>
 
-      <SectionPractice
-        surahId={mushaf.surahId}
-        focusAyah={current}
-        onSelectSection={(section) => {
-          setRevealed(new Set());
-          setPeeks(0);
-          setCurrent(section.from);
-        }}
-      />
+      <GuideTarget id="memorize.actions">
+        <View style={[styles.actions, { flexDirection: row }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleAgain()}
+            style={[
+              styles.secondary,
+              { backgroundColor: colors.surface, shadowColor: colors.tint },
+            ]}
+          >
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.text, fontWeight: "700" }}
+            >
+              {t.quran_again}
+            </AppText>
+          </Pressable>
+          <View style={styles.primary}>
+            <ChunkyButton
+              label={(mode === "full" ? t.quran_test_me : t.quran_knew) ?? ""}
+              onPress={() => void handleRemembered()}
+            />
+          </View>
+        </View>
+      </GuideTarget>
+
+      <GuideTarget id="memorize.sections">
+        <SectionPractice
+          surahId={mushaf.surahId}
+          focusAyah={current}
+          onSelectSection={(section) => {
+            setRevealed(new Set());
+            setPeeks(0);
+            setCurrent(section.from);
+          }}
+        />
+      </GuideTarget>
     </ScrollView>
   );
 }

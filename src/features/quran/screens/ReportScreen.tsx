@@ -33,13 +33,12 @@ import {
   openMistakesByAyah,
   type MasteryLevel,
 } from "@/features/quran/utils/mastery";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 const KINDS: readonly PracticeKind[] = [
-  "order",
+  "fill",
   "next",
   "number",
-  "page",
-  "line",
   "concept",
   "recall",
 ];
@@ -146,280 +145,288 @@ export default function ReportScreen() {
       backTo="/exam"
     >
       <Rise delay={100}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {p("report_mastery")}
-          </AppText>
-          <View style={[styles.bigRow, { flexDirection: row }]}>
+        <GuideTarget id="report.mastery">
+          <Card>
             <AppText
-              variant="display"
-              style={{ color: levelColor[level], fontWeight: "800" }}
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, textAlign }}
             >
-              {`${number(Math.round(overall * 100))}٪`}
+              {p("report_mastery")}
             </AppText>
-            <View style={styles.bigMeta}>
+            <View style={[styles.bigRow, { flexDirection: row }]}>
               <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, fontWeight: "800", textAlign }}
+                variant="display"
+                style={{ color: levelColor[level], fontWeight: "800" }}
               >
-                {p(`level_${level}`)}
+                {`${number(Math.round(overall * 100))}٪`}
               </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {p("report_learned", { learned: learnedCount, total: rows.length })}
-              </AppText>
-            </View>
-          </View>
-          <ProgressBar value={overall} color={levelColor[level]} height={10} />
-
-          <View style={[styles.legend, { flexDirection: row }]}>
-            {(Object.keys(counts) as MasteryLevel[]).map((key) => (
-              <View key={key} style={[styles.legendItem, { flexDirection: row }]}>
-                <View style={[styles.dot, { backgroundColor: levelColor[key] }]} />
-                <AppText variant="caption" style={{ color: colors.textSecondary }}>
-                  {`${p(`level_${key}`)} ${number(counts[key])}`}
+              <View style={styles.bigMeta}>
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, fontWeight: "800", textAlign }}
+                >
+                  {p(`level_${level}`)}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {p("report_learned", { learned: learnedCount, total: rows.length })}
                 </AppText>
               </View>
-            ))}
-          </View>
-          {unresolved > 0 ? (
-            <AppText
-              variant="caption"
-              style={{ color: colors.error, fontWeight: "700", textAlign }}
-            >
-              {`${p("report_unresolved")}: ${number(unresolved)}`}
-            </AppText>
-          ) : null}
-        </Card>
+            </View>
+            <ProgressBar value={overall} color={levelColor[level]} height={10} />
+
+            <View style={[styles.legend, { flexDirection: row }]}>
+              {(Object.keys(counts) as MasteryLevel[]).map((key) => (
+                <View key={key} style={[styles.legendItem, { flexDirection: row }]}>
+                  <View style={[styles.dot, { backgroundColor: levelColor[key] }]} />
+                  <AppText variant="caption" style={{ color: colors.textSecondary }}>
+                    {`${p(`level_${key}`)} ${number(counts[key])}`}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+            {unresolved > 0 ? (
+              <AppText
+                variant="caption"
+                style={{ color: colors.error, fontWeight: "700", textAlign }}
+              >
+                {`${p("report_unresolved")}: ${number(unresolved)}`}
+              </AppText>
+            ) : null}
+          </Card>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={160}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("report_grid")}
-          </AppText>
-          <AppText
-            variant="caption"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {p("report_grid_hint")}
-          </AppText>
-          <View style={[styles.grid, { flexDirection: row }]}>
-            {rows.map((item) => (
-              <Pressable
-                key={item.ayah}
-                accessibilityRole="button"
-                accessibilityLabel={p("mistake_ayah", { ayah: item.ayah })}
-                onPress={() =>
-                  router.push({
-                    pathname: "/memorize",
-                    params: { ayah: String(item.ayah) },
-                  })
-                }
-                style={[
-                  styles.cell,
-                  {
-                    backgroundColor: item.learned || item.mastery > 0
-                      ? levelColor[levelFor(item.mastery)]
-                      : colors.track,
-                    opacity: item.learned || item.mastery > 0 ? 1 : 0.8,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="caption"
-                  style={{
-                    color: item.learned || item.mastery > 0 ? "#FFFFFF" : colors.textSecondary,
-                    fontWeight: "800",
-                  }}
-                >
-                  {number(item.ayah)}
-                </AppText>
-              </Pressable>
-            ))}
-          </View>
-        </Card>
-      </Rise>
-
-      {weakest.length > 0 ? (
-        <Rise delay={200}>
+        <GuideTarget id="report.grid">
           <Card>
             <AppText
               variant="bodySmall"
               style={{ color: colors.text, fontWeight: "800", textAlign }}
             >
-              {p("report_weakest")}
+              {p("report_grid")}
             </AppText>
-            {weakest.map((item) => (
-              <View key={item.ayah} style={[styles.weakRow, { flexDirection: row }]}>
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.text, fontWeight: "700", width: 72, textAlign }}
+            <AppText
+              variant="caption"
+              style={{ color: colors.textSecondary, textAlign }}
+            >
+              {p("report_grid_hint")}
+            </AppText>
+            <View style={[styles.grid, { flexDirection: row }]}>
+              {rows.map((item) => (
+                <Pressable
+                  key={item.ayah}
+                  accessibilityRole="button"
+                  accessibilityLabel={p("mistake_ayah", { ayah: item.ayah })}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/memorize",
+                      params: { ayah: String(item.ayah) },
+                    })
+                  }
+                  style={[
+                    styles.cell,
+                    {
+                      backgroundColor: item.learned || item.mastery > 0
+                        ? levelColor[levelFor(item.mastery)]
+                        : colors.track,
+                      opacity: item.learned || item.mastery > 0 ? 1 : 0.8,
+                    },
+                  ]}
                 >
-                  {p("mistake_ayah", { ayah: item.ayah })}
-                </AppText>
-                <ProgressBar
-                  value={item.mastery}
-                  color={levelColor[levelFor(item.mastery)]}
-                />
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.textSecondary, width: 40 }}
-                >
-                  {`${number(Math.round(item.mastery * 100))}٪`}
-                </AppText>
-              </View>
-            ))}
-            <ChunkyButton
-              label={p("report_practice_weak")}
-              onPress={() => router.push({ pathname: "/recall", params: { weak: "1" } })}
-            />
+                  <AppText
+                    variant="caption"
+                    style={{
+                      color: item.learned || item.mastery > 0 ? "#FFFFFF" : colors.textSecondary,
+                      fontWeight: "800",
+                    }}
+                  >
+                    {number(item.ayah)}
+                  </AppText>
+                </Pressable>
+              ))}
+            </View>
           </Card>
+        </GuideTarget>
+      </Rise>
+
+      {weakest.length > 0 ? (
+        <Rise delay={200}>
+          <GuideTarget id="report.weakest">
+            <Card>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.text, fontWeight: "800", textAlign }}
+              >
+                {p("report_weakest")}
+              </AppText>
+              {weakest.map((item) => (
+                <View key={item.ayah} style={[styles.weakRow, { flexDirection: row }]}>
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.text, fontWeight: "700", width: 72, textAlign }}
+                  >
+                    {p("mistake_ayah", { ayah: item.ayah })}
+                  </AppText>
+                  <ProgressBar
+                    value={item.mastery}
+                    color={levelColor[levelFor(item.mastery)]}
+                  />
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.textSecondary, width: 40 }}
+                  >
+                    {`${number(Math.round(item.mastery * 100))}٪`}
+                  </AppText>
+                </View>
+              ))}
+              <ChunkyButton
+                label={p("report_practice_weak")}
+                onPress={() => router.push({ pathname: "/recall", params: { weak: "1" } })}
+              />
+            </Card>
+          </GuideTarget>
         </Rise>
       ) : null}
 
       <Rise delay={240}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("report_progress")}
-          </AppText>
-
-          {surahAttempts.length === 0 ? (
+        <GuideTarget id="report.progress">
+          <Card>
             <AppText
-              variant="caption"
-              style={{ color: colors.textSecondary, textAlign: "center" }}
+              variant="bodySmall"
+              style={{ color: colors.text, fontWeight: "800", textAlign }}
             >
-              {p("report_no_data")}
+              {p("report_progress")}
             </AppText>
-          ) : (
-            <>
-              <View style={[styles.stats, { flexDirection: row }]}>
-                <Stat label={p("report_attempts")} value={number(surahAttempts.length)} />
-                <Stat label={p("report_questions")} value={number(questions)} />
-                <Stat
-                  label={p("report_overall_accuracy")}
-                  value={accuracy === null ? "—" : `${number(Math.round(accuracy * 100))}٪`}
-                />
-              </View>
 
+            {surahAttempts.length === 0 ? (
               <AppText
                 variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
+                style={{ color: colors.textSecondary, textAlign: "center" }}
               >
-                {p("report_week")}
+                {p("report_no_data")}
               </AppText>
-              <View style={[styles.bars, { flexDirection: row }]}>
-                {series.map((point) => {
-                  const barColor =
-                    point.accuracy === null
-                      ? colors.track
-                      : point.accuracy >= 0.8
-                        ? colors.success
-                        : point.accuracy >= 0.55
-                          ? colors.warning
-                          : colors.error;
+            ) : (
+              <>
+                <View style={[styles.stats, { flexDirection: row }]}>
+                  <Stat label={p("report_attempts")} value={number(surahAttempts.length)} />
+                  <Stat label={p("report_questions")} value={number(questions)} />
+                  <Stat
+                    label={p("report_overall_accuracy")}
+                    value={accuracy === null ? "—" : `${number(Math.round(accuracy * 100))}٪`}
+                  />
+                </View>
+
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {p("report_week")}
+                </AppText>
+                <View style={[styles.bars, { flexDirection: row }]}>
+                  {series.map((point) => {
+                    const barColor =
+                      point.accuracy === null
+                        ? colors.track
+                        : point.accuracy >= 0.8
+                          ? colors.success
+                          : point.accuracy >= 0.55
+                            ? colors.warning
+                            : colors.error;
+
+                    return (
+                      <View key={point.day} style={styles.barColumn}>
+                        <AppText
+                          variant="caption"
+                          style={{ color: colors.textSecondary, fontSize: 10, lineHeight: 14 }}
+                        >
+                          {point.accuracy === null
+                            ? ""
+                            : number(Math.round(point.accuracy * 100))}
+                        </AppText>
+                        <View style={[styles.barSlot, { height: BAR_AREA }]}>
+                          <View
+                            style={{
+                              height: Math.max(
+                                point.questions > 0
+                                  ? (point.questions / maxQuestions) * BAR_AREA
+                                  : 4,
+                                4,
+                              ),
+                              borderRadius: 6,
+                              backgroundColor: barColor,
+                            }}
+                          />
+                        </View>
+                        <AppText variant="caption" style={{ color: colors.textSecondary }}>
+                          {dayLabel(point.day)}
+                        </AppText>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <AppText
+                  variant="caption"
+                  style={{ color: trendColor, fontWeight: "800", textAlign }}
+                >
+                  {trendText}
+                </AppText>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {p("report_streak", { n: streak })}
+                </AppText>
+
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, fontWeight: "800", textAlign, marginTop: 6 }}
+                >
+                  {p("report_by_kind")}
+                </AppText>
+                {KINDS.map((kind) => {
+                  const tally = byKind[kind];
+
+                  if (!tally || tally.total === 0) {
+                    return null;
+                  }
+
+                  const ratio = tally.right / tally.total;
 
                   return (
-                    <View key={point.day} style={styles.barColumn}>
+                    <View key={kind} style={[styles.kindRow, { flexDirection: row }]}>
                       <AppText
                         variant="caption"
-                        style={{ color: colors.textSecondary, fontSize: 10, lineHeight: 14 }}
+                        style={{ color: colors.text, width: 76, textAlign }}
                       >
-                        {point.accuracy === null
-                          ? ""
-                          : number(Math.round(point.accuracy * 100))}
+                        {p(`kind_${kind}`)}
                       </AppText>
-                      <View style={[styles.barSlot, { height: BAR_AREA }]}>
-                        <View
-                          style={{
-                            height: Math.max(
-                              point.questions > 0
-                                ? (point.questions / maxQuestions) * BAR_AREA
-                                : 4,
-                              4,
-                            ),
-                            borderRadius: 6,
-                            backgroundColor: barColor,
-                          }}
-                        />
-                      </View>
-                      <AppText variant="caption" style={{ color: colors.textSecondary }}>
-                        {dayLabel(point.day)}
+                      <ProgressBar
+                        value={ratio}
+                        color={
+                          ratio >= 0.8
+                            ? colors.success
+                            : ratio >= 0.55
+                              ? colors.warning
+                              : colors.error
+                        }
+                      />
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.textSecondary, width: 44 }}
+                      >
+                        {`${number(Math.round(ratio * 100))}٪`}
                       </AppText>
                     </View>
                   );
                 })}
-              </View>
-
-              <AppText
-                variant="caption"
-                style={{ color: trendColor, fontWeight: "800", textAlign }}
-              >
-                {trendText}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {p("report_streak", { n: streak })}
-              </AppText>
-
-              <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, fontWeight: "800", textAlign, marginTop: 6 }}
-              >
-                {p("report_by_kind")}
-              </AppText>
-              {KINDS.map((kind) => {
-                const tally = byKind[kind];
-
-                if (!tally || tally.total === 0) {
-                  return null;
-                }
-
-                const ratio = tally.right / tally.total;
-
-                return (
-                  <View key={kind} style={[styles.kindRow, { flexDirection: row }]}>
-                    <AppText
-                      variant="caption"
-                      style={{ color: colors.text, width: 76, textAlign }}
-                    >
-                      {p(`kind_${kind}`)}
-                    </AppText>
-                    <ProgressBar
-                      value={ratio}
-                      color={
-                        ratio >= 0.8
-                          ? colors.success
-                          : ratio >= 0.55
-                            ? colors.warning
-                            : colors.error
-                      }
-                    />
-                    <AppText
-                      variant="caption"
-                      style={{ color: colors.textSecondary, width: 44 }}
-                    >
-                      {`${number(Math.round(ratio * 100))}٪`}
-                    </AppText>
-                  </View>
-                );
-              })}
-            </>
-          )}
-        </Card>
+              </>
+            )}
+          </Card>
+        </GuideTarget>
       </Rise>
     </ScreenFrame>
   );

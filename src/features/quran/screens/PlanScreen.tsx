@@ -53,6 +53,7 @@ import {
 import { useMemorizationPlan } from "@/features/quran/state/MemorizationPlanContext";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { fill } from "@/features/quran/utils/fill";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const PADDING = 20;
 
@@ -64,6 +65,7 @@ export default function PlanScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { plan, built, isLoaded, isDone, toggleDone, removePlan } =
@@ -463,214 +465,224 @@ export default function PlanScreen() {
 
       {!isLoaded ? null : !plan || !built || !summary ? (
         <Rise delay={120}>
-          <View style={[styles.card, styles.empty, { backgroundColor: colors.surface }]}>
-            <View style={[styles.emptyIcon, { backgroundColor: colors.tintSoft }]}>
-              <CalendarDays size={30} color={colors.onTint} />
+          <GuideTarget id="plan.empty">
+            <View style={[styles.card, styles.empty, { backgroundColor: colors.surface }]}>
+              <View style={[styles.emptyIcon, { backgroundColor: colors.tintSoft }]}>
+                <CalendarDays size={30} color={colors.onTint} />
+              </View>
+              <AppText
+                variant="body"
+                style={{ color: colors.text, fontWeight: "800", textAlign: "center" }}
+              >
+                {t.plan_empty_title}
+              </AppText>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.textSecondary, textAlign: "center" }}
+              >
+                {t.plan_empty_text}
+              </AppText>
+              <ChunkyButton
+                label={t.plan_create ?? ""}
+                onPress={() => router.push("/plan-setup")}
+                style={styles.fullWidth}
+              />
             </View>
-            <AppText
-              variant="body"
-              style={{ color: colors.text, fontWeight: "800", textAlign: "center" }}
-            >
-              {t.plan_empty_title}
-            </AppText>
-            <AppText
-              variant="bodySmall"
-              style={{ color: colors.textSecondary, textAlign: "center" }}
-            >
-              {t.plan_empty_text}
-            </AppText>
-            <ChunkyButton
-              label={t.plan_create ?? ""}
-              onPress={() => router.push("/plan-setup")}
-              style={styles.fullWidth}
-            />
-          </View>
+          </GuideTarget>
         </Rise>
       ) : (
         <>
           <Rise delay={110}>
-            <View style={styles.stack}>
-              {todayCard()}
-              {behind > 0 && !allDone ? (
+            <GuideTarget id="plan.today">
+              <View style={styles.stack}>
+                {todayCard()}
+                {behind > 0 && !allDone ? (
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.textSecondary, textAlign }}
+                  >
+                    {fill(t.plan_behind, { count: number(behind) })}
+                  </AppText>
+                ) : null}
+              </View>
+            </GuideTarget>
+          </Rise>
+
+          <Rise delay={150}>
+            <GuideTarget id="plan.progress">
+              <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                <View style={[styles.track, { backgroundColor: colors.track }]}>
+                  <View
+                    style={[
+                      styles.fill,
+                      {
+                        backgroundColor: colors.success,
+                        width: `${Math.round(progress * 100)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign, fontWeight: "700" }}
+                >
+                  {fill(t.plan_sum_progress_value, {
+                    done: number(doneCount),
+                    sessions: number(sessions.length),
+                    ayahs: number(doneAyahs),
+                    total: number(summary.totalAyahs),
+                  })}
+                </AppText>
+                <View style={[styles.statGrid, { flexDirection: row }]}>
+                  {[
+                    {
+                      label: t.plan_sum_per_session,
+                      value:
+                        summary.minPerSession === summary.maxPerSession
+                          ? number(summary.maxPerSession)
+                          : `${number(summary.minPerSession)}–${number(summary.maxPerSession)}`,
+                    },
+                    {
+                      label: t.plan_sum_start,
+                      value: summary.firstDate
+                        ? formatDate(summary.firstDate, language)
+                        : "—",
+                    },
+                    {
+                      label: t.plan_sum_end,
+                      value: summary.lastDate
+                        ? formatDate(summary.lastDate, language)
+                        : "—",
+                    },
+                  ].map((item) => (
+                    <View
+                      key={item.label}
+                      style={[styles.stat, { backgroundColor: colors.tintSoft }]}
+                    >
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.textSecondary, textAlign }}
+                      >
+                        {item.label}
+                      </AppText>
+                      <AppText
+                        variant="bodySmall"
+                        style={{ color: colors.text, fontWeight: "800", textAlign }}
+                      >
+                        {item.value}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </GuideTarget>
+          </Rise>
+
+          <Rise delay={190}>
+            <GuideTarget id="plan.export">
+              <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                <AppText
+                  variant="body"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {t.plan_export}
+                </AppText>
                 <AppText
                   variant="caption"
                   style={{ color: colors.textSecondary, textAlign }}
                 >
-                  {fill(t.plan_behind, { count: number(behind) })}
+                  {t.plan_export_hint}
                 </AppText>
-              ) : null}
-            </View>
-          </Rise>
+                <View style={[styles.actions, { flexDirection: row }]}>
+                  {(
+                    [
+                      { id: "pdf", label: t.plan_export_pdf, icon: FileText },
+                      { id: "excel", label: t.plan_export_excel, icon: FileSpreadsheet },
+                    ] as const
+                  ).map((item) => {
+                    const Icon = item.icon;
+                    const busy = exporting === item.id;
 
-          <Rise delay={150}>
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <View style={[styles.track, { backgroundColor: colors.track }]}>
-                <View
-                  style={[
-                    styles.fill,
-                    {
-                      backgroundColor: colors.success,
-                      width: `${Math.round(progress * 100)}%`,
-                    },
-                  ]}
-                />
-              </View>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign, fontWeight: "700" }}
-              >
-                {fill(t.plan_sum_progress_value, {
-                  done: number(doneCount),
-                  sessions: number(sessions.length),
-                  ayahs: number(doneAyahs),
-                  total: number(summary.totalAyahs),
-                })}
-              </AppText>
-              <View style={[styles.statGrid, { flexDirection: row }]}>
-                {[
-                  {
-                    label: t.plan_sum_per_session,
-                    value:
-                      summary.minPerSession === summary.maxPerSession
-                        ? number(summary.maxPerSession)
-                        : `${number(summary.minPerSession)}–${number(summary.maxPerSession)}`,
-                  },
-                  {
-                    label: t.plan_sum_start,
-                    value: summary.firstDate
-                      ? formatDate(summary.firstDate, language)
-                      : "—",
-                  },
-                  {
-                    label: t.plan_sum_end,
-                    value: summary.lastDate
-                      ? formatDate(summary.lastDate, language)
-                      : "—",
-                  },
-                ].map((item) => (
-                  <View
-                    key={item.label}
-                    style={[styles.stat, { backgroundColor: colors.tintSoft }]}
+                    return (
+                      <Pressable
+                        key={item.id}
+                        accessibilityRole="button"
+                        accessibilityState={{ busy, disabled: exporting !== null }}
+                        disabled={exporting !== null}
+                        onPress={() => void runExport(item.id)}
+                        style={[
+                          styles.action,
+                          {
+                            backgroundColor: colors.tintSoft,
+                            opacity: exporting && !busy ? 0.5 : 1,
+                          },
+                        ]}
+                      >
+                        <Icon size={18} color={colors.onTint} />
+                        <AppText
+                          variant="bodySmall"
+                          style={{ color: colors.onTint, fontWeight: "800" }}
+                        >
+                          {busy ? t.plan_exporting : item.label}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {message ? (
+                  <AppText
+                    variant="caption"
+                    accessibilityLiveRegion="polite"
+                    style={{ color: colors.textSecondary, textAlign }}
                   >
-                    <AppText
-                      variant="caption"
-                      style={{ color: colors.textSecondary, textAlign }}
-                    >
-                      {item.label}
-                    </AppText>
-                    <AppText
-                      variant="bodySmall"
-                      style={{ color: colors.text, fontWeight: "800", textAlign }}
-                    >
-                      {item.value}
-                    </AppText>
-                  </View>
-                ))}
+                    {message}
+                  </AppText>
+                ) : null}
               </View>
-            </View>
+            </GuideTarget>
           </Rise>
 
-          <Rise delay={190}>
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <AppText
-                variant="body"
-                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+          <Rise delay={230}>
+            <GuideTarget id="plan.view">
+              <View
+                style={[
+                  styles.segmented,
+                  { backgroundColor: colors.track, flexDirection: row },
+                ]}
               >
-                {t.plan_export}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {t.plan_export_hint}
-              </AppText>
-              <View style={[styles.actions, { flexDirection: row }]}>
                 {(
                   [
-                    { id: "pdf", label: t.plan_export_pdf, icon: FileText },
-                    { id: "excel", label: t.plan_export_excel, icon: FileSpreadsheet },
+                    { id: "calendar", label: t.plan_view_calendar },
+                    { id: "list", label: t.plan_view_list },
                   ] as const
                 ).map((item) => {
-                  const Icon = item.icon;
-                  const busy = exporting === item.id;
+                  const isSelected = view === item.id;
 
                   return (
                     <Pressable
                       key={item.id}
-                      accessibilityRole="button"
-                      accessibilityState={{ busy, disabled: exporting !== null }}
-                      disabled={exporting !== null}
-                      onPress={() => void runExport(item.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => setView(item.id)}
                       style={[
-                        styles.action,
-                        {
-                          backgroundColor: colors.tintSoft,
-                          opacity: exporting && !busy ? 0.5 : 1,
-                        },
+                        styles.segment,
+                        isSelected && { backgroundColor: colors.surface },
                       ]}
                     >
-                      <Icon size={18} color={colors.onTint} />
                       <AppText
                         variant="bodySmall"
-                        style={{ color: colors.onTint, fontWeight: "800" }}
+                        style={{
+                          color: colors.text,
+                          fontWeight: isSelected ? "800" : "500",
+                        }}
                       >
-                        {busy ? t.plan_exporting : item.label}
+                        {item.label}
                       </AppText>
                     </Pressable>
                   );
                 })}
               </View>
-              {message ? (
-                <AppText
-                  variant="caption"
-                  accessibilityLiveRegion="polite"
-                  style={{ color: colors.textSecondary, textAlign }}
-                >
-                  {message}
-                </AppText>
-              ) : null}
-            </View>
-          </Rise>
-
-          <Rise delay={230}>
-            <View
-              style={[
-                styles.segmented,
-                { backgroundColor: colors.track, flexDirection: row },
-              ]}
-            >
-              {(
-                [
-                  { id: "calendar", label: t.plan_view_calendar },
-                  { id: "list", label: t.plan_view_list },
-                ] as const
-              ).map((item) => {
-                const isSelected = view === item.id;
-
-                return (
-                  <Pressable
-                    key={item.id}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: isSelected }}
-                    onPress={() => setView(item.id)}
-                    style={[
-                      styles.segment,
-                      isSelected && { backgroundColor: colors.surface },
-                    ]}
-                  >
-                    <AppText
-                      variant="bodySmall"
-                      style={{
-                        color: colors.text,
-                        fontWeight: isSelected ? "800" : "500",
-                      }}
-                    >
-                      {item.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
+            </GuideTarget>
           </Rise>
 
           {view === "calendar" ? (
@@ -834,6 +846,7 @@ export default function PlanScreen() {
 
   return (
     <FlatList
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,

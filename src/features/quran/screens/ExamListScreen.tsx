@@ -30,6 +30,7 @@ import { EXAMS } from "@/features/quran/data/exams";
 import { usePT } from "@/features/quran/i18n/practice";
 import { useExamResults } from "@/features/quran/state/useExamResults";
 import { fill } from "@/features/quran/utils/fill";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const PADDING = 20;
 
@@ -53,6 +54,7 @@ export default function ExamListScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { resultFor } = useExamResults();
@@ -62,6 +64,7 @@ export default function ExamListScreen() {
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
@@ -99,32 +102,34 @@ export default function ExamListScreen() {
 
         return (
           <Rise key={link.route} delay={100 + position * 50}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push(link.route)}
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, flexDirection: row, gap: 14 },
-              ]}
-            >
-              <View style={[styles.linkIcon, { backgroundColor: colors.tintSoft }]}>
-                <Icon size={24} color={colors.onTint} />
-              </View>
-              <View style={styles.cardText}>
-                <AppText
-                  variant="bodySmall"
-                  style={{ color: colors.text, fontWeight: "800", textAlign }}
-                >
-                  {p(link.titleKey)}
-                </AppText>
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.textSecondary, textAlign }}
-                >
-                  {p(link.hintKey)}
-                </AppText>
-              </View>
-            </Pressable>
+            <GuideTarget id={`exam.link.${link.route}`}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push(link.route)}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.surface, flexDirection: row, gap: 14 },
+                ]}
+              >
+                <View style={[styles.linkIcon, { backgroundColor: colors.tintSoft }]}>
+                  <Icon size={24} color={colors.onTint} />
+                </View>
+                <View style={styles.cardText}>
+                  <AppText
+                    variant="bodySmall"
+                    style={{ color: colors.text, fontWeight: "800", textAlign }}
+                  >
+                    {p(link.titleKey)}
+                  </AppText>
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.textSecondary, textAlign }}
+                  >
+                    {p(link.hintKey)}
+                  </AppText>
+                </View>
+              </Pressable>
+            </GuideTarget>
           </Rise>
         );
       })}
@@ -134,65 +139,67 @@ export default function ExamListScreen() {
 
         return (
           <Rise key={exam.id} delay={120 + Math.min(position, 8) * 60}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() =>
-                router.push({
-                  pathname: "/exam-play",
-                  params: { id: exam.id },
-                })
-              }
-              style={[
-                styles.card,
-                { backgroundColor: colors.surface, flexDirection: row },
-              ]}
-            >
-              <View style={styles.cardText}>
-                <Text
-                  allowFontScaling={false}
-                  style={[styles.arabicName, { color: colors.text, textAlign }]}
-                >
-                  {exam.arabicName}
-                </Text>
-                <AppText
-                  variant="bodySmall"
-                  style={{ color: colors.text, fontWeight: "800", textAlign }}
-                >
-                  {exam.title[language]}
-                </AppText>
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.textSecondary, textAlign }}
-                >
-                  {exam.subtitle[language]}
-                </AppText>
-                <View style={[styles.metaRow, { flexDirection: row }]}>
-                  <View
-                    style={[styles.badge, { backgroundColor: colors.tintSoft }]}
+            <GuideTarget id={`exam.item.${position}`}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  router.push({
+                    pathname: "/exam-play",
+                    params: { id: exam.id },
+                  })
+                }
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.surface, flexDirection: row },
+                ]}
+              >
+                <View style={styles.cardText}>
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.arabicName, { color: colors.text, textAlign }]}
                   >
-                    <AppText
-                      variant="caption"
-                      style={{ color: colors.onTint, fontWeight: "700" }}
-                    >
-                      {fill(t.quran_exam_count, {
-                        count: number(exam.questions.length),
-                      })}
-                    </AppText>
-                  </View>
+                    {exam.arabicName}
+                  </Text>
+                  <AppText
+                    variant="bodySmall"
+                    style={{ color: colors.text, fontWeight: "800", textAlign }}
+                  >
+                    {exam.title[language]}
+                  </AppText>
                   <AppText
                     variant="caption"
-                    style={{ color: colors.textSecondary, fontWeight: "700" }}
+                    style={{ color: colors.textSecondary, textAlign }}
                   >
-                    {result
-                      ? fill(t.quran_quiz_best, {
-                          score: number(result.best),
-                          total: number(result.total),
-                        })
-                      : t.quran_quiz_not_taken}
+                    {exam.subtitle[language]}
                   </AppText>
+                  <View style={[styles.metaRow, { flexDirection: row }]}>
+                    <View
+                      style={[styles.badge, { backgroundColor: colors.tintSoft }]}
+                    >
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.onTint, fontWeight: "700" }}
+                      >
+                        {fill(t.quran_exam_count, {
+                          count: number(exam.questions.length),
+                        })}
+                      </AppText>
+                    </View>
+                    <AppText
+                      variant="caption"
+                      style={{ color: colors.textSecondary, fontWeight: "700" }}
+                    >
+                      {result
+                        ? fill(t.quran_quiz_best, {
+                            score: number(result.best),
+                            total: number(result.total),
+                          })
+                        : t.quran_quiz_not_taken}
+                    </AppText>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
+              </Pressable>
+            </GuideTarget>
           </Rise>
         );
       })}

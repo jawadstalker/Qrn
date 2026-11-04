@@ -33,6 +33,7 @@ import {
 import { shuffle, starsFor } from "@/features/quran/utils/quiz";
 import { weakAyahs } from "@/features/quran/utils/mastery";
 import { getStage } from "@/features/quran/utils/stages";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 type Phase = "setup" | "run" | "result";
 type Scope = "all" | "weak";
@@ -247,16 +248,18 @@ export default function RecallScreen() {
           >
             {p("recall_style")}
           </AppText>
-          <View style={[styles.chips, { flexDirection: row }]}>
-            {HIDE_STYLES.map((item) => (
-              <Chip
-                key={item}
-                label={p(`style_${item}`)}
-                active={style === item}
-                onPress={() => setStyle(item)}
-              />
-            ))}
-          </View>
+          <GuideTarget id="recall.style">
+            <View style={[styles.chips, { flexDirection: row }]}>
+              {HIDE_STYLES.map((item) => (
+                <Chip
+                  key={item}
+                  label={p(`style_${item}`)}
+                  active={style === item}
+                  onPress={() => setStyle(item)}
+                />
+              ))}
+            </View>
+          </GuideTarget>
 
           {hasSingle && params.weak !== "1" && !fromStage ? (
             <AppText
@@ -273,19 +276,21 @@ export default function RecallScreen() {
               >
                 {p("recall_scope")}
               </AppText>
-              <View style={[styles.chips, { flexDirection: row }]}>
-                <Chip
-                  label={p("scope_all")}
-                  active={scope === "all"}
-                  onPress={() => setScope("all")}
-                />
-                <Chip
-                  label={p("scope_weak")}
-                  active={scope === "weak"}
-                  disabled={weak.length === 0}
-                  onPress={() => setScope("weak")}
-                />
-              </View>
+              <GuideTarget id="recall.scope">
+                <View style={[styles.chips, { flexDirection: row }]}>
+                  <Chip
+                    label={p("scope_all")}
+                    active={scope === "all"}
+                    onPress={() => setScope("all")}
+                  />
+                  <Chip
+                    label={p("scope_weak")}
+                    active={scope === "weak"}
+                    disabled={weak.length === 0}
+                    onPress={() => setScope("weak")}
+                  />
+                </View>
+              </GuideTarget>
               {weak.length === 0 ? (
                 <AppText
                   variant="caption"
@@ -297,7 +302,9 @@ export default function RecallScreen() {
             </>
           )}
 
-          <ChunkyButton label={p("recall_start")} onPress={start} />
+          <GuideTarget id="recall.start">
+            <ChunkyButton label={p("recall_start")} onPress={start} />
+          </GuideTarget>
         </Card>
       ) : null}
 

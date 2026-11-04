@@ -8,6 +8,8 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
+import type { RefObject } from "react";
+import type { View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   GUIDE_IDS,
@@ -34,6 +36,12 @@ interface StoredGuides {
   pagesOff: boolean;
 }
 
+/** The main vertical scroller of the screen that is on top, so a guide can bring a target into view. */
+export interface GuideScroller {
+  scrollTo: (y: number) => void;
+  getOffset: () => number;
+}
+
 interface GuideContextType {
   /** The stored flags are loaded; nothing opens before that. */
   ready: boolean;
@@ -46,11 +54,22 @@ interface GuideContextType {
   pagesAllowed: () => boolean;
   /** Opens a guide now (also used to replay one). */
   start: (id: GuideId) => void;
-  /** Closes the guide and remembers that it was seen. */
-  finish: (id: GuideId, options?: { disablePages?: boolean }) => void;
+  /**
+   * Closes the guide and remembers that it was seen.
+   * `alsoSeen` marks other guides as seen too (skipping the intro also skips the first page guide).
+   */
+  finish: (
+    id: GuideId,
+    options?: { disablePages?: boolean; alsoSeen?: readonly GuideId[] },
+  ) => void;
   setPagesEnabled: (enabled: boolean) => void;
   /** Forgets every page guide (not the intro) and turns page guides back on. */
   resetPageGuides: () => void;
+  /** Screens register the elements a guide can point at; returns the function that removes it. */
+  registerTarget: (id: string, ref: RefObject<View | null>) => () => void;
+  getTarget: (id: string) => View | null;
+  registerScroller: (scroller: GuideScroller) => () => void;
+  getScroller: () => GuideScroller | null;
 }
 
 const GuideContext = createContext<GuideContextType | undefined>(undefined);
@@ -86,6 +105,8 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const [pagesEnabled, setPagesEnabledState] = useState(true);
   const seenRef = useRef<Seen>({});
   const pagesOffRef = useRef(false);
+  const targetsRef = useRef(new Map<string, RefObject<View | null>>());
+  const scrollersRef = useRef<GuideScroller[]>([]);
 
   const persist = useCallback(() => {
     const payload: StoredGuides = {
@@ -147,8 +168,17 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const finish = useCallback(
-    (id: GuideId, options?: { disablePages?: boolean }) => {
-      seenRef.current = { ...seenRef.current, [id]: true };
+    (
+      id: GuideId,
+      options?: { disablePages?: boolean; alsoSeen?: readonly GuideId[] },
+    ) => {
+      const next: Seen = { ...seenRef.current, [id]: true };
+
+      options?.alsoSeen?.forEach((other) => {
+        next[other] = true;
+      });
+
+      seenRef.current = next;
 
       if (options?.disablePages) {
         pagesOffRef.current = true;
@@ -183,6 +213,41 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     persist();
   }, [persist]);
 
+  const registerTarget = useCallback(
+    (id: string, ref: RefObject<View | null>) => {
+      targetsRef.current.set(id, ref);
+
+      return () => {
+        /* A newer element may have taken the id over (remount); only remove our own. */
+        if (targetsRef.current.get(id) === ref) {
+          targetsRef.current.delete(id);
+        }
+      };
+    },
+    [],
+  );
+
+  const getTarget = useCallback(
+    (id: string) => targetsRef.current.get(id)?.current ?? null,
+    [],
+  );
+
+  const registerScroller = useCallback((scroller: GuideScroller) => {
+    scrollersRef.current = [...scrollersRef.current, scroller];
+
+    return () => {
+      scrollersRef.current = scrollersRef.current.filter(
+        (item) => item !== scroller,
+      );
+    };
+  }, []);
+
+  /* The most recently focused screen wins. */
+  const getScroller = useCallback(
+    () => scrollersRef.current[scrollersRef.current.length - 1] ?? null,
+    [],
+  );
+
   const value = useMemo<GuideContextType>(
     () => ({
       ready,
@@ -194,6 +259,10 @@ export function GuideProvider({ children }: { children: ReactNode }) {
       finish,
       setPagesEnabled,
       resetPageGuides,
+      registerTarget,
+      getTarget,
+      registerScroller,
+      getScroller,
     }),
     [
       ready,
@@ -205,6 +274,10 @@ export function GuideProvider({ children }: { children: ReactNode }) {
       finish,
       setPagesEnabled,
       resetPageGuides,
+      registerTarget,
+      getTarget,
+      registerScroller,
+      getScroller,
     ],
   );
 

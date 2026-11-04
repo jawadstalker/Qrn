@@ -23,6 +23,7 @@ import {
 import { JUZ30_SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { SectionMiniBar } from "@/features/quran/components/SectionMiniBar";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 type Filter = "all" | "learning" | "done";
 
@@ -43,6 +44,7 @@ export default function QuranLibraryScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { statsFor, setSurah } = useQuranProgress();
   const [query, setQuery] = useState("");
@@ -107,7 +109,7 @@ export default function QuranLibraryScreen() {
     });
   }, [query, filter, rowStates]);
 
-  const renderItem = ({ item }: ListRenderItemInfo<SurahInfo>) => {
+  const renderRow = ({ item }: ListRenderItemInfo<SurahInfo>) => {
     const rowState = rowStates.get(item.id);
     const available = rowState !== undefined;
     const state: RowState = rowState
@@ -186,8 +188,17 @@ export default function QuranLibraryScreen() {
     );
   };
 
+  /* The first row is a guide target so the tour can show what a surah row looks like. */
+  const renderItem = (info: ListRenderItemInfo<SurahInfo>) =>
+    info.index === 0 ? (
+      <GuideTarget id="library.first">{renderRow(info)}</GuideTarget>
+    ) : (
+      renderRow(info)
+    );
+
   return (
     <FlatList
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
       data={data}
@@ -204,55 +215,59 @@ export default function QuranLibraryScreen() {
           >
             {t.quran_library}
           </AppText>
-          <View
-            style={[
-              styles.search,
-              { backgroundColor: colors.surface, flexDirection: row },
-            ]}
-          >
-            <Search size={20} color={colors.textSecondary} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t.quran_search}
-              placeholderTextColor={colors.textSecondary}
-              accessibilityLabel={t.quran_search}
-              style={[styles.input, { color: colors.text, textAlign }]}
-            />
-          </View>
-          <View
-            style={[
-              styles.segmented,
-              { backgroundColor: colors.tintSoft, flexDirection: row },
-            ]}
-          >
-            {FILTERS.map((item) => {
-              const selected = item === filter;
+          <GuideTarget id="library.search">
+            <View
+              style={[
+                styles.search,
+                { backgroundColor: colors.surface, flexDirection: row },
+              ]}
+            >
+              <Search size={20} color={colors.textSecondary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t.quran_search}
+                placeholderTextColor={colors.textSecondary}
+                accessibilityLabel={t.quran_search}
+                style={[styles.input, { color: colors.text, textAlign }]}
+              />
+            </View>
+          </GuideTarget>
+          <GuideTarget id="library.filters">
+            <View
+              style={[
+                styles.segmented,
+                { backgroundColor: colors.tintSoft, flexDirection: row },
+              ]}
+            >
+              {FILTERS.map((item) => {
+                const selected = item === filter;
 
-              return (
-                <Pressable
-                  key={item}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  onPress={() => setFilter(item)}
-                  style={[
-                    styles.segment,
-                    selected && { backgroundColor: colors.surface },
-                  ]}
-                >
-                  <AppText
-                    variant="bodySmall"
-                    style={{
-                      color: colors.text,
-                      fontWeight: selected ? "800" : "500",
-                    }}
+                return (
+                  <Pressable
+                    key={item}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    onPress={() => setFilter(item)}
+                    style={[
+                      styles.segment,
+                      selected && { backgroundColor: colors.surface },
+                    ]}
                   >
-                    {t[`quran_filter_${item}`]}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <AppText
+                      variant="bodySmall"
+                      style={{
+                        color: colors.text,
+                        fontWeight: selected ? "800" : "500",
+                      }}
+                    >
+                      {t[`quran_filter_${item}`]}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </GuideTarget>
         </View>
       }
     />

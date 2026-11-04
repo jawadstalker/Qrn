@@ -23,6 +23,7 @@ import {
   type MistakeRecord,
 } from "@/features/quran/state/practiceStore";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 type Filter = "open" | "all";
 
@@ -83,37 +84,43 @@ export default function MistakesScreen() {
       subtitle={p("mistakes_sub")}
       backTo="/exam"
     >
-      <View style={[styles.chips, { flexDirection: row }]}>
-        <Chip
-          label={`${p("mistakes_filter_open")} (${openCount})`}
-          active={filter === "open"}
-          onPress={() => setFilter("open")}
-        />
-        <Chip
-          label={`${p("mistakes_filter_all")} (${all.length})`}
-          active={filter === "all"}
-          onPress={() => setFilter("all")}
-        />
-      </View>
+      <GuideTarget id="mistakes.filter">
+        <View style={[styles.chips, { flexDirection: row }]}>
+          <Chip
+            label={`${p("mistakes_filter_open")} (${openCount})`}
+            active={filter === "open"}
+            onPress={() => setFilter("open")}
+          />
+          <Chip
+            label={`${p("mistakes_filter_all")} (${all.length})`}
+            active={filter === "all"}
+            onPress={() => setFilter("all")}
+          />
+        </View>
+      </GuideTarget>
 
       {openCount > 0 ? (
-        <ChunkyButton
-          label={p("mistakes_practice_all")}
-          onPress={() => router.push({ pathname: "/recall", params: { weak: "1" } })}
-        />
+        <GuideTarget id="mistakes.practice">
+          <ChunkyButton
+            label={p("mistakes_practice_all")}
+            onPress={() => router.push({ pathname: "/recall", params: { weak: "1" } })}
+          />
+        </GuideTarget>
       ) : null}
 
       {visible.length === 0 ? (
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, textAlign: "center" }}
-          >
-            {filter === "open" && all.length > 0
-              ? p("mistakes_empty_open")
-              : p("mistakes_empty")}
-          </AppText>
-        </Card>
+        <GuideTarget id="mistakes.empty">
+          <Card>
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, textAlign: "center" }}
+            >
+              {filter === "open" && all.length > 0
+                ? p("mistakes_empty_open")
+                : p("mistakes_empty")}
+            </AppText>
+          </Card>
+        </GuideTarget>
       ) : (
         visible.map((mistake, position) => {
           const surah = getSurah(mistake.surahId);
@@ -121,113 +128,115 @@ export default function MistakesScreen() {
 
           return (
             <Rise key={mistake.key} delay={Math.min(position, 8) * 40}>
-              <View
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: open ? colors.error : colors.success,
-                  },
-                ]}
-              >
-                <View style={[styles.titleRow, { flexDirection: row }]}>
-                  <AppText
-                    variant="bodySmall"
-                    style={{ color: colors.text, fontWeight: "800", textAlign }}
-                  >
-                    {[
-                      surah ? (isRTL ? surah.name : surah.transliteration) : "",
-                      mistake.ayah !== undefined
-                        ? p("mistake_ayah", { ayah: mistake.ayah })
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </AppText>
-                  <View style={[styles.kind, { backgroundColor: colors.tintSoft }]}>
-                    <AppText
-                      variant="caption"
-                      style={{ color: colors.onTint, fontWeight: "700" }}
-                    >
-                      {p(`kind_${mistake.kind}`)}
-                    </AppText>
-                  </View>
-                </View>
-
-                <AppText
-                  variant="caption"
-                  style={{ color: colors.textSecondary, textAlign }}
+              <GuideTarget id={`mistakes.item.${position}`}>
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: open ? colors.error : colors.success,
+                    },
+                  ]}
                 >
-                  {`${p("mistakes_times", { n: mistake.count })} · ${p("mistakes_last", { date: dateText(mistake.lastAt) })}`}
-                </AppText>
-
-                {mistake.lastPicked ? (
-                  <View style={[styles.answer, { borderColor: colors.error }]}>
+                  <View style={[styles.titleRow, { flexDirection: row }]}>
                     <AppText
-                      variant="caption"
-                      style={{ color: colors.error, fontWeight: "800", textAlign }}
+                      variant="bodySmall"
+                      style={{ color: colors.text, fontWeight: "800", textAlign }}
                     >
-                      {p("your_answer")}
+                      {[
+                        surah ? (isRTL ? surah.name : surah.transliteration) : "",
+                        mistake.ayah !== undefined
+                          ? p("mistake_ayah", { ayah: mistake.ayah })
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </AppText>
-                    {mistake.arabic ? (
-                      <Text allowFontScaling={false} style={[styles.arabic, { color: colors.text }]}>
-                        {mistake.lastPicked}
-                      </Text>
-                    ) : (
-                      <AppText variant="caption" style={{ color: colors.text, textAlign }}>
-                        {mistake.lastPicked}
+                    <View style={[styles.kind, { backgroundColor: colors.tintSoft }]}>
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.onTint, fontWeight: "700" }}
+                      >
+                        {p(`kind_${mistake.kind}`)}
                       </AppText>
-                    )}
+                    </View>
                   </View>
-                ) : null}
 
-                {mistake.correct ? (
-                  <View style={[styles.answer, { borderColor: colors.success }]}>
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.textSecondary, textAlign }}
+                  >
+                    {`${p("mistakes_times", { n: mistake.count })} · ${p("mistakes_last", { date: dateText(mistake.lastAt) })}`}
+                  </AppText>
+
+                  {mistake.lastPicked ? (
+                    <View style={[styles.answer, { borderColor: colors.error }]}>
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.error, fontWeight: "800", textAlign }}
+                      >
+                        {p("your_answer")}
+                      </AppText>
+                      {mistake.arabic ? (
+                        <Text allowFontScaling={false} style={[styles.arabic, { color: colors.text }]}>
+                          {mistake.lastPicked}
+                        </Text>
+                      ) : (
+                        <AppText variant="caption" style={{ color: colors.text, textAlign }}>
+                          {mistake.lastPicked}
+                        </AppText>
+                      )}
+                    </View>
+                  ) : null}
+
+                  {mistake.correct ? (
+                    <View style={[styles.answer, { borderColor: colors.success }]}>
+                      <AppText
+                        variant="caption"
+                        style={{ color: colors.success, fontWeight: "800", textAlign }}
+                      >
+                        {p("correct_answer")}
+                      </AppText>
+                      {mistake.arabic ? (
+                        <Text allowFontScaling={false} style={[styles.arabic, { color: colors.text }]}>
+                          {mistake.correct}
+                        </Text>
+                      ) : (
+                        <AppText variant="caption" style={{ color: colors.text, textAlign }}>
+                          {mistake.correct}
+                        </AppText>
+                      )}
+                    </View>
+                  ) : null}
+
+                  {open ? (
+                    <View style={[styles.actions, { flexDirection: row }]}>
+                      {mistake.ayah !== undefined ? (
+                        <View style={styles.action}>
+                          <PillButton
+                            label={p("mistakes_practice")}
+                            onPress={() => practice(mistake)}
+                          />
+                        </View>
+                      ) : null}
+                      <View style={styles.action}>
+                        <PillButton
+                          tone="good"
+                          label={p("mistakes_resolve")}
+                          onPress={() => void resolveMistake(mistake.key)}
+                        />
+                      </View>
+                    </View>
+                  ) : (
                     <AppText
                       variant="caption"
                       style={{ color: colors.success, fontWeight: "800", textAlign }}
                     >
-                      {p("correct_answer")}
+                      {p("mistakes_resolved")}
                     </AppText>
-                    {mistake.arabic ? (
-                      <Text allowFontScaling={false} style={[styles.arabic, { color: colors.text }]}>
-                        {mistake.correct}
-                      </Text>
-                    ) : (
-                      <AppText variant="caption" style={{ color: colors.text, textAlign }}>
-                        {mistake.correct}
-                      </AppText>
-                    )}
-                  </View>
-                ) : null}
-
-                {open ? (
-                  <View style={[styles.actions, { flexDirection: row }]}>
-                    {mistake.ayah !== undefined ? (
-                      <View style={styles.action}>
-                        <PillButton
-                          label={p("mistakes_practice")}
-                          onPress={() => practice(mistake)}
-                        />
-                      </View>
-                    ) : null}
-                    <View style={styles.action}>
-                      <PillButton
-                        tone="good"
-                        label={p("mistakes_resolve")}
-                        onPress={() => void resolveMistake(mistake.key)}
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <AppText
-                    variant="caption"
-                    style={{ color: colors.success, fontWeight: "800", textAlign }}
-                  >
-                    {p("mistakes_resolved")}
-                  </AppText>
-                )}
-              </View>
+                  )}
+                </View>
+              </GuideTarget>
             </Rise>
           );
         })

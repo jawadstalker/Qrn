@@ -47,6 +47,7 @@ import { surahLabel } from "@/features/quran/plan/export/exportData";
 import { useMemorizationPlan } from "@/features/quran/state/MemorizationPlanContext";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { fill } from "@/features/quran/utils/fill";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const PADDING = 20;
 const QUICK_AMOUNTS = [3, 5, 10, 15, 20];
@@ -201,6 +202,7 @@ export default function PlanSetupScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { play } = useSound();
   const { plan, isLoaded, savePlan } = useMemorizationPlan();
@@ -305,6 +307,7 @@ export default function PlanSetupScreen() {
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
@@ -330,391 +333,401 @@ export default function PlanSetupScreen() {
         </AppText>
       </View>
 
-      <Card>
-        <SectionTitle>{t.plan_step_what ?? ""}</SectionTitle>
+      <GuideTarget id="planSetup.what">
+        <Card>
+          <SectionTitle>{t.plan_step_what ?? ""}</SectionTitle>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setPickingSurahs(true)}
-          style={[styles.field, { backgroundColor: colors.tintSoft, flexDirection: row }]}
-        >
-          <AppText
-            variant="bodySmall"
-            numberOfLines={2}
-            style={{ color: colors.onTint, fontWeight: "700", flex: 1, textAlign }}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setPickingSurahs(true)}
+            style={[styles.field, { backgroundColor: colors.tintSoft, flexDirection: row }]}
           >
-            {config.surahIds.length > 0
-              ? config.surahIds.length <= 3
-                ? config.surahIds.map(name).join(language === "fa" ? "، " : ", ")
-                : fill(t.plan_surahs_selected, {
-                    count: number(config.surahIds.length),
-                  })
-              : t.plan_pick_surahs}
-          </AppText>
-          <Plus size={18} color={colors.onTint} />
-        </Pressable>
-
-        <View style={[styles.wrapRow, { flexDirection: row }]}>
-          <Chip
-            label={t.plan_preset_current ?? ""}
-            selected={
-              config.surahIds.length === 1 && config.surahIds[0] === currentSurahId
-            }
-            onPress={() => setSurahs([currentSurahId], false)}
-          />
-          <Chip
-            label={t.plan_preset_juz30 ?? ""}
-            selected={
-              config.surahIds.length === JUZ_30.length &&
-              config.surahIds.every((id) => JUZ_30.includes(id))
-            }
-            onPress={() => setSurahs(JUZ_30, reversed)}
-          />
-          <Chip
-            label={t.plan_preset_clear ?? ""}
-            selected={false}
-            onPress={() => setSurahs([], false)}
-          />
-        </View>
-
-        {config.surahIds.length > 1 ? (
-          <View style={styles.block}>
-            <Hint>{t.plan_order_label ?? ""}</Hint>
-            <View
-              style={[
-                styles.segmented,
-                { backgroundColor: colors.track, flexDirection: row },
-              ]}
+            <AppText
+              variant="bodySmall"
+              numberOfLines={2}
+              style={{ color: colors.onTint, fontWeight: "700", flex: 1, textAlign }}
             >
-              {[
-                { id: false, label: t.plan_order_quran },
-                { id: true, label: t.plan_order_reverse },
-              ].map((item) => {
-                const selected = reversed === item.id;
+              {config.surahIds.length > 0
+                ? config.surahIds.length <= 3
+                  ? config.surahIds.map(name).join(language === "fa" ? "، " : ", ")
+                  : fill(t.plan_surahs_selected, {
+                      count: number(config.surahIds.length),
+                    })
+                : t.plan_pick_surahs}
+            </AppText>
+            <Plus size={18} color={colors.onTint} />
+          </Pressable>
 
-                return (
-                  <Pressable
-                    key={String(item.id)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    onPress={() => {
-                      if (!selected) {
-                        play("select");
-                        update({ surahIds: [...config.surahIds].reverse() });
-                      }
-                    }}
-                    style={[
-                      styles.segment,
-                      selected && { backgroundColor: colors.surface },
-                    ]}
-                  >
-                    <AppText
-                      variant="bodySmall"
-                      style={{ color: colors.text, fontWeight: selected ? "800" : "500" }}
-                    >
-                      {item.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
+          <View style={[styles.wrapRow, { flexDirection: row }]}>
+            <Chip
+              label={t.plan_preset_current ?? ""}
+              selected={
+                config.surahIds.length === 1 && config.surahIds[0] === currentSurahId
+              }
+              onPress={() => setSurahs([currentSurahId], false)}
+            />
+            <Chip
+              label={t.plan_preset_juz30 ?? ""}
+              selected={
+                config.surahIds.length === JUZ_30.length &&
+                config.surahIds.every((id) => JUZ_30.includes(id))
+              }
+              onPress={() => setSurahs(JUZ_30, reversed)}
+            />
+            <Chip
+              label={t.plan_preset_clear ?? ""}
+              selected={false}
+              onPress={() => setSurahs([], false)}
+            />
           </View>
-        ) : null}
 
-        {singleSurah ? (
-          <View style={styles.block}>
-            <Hint>{t.plan_range_title ?? ""}</Hint>
-            <View style={[styles.rangeRow, { flexDirection: row }]}>
-              <View style={styles.rangeItem}>
-                <Hint>{t.plan_range_from ?? ""}</Hint>
-                <Stepper
-                  value={rangeFrom}
-                  min={1}
-                  max={singleSurah.verses}
-                  label={t.plan_range_from ?? ""}
-                  onChange={(next) =>
-                    update({ fromAyah: next, toAyah: Math.max(rangeTo, next) })
-                  }
-                />
-              </View>
-              <View style={styles.rangeItem}>
-                <Hint>{t.plan_range_to ?? ""}</Hint>
-                <Stepper
-                  value={rangeTo}
-                  min={rangeFrom}
-                  max={singleSurah.verses}
-                  label={t.plan_range_to ?? ""}
-                  onChange={(next) => update({ toAyah: next })}
-                />
-              </View>
-            </View>
-          </View>
-        ) : null}
-      </Card>
-
-      <Card>
-        <SectionTitle>{t.plan_step_how ?? ""}</SectionTitle>
-        <View
-          style={[
-            styles.segmented,
-            { backgroundColor: colors.track, flexDirection: row },
-          ]}
-        >
-          {(
-            [
-              { id: "perDay", label: t.plan_mode_per_day },
-              { id: "targetDate", label: t.plan_mode_target },
-            ] as const
-          ).map((item) => {
-            const selected = config.mode === item.id;
-
-            return (
-              <Pressable
-                key={item.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  if (!selected) {
-                    play("select");
-                    changeMode(item.id);
-                  }
-                }}
+          {config.surahIds.length > 1 ? (
+            <View style={styles.block}>
+              <Hint>{t.plan_order_label ?? ""}</Hint>
+              <View
                 style={[
-                  styles.segment,
-                  selected && { backgroundColor: colors.surface },
+                  styles.segmented,
+                  { backgroundColor: colors.track, flexDirection: row },
                 ]}
+              >
+                {[
+                  { id: false, label: t.plan_order_quran },
+                  { id: true, label: t.plan_order_reverse },
+                ].map((item) => {
+                  const selected = reversed === item.id;
+
+                  return (
+                    <Pressable
+                      key={String(item.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      onPress={() => {
+                        if (!selected) {
+                          play("select");
+                          update({ surahIds: [...config.surahIds].reverse() });
+                        }
+                      }}
+                      style={[
+                        styles.segment,
+                        selected && { backgroundColor: colors.surface },
+                      ]}
+                    >
+                      <AppText
+                        variant="bodySmall"
+                        style={{ color: colors.text, fontWeight: selected ? "800" : "500" }}
+                      >
+                        {item.label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
+          {singleSurah ? (
+            <View style={styles.block}>
+              <Hint>{t.plan_range_title ?? ""}</Hint>
+              <View style={[styles.rangeRow, { flexDirection: row }]}>
+                <View style={styles.rangeItem}>
+                  <Hint>{t.plan_range_from ?? ""}</Hint>
+                  <Stepper
+                    value={rangeFrom}
+                    min={1}
+                    max={singleSurah.verses}
+                    label={t.plan_range_from ?? ""}
+                    onChange={(next) =>
+                      update({ fromAyah: next, toAyah: Math.max(rangeTo, next) })
+                    }
+                  />
+                </View>
+                <View style={styles.rangeItem}>
+                  <Hint>{t.plan_range_to ?? ""}</Hint>
+                  <Stepper
+                    value={rangeTo}
+                    min={rangeFrom}
+                    max={singleSurah.verses}
+                    label={t.plan_range_to ?? ""}
+                    onChange={(next) => update({ toAyah: next })}
+                  />
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </Card>
+      </GuideTarget>
+
+      <GuideTarget id="planSetup.how">
+        <Card>
+          <SectionTitle>{t.plan_step_how ?? ""}</SectionTitle>
+          <View
+            style={[
+              styles.segmented,
+              { backgroundColor: colors.track, flexDirection: row },
+            ]}
+          >
+            {(
+              [
+                { id: "perDay", label: t.plan_mode_per_day },
+                { id: "targetDate", label: t.plan_mode_target },
+              ] as const
+            ).map((item) => {
+              const selected = config.mode === item.id;
+
+              return (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    if (!selected) {
+                      play("select");
+                      changeMode(item.id);
+                    }
+                  }}
+                  style={[
+                    styles.segment,
+                    selected && { backgroundColor: colors.surface },
+                  ]}
+                >
+                  <AppText
+                    variant="bodySmall"
+                    style={{ color: colors.text, fontWeight: selected ? "800" : "500" }}
+                  >
+                    {item.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Hint>
+            {(config.mode === "perDay"
+              ? t.plan_mode_per_day_hint
+              : t.plan_mode_target_hint) ?? ""}
+          </Hint>
+
+          {config.mode === "perDay" ? (
+            <View style={styles.block}>
+              <Hint>{t.plan_per_day_label ?? ""}</Hint>
+              <View style={styles.center}>
+                <Stepper
+                  value={config.perDay}
+                  min={1}
+                  max={MAX_PER_DAY}
+                  label={t.plan_per_day_label ?? ""}
+                  onChange={(next) => update({ perDay: next })}
+                />
+              </View>
+              <View style={[styles.wrapRow, styles.centerRow, { flexDirection: row }]}>
+                {QUICK_AMOUNTS.map((amount) => (
+                  <Chip
+                    key={amount}
+                    label={number(amount)}
+                    selected={config.perDay === amount}
+                    onPress={() => update({ perDay: amount })}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : (
+            <View style={styles.block}>
+              <Hint>{t.plan_target_label ?? ""}</Hint>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setPickingDate("target")}
+                style={[styles.field, { backgroundColor: colors.tintSoft, flexDirection: row }]}
               >
                 <AppText
                   variant="bodySmall"
-                  style={{ color: colors.text, fontWeight: selected ? "800" : "500" }}
+                  style={{ color: colors.onTint, fontWeight: "700", flex: 1, textAlign }}
                 >
-                  {item.label}
+                  {config.targetDate
+                    ? formatDate(config.targetDate, language)
+                    : t.plan_pick_date}
                 </AppText>
+                <CalendarDays size={18} color={colors.onTint} />
               </Pressable>
-            );
-          })}
-        </View>
-        <Hint>
-          {(config.mode === "perDay"
-            ? t.plan_mode_per_day_hint
-            : t.plan_mode_target_hint) ?? ""}
-        </Hint>
+            </View>
+          )}
 
-        {config.mode === "perDay" ? (
           <View style={styles.block}>
-            <Hint>{t.plan_per_day_label ?? ""}</Hint>
-            <View style={styles.center}>
-              <Stepper
-                value={config.perDay}
-                min={1}
-                max={MAX_PER_DAY}
-                label={t.plan_per_day_label ?? ""}
-                onChange={(next) => update({ perDay: next })}
-              />
-            </View>
-            <View style={[styles.wrapRow, styles.centerRow, { flexDirection: row }]}>
-              {QUICK_AMOUNTS.map((amount) => (
-                <Chip
-                  key={amount}
-                  label={number(amount)}
-                  selected={config.perDay === amount}
-                  onPress={() => update({ perDay: amount })}
-                />
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.block}>
-            <Hint>{t.plan_target_label ?? ""}</Hint>
+            <Hint>{t.plan_start_label ?? ""}</Hint>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setPickingDate("target")}
+              onPress={() => setPickingDate("start")}
               style={[styles.field, { backgroundColor: colors.tintSoft, flexDirection: row }]}
             >
               <AppText
                 variant="bodySmall"
                 style={{ color: colors.onTint, fontWeight: "700", flex: 1, textAlign }}
               >
-                {config.targetDate
-                  ? formatDate(config.targetDate, language)
-                  : t.plan_pick_date}
+                {formatDate(config.startDate, language)}
               </AppText>
               <CalendarDays size={18} color={colors.onTint} />
             </Pressable>
           </View>
-        )}
+        </Card>
+      </GuideTarget>
 
-        <View style={styles.block}>
-          <Hint>{t.plan_start_label ?? ""}</Hint>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setPickingDate("start")}
-            style={[styles.field, { backgroundColor: colors.tintSoft, flexDirection: row }]}
-          >
-            <AppText
-              variant="bodySmall"
-              style={{ color: colors.onTint, fontWeight: "700", flex: 1, textAlign }}
-            >
-              {formatDate(config.startDate, language)}
-            </AppText>
-            <CalendarDays size={18} color={colors.onTint} />
-          </Pressable>
-        </View>
-      </Card>
-
-      <Card>
-        <SectionTitle>{t.plan_days_label ?? ""}</SectionTitle>
-        <View style={[styles.wrapRow, { flexDirection: row }]}>
-          {weekdayOrder(weekStart).map((day) => (
-            <Chip
-              key={day}
-              label={weekdayName(language, day)}
-              selected={config.weekdays.includes(day)}
-              onPress={() => toggleWeekday(day)}
-            />
-          ))}
-        </View>
-        <Hint>{t.plan_days_hint ?? ""}</Hint>
-
-        <View style={[styles.switchRow, { flexDirection: row }]}>
-          <View style={styles.switchText}>
-            <AppText
-              variant="bodySmall"
-              style={{ color: colors.text, textAlign, fontWeight: "800" }}
-            >
-              {t.plan_review_label}
-            </AppText>
-            <Hint>{t.plan_review_hint ?? ""}</Hint>
-          </View>
-          <Switch
-            value={config.review}
-            onValueChange={(next) => {
-              play("select");
-              update({ review: next });
-            }}
-            accessibilityLabel={t.plan_review_label}
-            trackColor={{ true: colors.primary, false: colors.track }}
-            thumbColor="#FFFFFF"
-          />
-        </View>
-      </Card>
-
-      <Card>
-        <SectionTitle>{t.plan_preview ?? ""}</SectionTitle>
-
-        {built.issues.length > 0 ? (
-          <View style={styles.block}>
-            {built.issues.map((issue) => (
-              <AppText
-                key={issue}
-                variant="bodySmall"
-                style={{ color: colors.warning, textAlign, fontWeight: "700" }}
-              >
-                {issueText(issue)}
-              </AppText>
+      <GuideTarget id="planSetup.days">
+        <Card>
+          <SectionTitle>{t.plan_days_label ?? ""}</SectionTitle>
+          <View style={[styles.wrapRow, { flexDirection: row }]}>
+            {weekdayOrder(weekStart).map((day) => (
+              <Chip
+                key={day}
+                label={weekdayName(language, day)}
+                selected={config.weekdays.includes(day)}
+                onPress={() => toggleWeekday(day)}
+              />
             ))}
           </View>
-        ) : (
-          <>
-            <View style={[styles.statGrid, { flexDirection: row }]}>
-              {[
-                {
-                  label: t.plan_sum_sessions,
-                  value: number(built.summary.sessionCount),
-                },
-                {
-                  label: t.plan_sum_per_session,
-                  value:
-                    built.summary.minPerSession === built.summary.maxPerSession
-                      ? number(built.summary.maxPerSession)
-                      : `${number(built.summary.minPerSession)}–${number(built.summary.maxPerSession)}`,
-                },
-                {
-                  label: t.plan_sum_end,
-                  value: built.summary.lastDate
-                    ? formatDate(built.summary.lastDate, language)
-                    : "—",
-                },
-                {
-                  label: t.plan_sum_total,
-                  value: number(built.summary.totalAyahs),
-                },
-              ].map((item) => (
+          <Hint>{t.plan_days_hint ?? ""}</Hint>
+
+          <View style={[styles.switchRow, { flexDirection: row }]}>
+            <View style={styles.switchText}>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+              >
+                {t.plan_review_label}
+              </AppText>
+              <Hint>{t.plan_review_hint ?? ""}</Hint>
+            </View>
+            <Switch
+              value={config.review}
+              onValueChange={(next) => {
+                play("select");
+                update({ review: next });
+              }}
+              accessibilityLabel={t.plan_review_label}
+              trackColor={{ true: colors.primary, false: colors.track }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </Card>
+      </GuideTarget>
+
+      <GuideTarget id="planSetup.preview">
+        <Card>
+          <SectionTitle>{t.plan_preview ?? ""}</SectionTitle>
+
+          {built.issues.length > 0 ? (
+            <View style={styles.block}>
+              {built.issues.map((issue) => (
+                <AppText
+                  key={issue}
+                  variant="bodySmall"
+                  style={{ color: colors.warning, textAlign, fontWeight: "700" }}
+                >
+                  {issueText(issue)}
+                </AppText>
+              ))}
+            </View>
+          ) : (
+            <>
+              <View style={[styles.statGrid, { flexDirection: row }]}>
+                {[
+                  {
+                    label: t.plan_sum_sessions,
+                    value: number(built.summary.sessionCount),
+                  },
+                  {
+                    label: t.plan_sum_per_session,
+                    value:
+                      built.summary.minPerSession === built.summary.maxPerSession
+                        ? number(built.summary.maxPerSession)
+                        : `${number(built.summary.minPerSession)}–${number(built.summary.maxPerSession)}`,
+                  },
+                  {
+                    label: t.plan_sum_end,
+                    value: built.summary.lastDate
+                      ? formatDate(built.summary.lastDate, language)
+                      : "—",
+                  },
+                  {
+                    label: t.plan_sum_total,
+                    value: number(built.summary.totalAyahs),
+                  },
+                ].map((item) => (
+                  <View
+                    key={item.label}
+                    style={[styles.stat, { backgroundColor: colors.tintSoft }]}
+                  >
+                    <AppText
+                      variant="caption"
+                      style={{ color: colors.textSecondary, textAlign }}
+                    >
+                      {item.label}
+                    </AppText>
+                    <AppText
+                      variant="bodySmall"
+                      style={{ color: colors.text, fontWeight: "800", textAlign }}
+                    >
+                      {item.value}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+              <Hint>
+                {fill(t.plan_days_count, { count: number(built.summary.spanDays) })}
+              </Hint>
+
+              {built.sessions.slice(0, 3).map((session) => (
                 <View
-                  key={item.label}
-                  style={[styles.stat, { backgroundColor: colors.tintSoft }]}
+                  key={session.index}
+                  style={[styles.previewRow, { flexDirection: row, borderColor: colors.border }]}
                 >
                   <AppText
                     variant="caption"
-                    style={{ color: colors.textSecondary, textAlign }}
+                    style={{ color: colors.textSecondary, fontWeight: "700" }}
                   >
-                    {item.label}
+                    {formatDate(session.date, language)}
                   </AppText>
-                  <AppText
-                    variant="bodySmall"
-                    style={{ color: colors.text, fontWeight: "800", textAlign }}
+                  <Text
+                    allowFontScaling={false}
+                    numberOfLines={1}
+                    style={[styles.previewPortion, { color: colors.text, textAlign }]}
                   >
-                    {item.value}
-                  </AppText>
+                    {formatSegments(session.segments, number, name)}
+                  </Text>
                 </View>
               ))}
-            </View>
-            <Hint>
-              {fill(t.plan_days_count, { count: number(built.summary.spanDays) })}
-            </Hint>
 
-            {built.sessions.slice(0, 3).map((session) => (
-              <View
-                key={session.index}
-                style={[styles.previewRow, { flexDirection: row, borderColor: colors.border }]}
-              >
+              {showHeavy ? (
                 <AppText
                   variant="caption"
-                  style={{ color: colors.textSecondary, fontWeight: "700" }}
+                  style={{ color: colors.warning, textAlign, fontWeight: "700" }}
                 >
-                  {formatDate(session.date, language)}
+                  {fill(t.plan_heavy_warning, {
+                    count: number(built.summary.maxPerSession),
+                  })}
                 </AppText>
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={[styles.previewPortion, { color: colors.text, textAlign }]}
+              ) : null}
+              {showEarly ? (
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
                 >
-                  {formatSegments(session.segments, number, name)}
-                </Text>
-              </View>
-            ))}
-
-            {showHeavy ? (
-              <AppText
-                variant="caption"
-                style={{ color: colors.warning, textAlign, fontWeight: "700" }}
-              >
-                {fill(t.plan_heavy_warning, {
-                  count: number(built.summary.maxPerSession),
-                })}
-              </AppText>
-            ) : null}
-            {showEarly ? (
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {t.plan_early_note}
-              </AppText>
-            ) : null}
-          </>
-        )}
-      </Card>
+                  {t.plan_early_note}
+                </AppText>
+              ) : null}
+            </>
+          )}
+        </Card>
+      </GuideTarget>
 
       {editing && plan!.done.length > 0 ? (
         <Hint>{t.plan_edit_warning ?? ""}</Hint>
       ) : null}
 
       {built.issues.length === 0 ? (
-        <ChunkyButton
-          label={editing ? (t.plan_save_edit ?? "") : (t.plan_save ?? "")}
-          onPress={() => void save()}
-        />
+        <GuideTarget id="planSetup.save">
+          <ChunkyButton
+            label={editing ? (t.plan_save_edit ?? "") : (t.plan_save ?? "")}
+            onPress={() => void save()}
+          />
+        </GuideTarget>
       ) : (
         <View
           accessibilityRole="button"

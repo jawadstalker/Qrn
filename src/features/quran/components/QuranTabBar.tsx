@@ -17,6 +17,7 @@ import { useLanguage } from "@/core/i18n/LanguageContext";
 import { normalizeRoute } from "@/core/navigation/routes";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 export const BAR_HEIGHT = 72;
 export const HIDDEN_ROUTES: readonly string[] = [
@@ -82,29 +83,34 @@ export function QuranTabBar() {
         const Icon = tab.icon;
 
         return (
-          <Pressable
+          <GuideTarget
             key={tab.route}
-            accessibilityRole="tab"
-            accessibilityLabel={t[tab.labelKey]}
-            accessibilityState={{ selected: active }}
+            id={`tab.${tab.route}`}
             style={styles.tab}
-            onPress={() => {
-              void Haptics.selectionAsync();
-
-              if (!active) {
-                router.replace(tab.route);
-              }
-            }}
           >
-            <Icon size={23} color={color} strokeWidth={active ? 2.3 : 1.8} />
-            <AppText
-              variant="caption"
-              numberOfLines={1}
-              style={[styles.label, { color }, active && styles.active]}
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel={t[tab.labelKey]}
+              accessibilityState={{ selected: active }}
+              style={styles.tabPress}
+              onPress={() => {
+                void Haptics.selectionAsync();
+
+                if (!active) {
+                  router.replace(tab.route);
+                }
+              }}
             >
-              {t[tab.labelKey]}
-            </AppText>
-          </Pressable>
+              <Icon size={23} color={color} strokeWidth={active ? 2.3 : 1.8} />
+              <AppText
+                variant="caption"
+                numberOfLines={1}
+                style={[styles.label, { color }, active && styles.active]}
+              >
+                {t[tab.labelKey]}
+              </AppText>
+            </Pressable>
+          </GuideTarget>
         );
       })}
     </View>
@@ -122,6 +128,9 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   tab: {
+    flex: 1,
+  },
+  tabPress: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",

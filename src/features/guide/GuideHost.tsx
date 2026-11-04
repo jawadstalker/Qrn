@@ -1,17 +1,30 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   BackHandler,
   Platform,
-  ScrollView,
   StyleSheet,
-  Text,
   View,
   type LayoutChangeEvent,
 } from "react-native";
 import { usePathname } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
@@ -32,16 +45,44 @@ import {
   GUIDE_ROUTES,
   GUIDE_UI,
   type GuideId,
-  type GuideItem,
+  type GuideStep,
 } from "@/features/guide/guideContent";
+import {
+  measureNode,
+  needsScroll,
+  padRect,
+  placeCard,
+  roundedRectPath,
+  scrollDelta,
+  unionRects,
+  type Measurable,
+  type Rect,
+} from "@/features/guide/guideGeometry";
 import { useGuide } from "@/features/guide/GuideContext";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 /** Wait a moment after a page opens so its own entrance animations can finish first. */
 const SHOW_DELAY = 850;
-const CARD_MAX_WIDTH = 400;
-const CARD_MARGIN = 20;
-const SPOTLIGHT_RADIUS = 24;
-const DIM = "rgba(12, 10, 28, 0.6)";
+const CARD_MAX_WIDTH = 340;
+const CARD_MARGIN = 16;
+const DEFAULT_PAD = 8;
+const DEFAULT_RADIUS = 18;
+const SCROLL_SETTLE = 520;
+const DIM = "rgba(12, 10, 28, 0.68)";
+/**
+ * The spotlight glides from one target to the next with Reanimated animated props on an SVG path.
+ * If that ever misbehaves on a device (screen stays dark with no highlighted area), set this to false:
+ * the highlight is then drawn from plain JavaScript state, without the glide, and everything else
+ * (scrolling, cards, arrows, buttons) works the same.
+ */
+const ANIMATE_SPOTLIGHT = true;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const toIds = (target: GuideStep["target"]): readonly string[] =>
+  target === undefined ? [] : typeof target === "string" ? [target] : target;
 
 /** The older /quran/* routes show the same screens as the root ones. */
 function guideRoute(pathname: string): string {
@@ -54,43 +95,11 @@ function guideRoute(pathname: string): string {
   return route.startsWith("/quran/") ? route.slice("/quran".length) : route;
 }
 
-/**
- * Bold the "Name:" part of a row such as "Library: pick a surah".
- *
- * AppText guesses the script from plain string children. A fragment hides the text from that
- * guess, so the script is passed explicitly; otherwise Persian would render in the Latin font.
- */
-function ItemText({
-  text,
-  color,
-  textAlign,
-  persian,
-}: {
-  text: string;
-  color: string;
-  textAlign: "left" | "right";
-  persian: boolean;
-}) {
-  const colon = text.indexOf(":");
-  const hasLabel = colon > 0 && colon <= 40;
-
-  return (
-    <AppText
-      variant="bodySmall"
-      forcePersian={persian}
-      forceEnglish={!persian}
-      style={[styles.itemText, { color, textAlign }]}
-    >
-      {hasLabel ? (
-        <>
-          <Text style={styles.itemLabel}>{text.slice(0, colon + 1)}</Text>
-          {text.slice(colon + 1)}
-        </>
-      ) : (
-        text
-      )}
-    </AppText>
-  );
+interface OverlayBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export function GuideHost({ enabled }: { enabled: boolean }) {
@@ -98,14 +107,43 @@ export function GuideHost({ enabled }: { enabled: boolean }) {
   const { language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
   const pathname = usePathname();
   const route = guideRoute(pathname);
-  const { ready, active, hasSeen, pagesAllowed, start, finish } = useGuide();
+  const {
+    ready,
+    active,
+    hasSeen,
+    pagesAllowed,
+    start,
+    finish,
+    getTarget,
+    getScroller,
+  } = useGuide();
+
+  const overlayRef = useRef<View>(null);
+  const [overlay, setOverlay] = useState<OverlayBox | null>(null);
   const [progress, setProgress] = useState<{
     id: GuideId | null;
     index: number;
   }>({ id: null, index: 0 });
-  const [size, setSize] = useState({ width: 0, height: 0 });
+  const [placed, setPlaced] = useState<{ key: string; spot: Rect | null }>({
+    key: "",
+    spot: null,
+  });
+  const [cardHeight, setCardHeight] = useState(0);
+
+  /* Spotlight geometry, animated on the UI thread. */
+  const overlayW = useSharedValue(0);
+  const overlayH = useSharedValue(0);
+  const holeX = useSharedValue(0);
+  const holeY = useSharedValue(0);
+  const holeW = useSharedValue(0);
+  const holeH = useSharedValue(0);
+  const holeR = useSharedValue(DEFAULT_RADIUS);
+  const ring = useSharedValue(0);
+  const pulse = useSharedValue(0);
+  const cardIn = useSharedValue(0);
 
   /* Open a guide on its own: the intro on the home page, then each page the first time it opens. */
   useEffect(() => {
@@ -133,7 +171,40 @@ export function GuideHost({ enabled }: { enabled: boolean }) {
     return () => clearTimeout(timer);
   }, [enabled, ready, active, route, hasSeen, pagesAllowed, start]);
 
+  /* Steps whose target is not on screen (and are optional) are left out; counted once per opening. */
+  const steps = useMemo<readonly GuideStep[]>(
+    () =>
+      active
+        ? GUIDES[active].steps.filter(
+            (step) =>
+              !step.optional ||
+              toIds(step.target).some((id) => getTarget(id) !== null),
+          )
+        : [],
+    [active, getTarget],
+  );
+
   const index = progress.id === active ? progress.index : 0;
+  const step = steps[Math.min(index, steps.length - 1)];
+  const total = steps.length;
+  const isLast = index >= total - 1;
+  const key = `${active}:${index}`;
+
+  /* Nothing to point at and nothing to say: close silently. */
+  useEffect(() => {
+    if (active && steps.length === 0) {
+      finish(active);
+    }
+  }, [active, steps, finish]);
+
+  const skip = useCallback(() => {
+    if (!active) {
+      return;
+    }
+
+    /* Skipping the intro also skips the first page guide, which sits on the same page. */
+    finish(active, active === "tour" ? { alsoSeen: ["garden"] } : undefined);
+  }, [active, finish]);
 
   const go = useCallback(
     (to: number) => {
@@ -143,7 +214,7 @@ export function GuideHost({ enabled }: { enabled: boolean }) {
     [active],
   );
 
-  /* Android back button: one step back, and closes the guide from the first step. */
+  /* Android back button: one step back, and skips the guide from the first step. */
   useEffect(() => {
     if (!active) {
       return undefined;
@@ -155,7 +226,7 @@ export function GuideHost({ enabled }: { enabled: boolean }) {
         if (index > 0) {
           go(index - 1);
         } else {
-          finish(active);
+          skip();
         }
 
         return true;
@@ -163,275 +234,492 @@ export function GuideHost({ enabled }: { enabled: boolean }) {
     );
 
     return () => subscription.remove();
-  }, [active, index, go, finish]);
+  }, [active, index, go, skip]);
 
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-
-    setSize((previous) =>
-      previous.width === width && previous.height === height
-        ? previous
-        : { width, height },
-    );
+  /* The overlay's own position in the window; targets are measured in window coordinates. */
+  const onLayout = useCallback((_event: LayoutChangeEvent) => {
+    overlayRef.current?.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) {
+        setOverlay((previous) =>
+          previous &&
+          previous.x === x &&
+          previous.y === y &&
+          previous.w === w &&
+          previous.h === h
+            ? previous
+            : { x, y, w, h },
+        );
+      }
+    });
   }, []);
 
-  if (!active || !enabled) {
+  /* A fresh opening starts with the spotlight collapsed in the middle, so the first target grows out of it. */
+  useEffect(() => {
+    if (!overlay) {
+      return;
+    }
+
+    overlayW.value = overlay.w;
+    overlayH.value = overlay.h;
+  }, [overlay, overlayW, overlayH]);
+
+  useEffect(() => {
+    if (!active || !overlay) {
+      return;
+    }
+
+    holeX.value = overlay.w / 2;
+    holeY.value = overlay.h / 2;
+    holeW.value = 0;
+    holeH.value = 0;
+    ring.value = 0;
+    cardIn.value = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, overlay === null]);
+
+  useEffect(() => {
+    if (!active || reduced) {
+      pulse.value = 0;
+
+      return undefined;
+    }
+
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+
+    return () => {
+      pulse.value = 0;
+    };
+  }, [active, reduced, pulse]);
+
+  const moveSpotlight = useCallback(
+    (spot: Rect | null, radius: number, showCard: boolean) => {
+      const duration = reduced ? 0 : 340;
+      const easing = Easing.out(Easing.cubic);
+
+      if (spot) {
+        holeX.value = withTiming(spot.x, { duration, easing });
+        holeY.value = withTiming(spot.y, { duration, easing });
+        holeW.value = withTiming(spot.w, { duration, easing });
+        holeH.value = withTiming(spot.h, { duration, easing });
+        holeR.value = withTiming(radius, { duration, easing });
+        ring.value = withTiming(1, { duration });
+      } else {
+        holeW.value = withTiming(0, { duration, easing });
+        holeH.value = withTiming(0, { duration, easing });
+        ring.value = withTiming(0, { duration });
+      }
+
+      if (showCard) {
+        cardIn.value = withDelay(
+          reduced ? 0 : spot ? 240 : 100,
+          withTiming(1, { duration: reduced ? 0 : 220 }),
+        );
+      }
+    },
+    [reduced, holeX, holeY, holeW, holeH, holeR, ring, cardIn],
+  );
+
+  const tabBarShown = !HIDDEN_ROUTES.includes(route);
+  const barHeight = BAR_HEIGHT + insets.bottom;
+  const reserved = tabBarShown ? barHeight : insets.bottom;
+
+  /* Resolve the current step: find the target, scroll it into view, then light it up. */
+  useEffect(() => {
+    if (!active || !overlay || !step) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const bounds = { w: overlay.w, h: overlay.h };
+    const ids = toIds(step.target);
+    const pad = step.pad ?? DEFAULT_PAD;
+    const radius = step.radius ?? DEFAULT_RADIUS;
+
+    cardIn.value = withTiming(0, { duration: reduced ? 0 : 120 });
+
+    const measureAll = async (): Promise<Rect | null> => {
+      const rects = await Promise.all(
+        ids.map((id) => measureNode(getTarget(id) as unknown as Measurable)),
+      );
+
+      return unionRects(rects.filter((rect): rect is Rect => rect !== null));
+    };
+
+    const toLocal = (rect: Rect): Rect => ({
+      x: rect.x - overlay.x,
+      y: rect.y - overlay.y,
+      w: rect.w,
+      h: rect.h,
+    });
+
+    const run = async () => {
+      let spot: Rect | null = null;
+
+      if (ids.length > 0) {
+        let raw = await measureAll();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!raw) {
+          /* The screen may still be settling; look once more before giving up. */
+          await sleep(250);
+
+          if (cancelled) {
+            return;
+          }
+
+          raw = await measureAll();
+
+          if (cancelled) {
+            return;
+          }
+        }
+
+        if (raw) {
+          const scroller = step.fixed ? null : getScroller();
+
+          if (scroller) {
+            const area = {
+              top: insets.top + 12,
+              bottom: overlay.h - reserved - 12,
+            };
+            const local = toLocal(raw);
+
+            if (needsScroll(local, area)) {
+              const delta = scrollDelta(local, area);
+
+              if (Math.abs(delta) > 6) {
+                scroller.scrollTo(Math.max(0, scroller.getOffset() + delta));
+                await sleep(reduced ? 60 : SCROLL_SETTLE);
+
+                if (cancelled) {
+                  return;
+                }
+
+                raw = (await measureAll()) ?? raw;
+
+                if (cancelled) {
+                  return;
+                }
+              }
+            }
+          }
+
+          spot = padRect(toLocal(raw), pad, bounds);
+        }
+      }
+
+      setPlaced({ key, spot });
+      moveSpotlight(spot, radius, true);
+
+      /* Entrance animations of the screen can still move things; look again once they are done. */
+      if (spot) {
+        await sleep(450);
+
+        if (cancelled) {
+          return;
+        }
+
+        const again = await measureAll();
+
+        if (cancelled || !again) {
+          return;
+        }
+
+        const next = padRect(toLocal(again), pad, bounds);
+        const moved =
+          Math.abs(next.x - spot.x) +
+          Math.abs(next.y - spot.y) +
+          Math.abs(next.w - spot.w) +
+          Math.abs(next.h - spot.h);
+
+        if (moved > 3) {
+          setPlaced({ key, spot: next });
+          moveSpotlight(next, radius, false);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, index, overlay, step, key]);
+
+  const dimProps = useAnimatedProps(() => ({
+    d:
+      `M0 0H${overlayW.value}V${overlayH.value}H0Z` +
+      roundedRectPath(
+        holeX.value,
+        holeY.value,
+        holeW.value,
+        holeH.value,
+        holeR.value,
+      ),
+  }));
+
+  const ringProps = useAnimatedProps(() => ({
+    d: roundedRectPath(
+      holeX.value,
+      holeY.value,
+      holeW.value,
+      holeH.value,
+      holeR.value,
+    ),
+    strokeOpacity: ring.value * (0.55 + 0.45 * pulse.value),
+  }));
+
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: cardIn.value,
+    transform: [{ translateY: (1 - cardIn.value) * 10 }],
+  }));
+
+  if (!active || !enabled || !step) {
     return null;
   }
 
-  const guide = GUIDES[active];
-  const total = guide.steps.length;
-  const current = guide.steps[Math.min(index, total - 1)]!;
-  const isLast = index >= total - 1;
   const ui = GUIDE_UI[language];
-  const number = (value: number) => formatNumber(value, language);
-
-  const Icon = current.icon;
+  const Icon = step.icon;
   const Forward = isRTL ? ChevronLeft : ChevronRight;
   const Back = isRTL ? ChevronRight : ChevronLeft;
+  const number = (value: number) => formatNumber(value, language);
+  const doneLabel = step.doneLabel?.[language] ?? ui.done;
+  const title = step.title[language];
+  const body = step.body[language];
 
-  const spotlight = current.spotlight === "tabBar";
-  const barHeight = BAR_HEIGHT + insets.bottom;
-  const tabBarShown = !HIDDEN_ROUTES.includes(route);
-  const bottomSpace = spotlight || tabBarShown ? barHeight : insets.bottom;
-  const cardWidth = Math.min(CARD_MAX_WIDTH, size.width - CARD_MARGIN * 2);
-  const maxCardHeight = Math.max(
-    size.height - insets.top - bottomSpace - 40,
-    200,
-  );
-
-  const outer = `M0 0H${size.width}V${size.height}H0Z`;
-  const barTop = size.height - barHeight;
-  const hole =
-    `M0 ${size.height}V${barTop + SPOTLIGHT_RADIUS}` +
-    `Q0 ${barTop} ${SPOTLIGHT_RADIUS} ${barTop}` +
-    `H${size.width - SPOTLIGHT_RADIUS}` +
-    `Q${size.width} ${barTop} ${size.width} ${barTop + SPOTLIGHT_RADIUS}` +
-    `V${size.height}Z`;
-  const ring =
-    `M0 ${barTop + SPOTLIGHT_RADIUS}Q0 ${barTop} ${SPOTLIGHT_RADIUS} ${barTop}` +
-    `H${size.width - SPOTLIGHT_RADIUS}` +
-    `Q${size.width} ${barTop} ${size.width} ${barTop + SPOTLIGHT_RADIUS}`;
-
-  const title = current.title[language];
-  const body = current.body[language];
-  const doneLabel = current.doneLabel?.[language] ?? ui.done;
+  const settled = placed.key === key;
+  const staticSpot = settled ? placed.spot : null;
+  const cardWidth = overlay
+    ? Math.min(CARD_MAX_WIDTH, overlay.w - CARD_MARGIN * 2)
+    : CARD_MAX_WIDTH;
+  const placement = overlay
+    ? placeCard(
+        settled ? placed.spot : null,
+        { w: cardWidth, h: cardHeight },
+        { top: insets.top + 12, bottom: overlay.h - reserved - 12 },
+        { w: overlay.w },
+      )
+    : null;
 
   return (
     <View
+      ref={overlayRef}
+      collapsable={false}
       style={[StyleSheet.absoluteFill, styles.overlay]}
       onLayout={onLayout}
       accessibilityViewIsModal
       importantForAccessibility="yes"
     >
-      {size.width > 0 ? (
+      {overlay ? (
         <Svg
-          width={size.width}
-          height={size.height}
+          width={overlay.w}
+          height={overlay.h}
           style={StyleSheet.absoluteFill}
           pointerEvents="none"
         >
-          <Path
-            d={spotlight ? `${outer}${hole}` : outer}
-            fill={DIM}
-            fillRule="evenodd"
-          />
-          {spotlight ? (
-            <Path d={ring} fill="none" stroke={GOLD} strokeWidth={2.5} />
-          ) : null}
+          {ANIMATE_SPOTLIGHT ? (
+            <>
+              <AnimatedPath
+                animatedProps={dimProps}
+                fill={DIM}
+                fillRule="evenodd"
+              />
+              <AnimatedPath
+                animatedProps={ringProps}
+                fill="none"
+                stroke={GOLD}
+                strokeWidth={2.5}
+              />
+            </>
+          ) : (
+            <>
+              <Path
+                d={
+                  `M0 0H${overlay.w}V${overlay.h}H0Z` +
+                  (staticSpot
+                    ? roundedRectPath(
+                        staticSpot.x,
+                        staticSpot.y,
+                        staticSpot.w,
+                        staticSpot.h,
+                        step.radius ?? DEFAULT_RADIUS,
+                      )
+                    : "")
+                }
+                fill={DIM}
+                fillRule="evenodd"
+              />
+              {staticSpot ? (
+                <Path
+                  d={roundedRectPath(
+                    staticSpot.x,
+                    staticSpot.y,
+                    staticSpot.w,
+                    staticSpot.h,
+                    step.radius ?? DEFAULT_RADIUS,
+                  )}
+                  fill="none"
+                  stroke={GOLD}
+                  strokeWidth={2.5}
+                  strokeOpacity={0.9}
+                />
+              ) : null}
+            </>
+          )}
         </Svg>
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: DIM }]} />
       )}
 
-      <View
-        style={[
-          styles.holder,
-          spotlight
-            ? { justifyContent: "flex-end", paddingBottom: barHeight + 14 }
-            : {
-                justifyContent: "center",
-                paddingTop: insets.top + 12,
-                paddingBottom: bottomSpace + 12,
-              },
-        ]}
-        pointerEvents="box-none"
-      >
-        {size.width > 0 ? (
-          <Animated.View
-            entering={FadeInDown.duration(260)}
-            accessibilityLiveRegion="polite"
-            style={[
-              styles.card,
-              {
-                width: cardWidth,
-                maxHeight: maxCardHeight,
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                shadowColor: colors.primary,
-              },
-            ]}
-          >
-            <Animated.View
-              key={`${active}-${index}`}
-              entering={FadeIn.duration(180)}
-              style={styles.content}
+      {overlay && placement ? (
+        <Animated.View
+          pointerEvents={settled ? "auto" : "none"}
+          accessibilityLiveRegion="polite"
+          onLayout={(event) => {
+            const next = Math.round(event.nativeEvent.layout.height);
+
+            setCardHeight((previous) => (previous === next ? previous : next));
+          }}
+          style={[
+            styles.card,
+            {
+              top: placement.top,
+              left: placement.left,
+              width: cardWidth,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              shadowColor: colors.primary,
+            },
+            cardStyle,
+          ]}
+        >
+          {placement.arrowX !== null && placement.side !== "center" ? (
+            <View
+              style={[
+                styles.arrow,
+                {
+                  left: placement.arrowX,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+                placement.side === "below" ? styles.arrowUp : styles.arrowDown,
+              ]}
+            />
+          ) : null}
+
+          <View style={[styles.header, { flexDirection: row }]}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.tint }]}>
+              <Icon size={20} color={colors.onTint} strokeWidth={2.1} />
+            </View>
+            <AppText
+              variant="body"
+              accessibilityRole="header"
+              style={[
+                styles.title,
+                { color: colors.text, textAlign, fontWeight: "800" },
+              ]}
             >
-              <View style={[styles.header, { flexDirection: row }]}>
-                <View
-                  style={[styles.iconCircle, { backgroundColor: colors.tint }]}
-                >
-                  <Icon size={24} color={colors.onTint} strokeWidth={2.1} />
-                </View>
-                <AppText
-                  variant="body"
-                  accessibilityRole="header"
-                  style={[
-                    styles.title,
-                    { color: colors.text, textAlign, fontWeight: "800" },
-                  ]}
-                >
-                  {title}
-                </AppText>
+              {title}
+            </AppText>
+          </View>
+
+          <AppText
+            variant="bodySmall"
+            style={{ color: colors.text, textAlign, lineHeight: 23 }}
+          >
+            {body}
+          </AppText>
+
+          {step.offerDisable ? (
+            <SoundPressable
+              accessibilityRole="button"
+              onPress={() => finish(active, { disablePages: true })}
+              hitSlop={6}
+              style={styles.disableLink}
+            >
+              <AppText
+                variant="caption"
+                style={{
+                  color: colors.textSecondary,
+                  textDecorationLine: "underline",
+                }}
+              >
+                {ui.disablePages}
+              </AppText>
+            </SoundPressable>
+          ) : null}
+
+          <View style={[styles.footer, { flexDirection: row }]}>
+            <View style={[styles.side, { flexDirection: row }]}>
+              {!isLast ? (
                 <SoundPressable
                   accessibilityRole="button"
                   accessibilityLabel={ui.skip}
-                  hitSlop={10}
-                  onPress={() => finish(active)}
-                  style={styles.close}
+                  hitSlop={8}
+                  onPress={skip}
+                  style={styles.skip}
                 >
-                  <X size={20} color={colors.textSecondary} />
+                  <AppText
+                    variant="bodySmall"
+                    style={{ color: colors.textSecondary, fontWeight: "700" }}
+                  >
+                    {ui.skip}
+                  </AppText>
                 </SoundPressable>
-              </View>
-
-              <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-              >
-                <AppText
-                  variant="bodySmall"
-                  style={{ color: colors.text, textAlign, lineHeight: 25 }}
-                >
-                  {body}
-                </AppText>
-                {current.items?.map((item: GuideItem) => {
-                  const ItemIcon = item.icon;
-
-                  return (
-                    <View
-                      key={item.text.en}
-                      style={[styles.itemRow, { flexDirection: row }]}
-                    >
-                      <View
-                        style={[
-                          styles.itemIcon,
-                          { backgroundColor: colors.tintSoft },
-                        ]}
-                      >
-                        <ItemIcon size={18} color={colors.onTint} />
-                      </View>
-                      <ItemText
-                        text={item.text[language]}
-                        color={colors.textSecondary}
-                        textAlign={textAlign}
-                        persian={isRTL}
-                      />
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </Animated.View>
-
-            {isLast && current.offerDisable ? (
-              <SoundPressable
-                accessibilityRole="button"
-                onPress={() => finish(active, { disablePages: true })}
-                hitSlop={6}
-                style={styles.disableLink}
-              >
+              ) : null}
+              {total > 1 ? (
                 <AppText
                   variant="caption"
-                  style={{
-                    color: colors.textSecondary,
-                    textDecorationLine: "underline",
-                  }}
+                  style={{ color: colors.textSecondary }}
                 >
-                  {ui.disablePages}
+                  {fill(ui.stepOf, {
+                    n: number(index + 1),
+                    total: number(total),
+                  })}
                 </AppText>
-              </SoundPressable>
-            ) : null}
+              ) : null}
+            </View>
 
-            <View style={[styles.footer, { flexDirection: row }]}>
-              <View style={[styles.progress, { flexDirection: row }]}>
-                {total > 1 ? (
-                  <View style={[styles.dots, { flexDirection: row }]}>
-                    {guide.steps.map((step, position) => (
-                      <View
-                        key={step.title.en}
-                        style={[
-                          styles.dot,
-                          position === index && styles.dotActive,
-                          {
-                            backgroundColor:
-                              position === index
-                                ? colors.primary
-                                : colors.track,
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-                {total > 1 ? (
-                  <AppText
-                    variant="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {fill(ui.stepOf, {
-                      n: number(index + 1),
-                      total: number(total),
-                    })}
-                  </AppText>
-                ) : null}
-              </View>
-
-              <View style={[styles.actions, { flexDirection: row }]}>
-                {index > 0 ? (
-                  <SoundPressable
-                    accessibilityRole="button"
-                    accessibilityLabel={ui.prev}
-                    onPress={() => go(index - 1)}
-                    style={[styles.prev, { backgroundColor: colors.tintSoft }]}
-                  >
-                    <Back size={20} color={colors.onTint} />
-                  </SoundPressable>
-                ) : null}
+            <View style={[styles.side, { flexDirection: row }]}>
+              {index > 0 ? (
                 <SoundPressable
                   accessibilityRole="button"
-                  accessibilityLabel={isLast ? doneLabel : ui.next}
-                  onPress={() => (isLast ? finish(active) : go(index + 1))}
-                  style={[
-                    styles.next,
-                    { backgroundColor: colors.primary, flexDirection: row },
-                  ]}
+                  accessibilityLabel={ui.prev}
+                  onPress={() => go(index - 1)}
+                  style={[styles.prev, { backgroundColor: colors.tintSoft }]}
                 >
-                  <AppText
-                    variant="button"
-                    style={{ color: colors.onPrimary, fontWeight: "800" }}
-                  >
-                    {isLast ? doneLabel : ui.next}
-                  </AppText>
-                  {isLast ? null : (
-                    <Forward size={18} color={colors.onPrimary} />
-                  )}
+                  <Back size={20} color={colors.onTint} />
                 </SoundPressable>
-              </View>
+              ) : null}
+              <SoundPressable
+                accessibilityRole="button"
+                accessibilityLabel={isLast ? doneLabel : ui.next}
+                onPress={() => (isLast ? finish(active) : go(index + 1))}
+                style={[
+                  styles.next,
+                  { backgroundColor: colors.primary, flexDirection: row },
+                ]}
+              >
+                <AppText
+                  variant="button"
+                  style={{ color: colors.onPrimary, fontWeight: "800" }}
+                >
+                  {isLast ? doneLabel : ui.next}
+                </AppText>
+                {isLast ? null : <Forward size={18} color={colors.onPrimary} />}
+              </SoundPressable>
             </View>
-          </Animated.View>
-        ) : null}
-      </View>
+          </View>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -442,113 +730,78 @@ const styles = StyleSheet.create({
     /* The tab bar and the mini player use elevation on Android; stay above them. */
     elevation: Platform.OS === "android" ? 60 : 0,
   },
-  holder: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-  },
   card: {
-    borderRadius: 24,
+    position: "absolute",
+    borderRadius: 22,
     borderWidth: 1,
-    paddingTop: 16,
+    paddingTop: 14,
     paddingHorizontal: 16,
-    paddingBottom: 14,
+    paddingBottom: 12,
     gap: 10,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
+    shadowOpacity: 0.25,
     shadowRadius: 18,
     elevation: 24,
   },
-  content: {
-    flexShrink: 1,
-    gap: 10,
+  arrow: {
+    position: "absolute",
+    width: 14,
+    height: 14,
+    transform: [{ rotate: "45deg" }],
+  },
+  arrowUp: {
+    top: -8,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+  },
+  arrowDown: {
+    bottom: -8,
+    borderBottomWidth: 1,
+    borderRightWidth: 1,
   },
   header: {
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
   },
   title: {
     flex: 1,
   },
-  close: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scroll: {
-    flexShrink: 1,
-  },
-  scrollContent: {
-    gap: 10,
-    paddingBottom: 2,
-  },
-  itemRow: {
-    alignItems: "center",
-    gap: 10,
-  },
-  itemIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  itemText: {
-    flex: 1,
-    lineHeight: 21,
-  },
-  itemLabel: {
-    fontWeight: "800",
-  },
   disableLink: {
-    alignSelf: "center",
-    paddingVertical: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 2,
   },
   footer: {
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 10,
-  },
-  progress: {
-    alignItems: "center",
-    gap: 10,
-    flexShrink: 1,
-  },
-  dots: {
-    alignItems: "center",
-    gap: 5,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dotActive: {
-    width: 18,
-  },
-  actions: {
-    alignItems: "center",
     gap: 8,
+    marginTop: 2,
+  },
+  side: {
+    alignItems: "center",
+    gap: 10,
+  },
+  skip: {
+    minHeight: 40,
+    justifyContent: "center",
   },
   prev: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
   next: {
-    minHeight: 44,
-    paddingHorizontal: 22,
-    borderRadius: 22,
+    minHeight: 40,
+    paddingHorizontal: 20,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     gap: 6,

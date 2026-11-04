@@ -15,6 +15,7 @@ import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
 import { PageBanner } from "@/features/quran/components/QuranDecor";
+import { useGuideScroll } from "@/features/guide/guideTargets";
 
 export const SCREEN_PADDING = 20;
 
@@ -41,12 +42,14 @@ export function ScreenFrame({
   const { t } = useLanguage();
   const { row, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,

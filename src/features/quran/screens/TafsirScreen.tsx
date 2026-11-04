@@ -32,6 +32,7 @@ import { VERSE_TEXT } from "@/features/quran/data/verseText";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { fill } from "@/features/quran/utils/fill";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const PADDING = 20;
 
@@ -40,6 +41,7 @@ export default function TafsirScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const { width } = useWindowDimensions();
   const { surahId: activeSurah } = useQuranProgress();
   const { target, playing, toggle, playSurah } = useRecitation();
@@ -94,6 +96,7 @@ export default function TafsirScreen() {
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
@@ -114,95 +117,99 @@ export default function TafsirScreen() {
       </Rise>
 
       <Rise delay={60}>
-        <View
-          style={[
-            styles.segmented,
-            { backgroundColor: colors.tintSoft, flexDirection: row },
-          ]}
-        >
-          {TAFSIR_SURAH_IDS.map((id) => {
-            const item = getSurah(id);
-            const isSelected = id === selected;
+        <GuideTarget id="tafsir.switch">
+          <View
+            style={[
+              styles.segmented,
+              { backgroundColor: colors.tintSoft, flexDirection: row },
+            ]}
+          >
+            {TAFSIR_SURAH_IDS.map((id) => {
+              const item = getSurah(id);
+              const isSelected = id === selected;
 
-            return (
-              <Pressable
-                key={id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: isSelected }}
-                onPress={() => choose(id)}
-                style={[
-                  styles.segment,
-                  isSelected && { backgroundColor: colors.surface },
-                ]}
-              >
-                <AppText
-                  variant="bodySmall"
-                  style={{
-                    color: colors.text,
-                    fontWeight: isSelected ? "800" : "500",
-                  }}
+              return (
+                <Pressable
+                  key={id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => choose(id)}
+                  style={[
+                    styles.segment,
+                    isSelected && { backgroundColor: colors.surface },
+                  ]}
                 >
-                  {isRTL ? item?.name : item?.transliteration}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <AppText
+                    variant="bodySmall"
+                    style={{
+                      color: colors.text,
+                      fontWeight: isSelected ? "800" : "500",
+                    }}
+                  >
+                    {isRTL ? item?.name : item?.transliteration}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </GuideTarget>
       </Rise>
 
       {tafsir && surah ? (
         <>
           <Rise delay={120}>
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <View style={[styles.surahRow, { flexDirection: row }]}>
-                <StarBadge
-                  size={52}
-                  label={number(surah.id)}
-                  color={GOLD}
-                  labelColor={GOLD_DARK}
-                />
-                <View style={styles.surahText}>
-                  <Text
-                    allowFontScaling={false}
-                    style={[
-                      styles.surahName,
-                      { color: colors.text, textAlign: isRTL ? "right" : "left" },
-                    ]}
+            <GuideTarget id="tafsir.card">
+              <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                <View style={[styles.surahRow, { flexDirection: row }]}>
+                  <StarBadge
+                    size={52}
+                    label={number(surah.id)}
+                    color={GOLD}
+                    labelColor={GOLD_DARK}
+                  />
+                  <View style={styles.surahText}>
+                    <Text
+                      allowFontScaling={false}
+                      style={[
+                        styles.surahName,
+                        { color: colors.text, textAlign: isRTL ? "right" : "left" },
+                      ]}
+                    >
+                      {surah.name}
+                    </Text>
+                    <AppText
+                      variant="caption"
+                      style={{ color: colors.textSecondary, textAlign }}
+                    >
+                      {`${surah.transliteration} · ${number(surah.verses)} ${t.quran_verses_word} · ${
+                        tafsir.revelation === "meccan"
+                          ? t.quran_revelation_meccan
+                          : t.quran_revelation_medinan
+                      }`}
+                    </AppText>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t.quran_listen_surah}
+                    onPress={listen}
+                    style={[styles.listenButton, { backgroundColor: colors.primary }]}
                   >
-                    {surah.name}
-                  </Text>
-                  <AppText
-                    variant="caption"
-                    style={{ color: colors.textSecondary, textAlign }}
-                  >
-                    {`${surah.transliteration} · ${number(surah.verses)} ${t.quran_verses_word} · ${
-                      tafsir.revelation === "meccan"
-                        ? t.quran_revelation_meccan
-                        : t.quran_revelation_medinan
-                    }`}
-                  </AppText>
+                    {isThisPlaying ? (
+                      <Pause size={20} color={colors.onPrimary} />
+                    ) : (
+                      <Play size={20} color={colors.onPrimary} />
+                    )}
+                  </Pressable>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t.quran_listen_surah}
-                  onPress={listen}
-                  style={[styles.listenButton, { backgroundColor: colors.primary }]}
+                <OrnamentDivider />
+                <AppText
+                  variant="bodySmall"
+                  style={{ color: colors.text, textAlign, lineHeight: 26 }}
                 >
-                  {isThisPlaying ? (
-                    <Pause size={20} color={colors.onPrimary} />
-                  ) : (
-                    <Play size={20} color={colors.onPrimary} />
-                  )}
-                </Pressable>
+                  {tafsir.intro[language]}
+                </AppText>
               </View>
-              <OrnamentDivider />
-              <AppText
-                variant="bodySmall"
-                style={{ color: colors.text, textAlign, lineHeight: 26 }}
-              >
-                {tafsir.intro[language]}
-              </AppText>
-            </View>
+            </GuideTarget>
           </Rise>
 
           {tafsir.sections.map((section, index) => {
@@ -215,109 +222,113 @@ export default function TafsirScreen() {
 
             return (
               <Rise key={`${selected}-${section.from}`} delay={160 + index * 40}>
-                <View style={[styles.card, { backgroundColor: colors.surface }]}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: isOpen }}
-                    onPress={() => toggleSection(index)}
-                    style={[styles.sectionHeader, { flexDirection: row }]}
-                  >
-                    <View
-                      style={[styles.rangeChip, { backgroundColor: colors.tint }]}
+                <GuideTarget id={`tafsir.group.${index}`}>
+                  <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: isOpen }}
+                      onPress={() => toggleSection(index)}
+                      style={[styles.sectionHeader, { flexDirection: row }]}
                     >
-                      <AppText
-                        variant="caption"
-                        style={{ color: colors.onTint, fontWeight: "700" }}
+                      <View
+                        style={[styles.rangeChip, { backgroundColor: colors.tint }]}
                       >
-                        {rangeLabel(section)}
-                      </AppText>
-                    </View>
-                    <AppText
-                      variant="body"
-                      style={{
-                        color: colors.text,
-                        fontWeight: "800",
-                        flex: 1,
-                        textAlign,
-                      }}
-                    >
-                      {section.title[language]}
-                    </AppText>
-                    <Chevron size={20} color={colors.textSecondary} />
-                  </Pressable>
-
-                  {isOpen ? (
-                    <View style={styles.sectionBody}>
-                      <View style={[styles.versesBox, { backgroundColor: "#FFFBEF" }]}>
-                        {sectionVerses.map((ayah) => {
-                          const text = verses?.[ayah - 1];
-
-                          if (!text) {
-                            return null;
-                          }
-
-                          return (
-                            <View key={ayah} style={styles.verse}>
-                              <View style={styles.verseRow}>
-                                <StarBadge
-                                  size={28}
-                                  label={number(ayah)}
-                                  color={GOLD}
-                                  labelColor={GOLD_DARK}
-                                />
-                                <Text
-                                  allowFontScaling={false}
-                                  style={styles.arabic}
-                                >
-                                  {text.ar}
-                                </Text>
-                              </View>
-                              {language === "en" ? (
-                                <AppText
-                                  variant="caption"
-                                  forceEnglish
-                                  style={styles.translation}
-                                >
-                                  {text.en}
-                                </AppText>
-                              ) : null}
-                            </View>
-                          );
-                        })}
+                        <AppText
+                          variant="caption"
+                          style={{ color: colors.onTint, fontWeight: "700" }}
+                        >
+                          {rangeLabel(section)}
+                        </AppText>
                       </View>
                       <AppText
-                        variant="bodySmall"
-                        style={{ color: colors.text, textAlign, lineHeight: 26 }}
+                        variant="body"
+                        style={{
+                          color: colors.text,
+                          fontWeight: "800",
+                          flex: 1,
+                          textAlign,
+                        }}
                       >
-                        {section.text[language]}
+                        {section.title[language]}
                       </AppText>
-                    </View>
-                  ) : null}
-                </View>
+                      <Chevron size={20} color={colors.textSecondary} />
+                    </Pressable>
+
+                    {isOpen ? (
+                      <View style={styles.sectionBody}>
+                        <View style={[styles.versesBox, { backgroundColor: "#FFFBEF" }]}>
+                          {sectionVerses.map((ayah) => {
+                            const text = verses?.[ayah - 1];
+
+                            if (!text) {
+                              return null;
+                            }
+
+                            return (
+                              <View key={ayah} style={styles.verse}>
+                                <View style={styles.verseRow}>
+                                  <StarBadge
+                                    size={28}
+                                    label={number(ayah)}
+                                    color={GOLD}
+                                    labelColor={GOLD_DARK}
+                                  />
+                                  <Text
+                                    allowFontScaling={false}
+                                    style={styles.arabic}
+                                  >
+                                    {text.ar}
+                                  </Text>
+                                </View>
+                                {language === "en" ? (
+                                  <AppText
+                                    variant="caption"
+                                    forceEnglish
+                                    style={styles.translation}
+                                  >
+                                    {text.en}
+                                  </AppText>
+                                ) : null}
+                              </View>
+                            );
+                          })}
+                        </View>
+                        <AppText
+                          variant="bodySmall"
+                          style={{ color: colors.text, textAlign, lineHeight: 26 }}
+                        >
+                          {section.text[language]}
+                        </AppText>
+                      </View>
+                    ) : null}
+                  </View>
+                </GuideTarget>
               </Rise>
             );
           })}
 
           <Rise delay={420}>
-            <View style={[styles.card, { backgroundColor: colors.surface }]}>
-              <AppText
-                variant="body"
-                style={{ color: colors.text, fontWeight: "800", textAlign }}
-              >
-                {t.quran_tafsir_lessons}
-              </AppText>
-              {tafsir.lessons[language].map((lesson) => (
-                <View key={lesson} style={[styles.lessonRow, { flexDirection: row }]}>
-                  <StarBadge size={16} color={GOLD} fillColor={GOLD} />
-                  <AppText
-                    variant="bodySmall"
-                    style={{ color: colors.text, textAlign, flex: 1, lineHeight: 24 }}
-                  >
-                    {lesson}
-                  </AppText>
-                </View>
-              ))}
-            </View>
+            <GuideTarget id="tafsir.lessons">
+              <View style={[styles.card, { backgroundColor: colors.surface }]}>
+                <AppText
+                  variant="body"
+                  style={{ color: colors.text, fontWeight: "800", textAlign }}
+                >
+                  {t.quran_tafsir_lessons}
+                </AppText>
+                {tafsir.lessons[language].map((lesson) => (
+                  <View key={lesson} style={[styles.lessonRow, { flexDirection: row }]}>
+                    <StarBadge size={16} color={GOLD} fillColor={GOLD} />
+                    <AppText
+                      variant="bodySmall"
+                      style={{ color: colors.text, textAlign, flex: 1, lineHeight: 24 }}
+                    >
+                      {lesson}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+            </GuideTarget>
           </Rise>
 
           <Rise delay={460}>

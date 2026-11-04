@@ -45,6 +45,7 @@ import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { dailyAyahFor } from "@/features/quran/data/verseText";
 import { getSurah } from "@/features/quran/data/surahs";
 import { fill } from "@/features/quran/utils/fill";
+import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
 const PADDING = 20;
 const CARD_HEIGHT = 380;
@@ -57,6 +58,7 @@ export default function QuranGardenScreen() {
   const { t, language } = useLanguage();
   const { row, textAlign, isRTL } = useDirection();
   const insets = useSafeAreaInsets();
+  const guideScroll = useGuideScroll();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { plant, learnedCount, dueAyahs, nextNewAyah, mushaf, quizFor } =
@@ -128,6 +130,7 @@ export default function QuranGardenScreen() {
 
   return (
     <ScrollView
+      {...guideScroll}
       style={{ backgroundColor: colors.background }}
       contentContainerStyle={[
         styles.content,
@@ -165,7 +168,7 @@ export default function QuranGardenScreen() {
 
       {/* No <Rise> here: on Android a GLView (TextureView) inside a view with animated
           opacity/transform renders blank. Keep every ancestor of the GL canvas static. */}
-      <View collapsable={false}>
+      <GuideTarget id="garden.plant">
         <View
           collapsable={false}
           style={[styles.plantCard, { backgroundColor: colors.tintSoft }]}
@@ -250,153 +253,163 @@ export default function QuranGardenScreen() {
             </AppText>
           </View>
         </View>
-      </View>
+      </GuideTarget>
 
       <Rise delay={120}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <View style={[styles.cardHeader, { flexDirection: row }]}>
-            <StarBadge size={26} color={GOLD} fillColor={GOLD} />
+        <GuideTarget id="garden.daily">
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={[styles.cardHeader, { flexDirection: row }]}>
+              <StarBadge size={26} color={GOLD} fillColor={GOLD} />
+              <AppText
+                variant="body"
+                style={{ color: colors.text, fontWeight: "800", flex: 1, textAlign }}
+              >
+                {t.quran_ayah_of_day}
+              </AppText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={dailyPlaying ? t.quran_pause : t.quran_play}
+                onPress={() =>
+                  dailyPlaying ? toggle() : playAyah(daily.surahId, daily.ayah)
+                }
+                style={[styles.dailyPlay, { backgroundColor: colors.primary }]}
+              >
+                {dailyPlaying ? (
+                  <Pause size={18} color={colors.onPrimary} />
+                ) : (
+                  <Play size={18} color={colors.onPrimary} />
+                )}
+              </Pressable>
+            </View>
+            <View style={styles.dailyBox}>
+              <Text allowFontScaling={false} style={styles.dailyArabic}>
+                {daily.ar}
+              </Text>
+            </View>
             <AppText
-              variant="body"
-              style={{ color: colors.text, fontWeight: "800", flex: 1, textAlign }}
+              variant="bodySmall"
+              forceEnglish={language === "en"}
+              style={{ color: colors.text, textAlign, lineHeight: 25 }}
             >
-              {t.quran_ayah_of_day}
+              {language === "fa" ? daily.fa : daily.en}
             </AppText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={dailyPlaying ? t.quran_pause : t.quran_play}
-              onPress={() =>
-                dailyPlaying ? toggle() : playAyah(daily.surahId, daily.ayah)
-              }
-              style={[styles.dailyPlay, { backgroundColor: colors.primary }]}
+            <AppText
+              variant="caption"
+              style={{ color: colors.textSecondary, textAlign }}
             >
-              {dailyPlaying ? (
-                <Pause size={18} color={colors.onPrimary} />
-              ) : (
-                <Play size={18} color={colors.onPrimary} />
-              )}
-            </Pressable>
+              {`${language === "fa" ? (dailySurah?.name ?? "") : (dailySurah?.transliteration ?? "")} · ${number(daily.ayah)}`}
+            </AppText>
           </View>
-          <View style={styles.dailyBox}>
-            <Text allowFontScaling={false} style={styles.dailyArabic}>
-              {daily.ar}
-            </Text>
-          </View>
-          <AppText
-            variant="bodySmall"
-            forceEnglish={language === "en"}
-            style={{ color: colors.text, textAlign, lineHeight: 25 }}
-          >
-            {language === "fa" ? daily.fa : daily.en}
-          </AppText>
-          <AppText
-            variant="caption"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {`${language === "fa" ? (dailySurah?.name ?? "") : (dailySurah?.transliteration ?? "")} · ${number(daily.ayah)}`}
-          </AppText>
-        </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={140}>
-        <View style={[styles.shortcuts, { flexDirection: row }]}>
-          {shortcuts.map((item) => {
-            const Icon = item.icon;
+        <GuideTarget id="garden.shortcuts">
+          <View style={[styles.shortcuts, { flexDirection: row }]}>
+            {shortcuts.map((item) => {
+              const Icon = item.icon;
 
-            return (
-              <Pressable
-                key={item.route}
-                accessibilityRole="button"
-                accessibilityLabel={item.title}
-                onPress={() => router.push(item.route)}
-                style={[styles.shortcut, { backgroundColor: colors.surface }]}
-              >
-                <View style={[styles.shortcutIcon, { backgroundColor: colors.tint }]}>
-                  <Icon size={22} color={colors.onTint} />
-                </View>
-                <AppText
-                  variant="bodySmall"
-                  style={{ color: colors.text, fontWeight: "800", textAlign: "center" }}
+              return (
+                <Pressable
+                  key={item.route}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  onPress={() => router.push(item.route)}
+                  style={[styles.shortcut, { backgroundColor: colors.surface }]}
                 >
-                  {item.title}
-                </AppText>
-                <AppText
-                  variant="caption"
-                  numberOfLines={2}
-                  style={{ color: colors.textSecondary, textAlign: "center" }}
-                >
-                  {item.hint}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
+                  <View style={[styles.shortcutIcon, { backgroundColor: colors.tint }]}>
+                    <Icon size={22} color={colors.onTint} />
+                  </View>
+                  <AppText
+                    variant="bodySmall"
+                    style={{ color: colors.text, fontWeight: "800", textAlign: "center" }}
+                  >
+                    {item.title}
+                  </AppText>
+                  <AppText
+                    variant="caption"
+                    numberOfLines={2}
+                    style={{ color: colors.textSecondary, textAlign: "center" }}
+                  >
+                    {item.hint}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={150}>
-        <PlanShortcutCard />
+        <GuideTarget id="garden.plan">
+          <PlanShortcutCard />
+        </GuideTarget>
       </Rise>
 
       <Rise delay={160}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <View style={[styles.cardHeader, { flexDirection: row }]}>
-            <Droplets size={20} color={colors.primary} />
+        <GuideTarget id="garden.water">
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={[styles.cardHeader, { flexDirection: row }]}>
+              <Droplets size={20} color={colors.primary} />
+              <AppText
+                variant="body"
+                style={{ color: colors.text, fontWeight: "800" }}
+              >
+                {t.quran_water_title}
+              </AppText>
+            </View>
             <AppText
-              variant="body"
-              style={{ color: colors.text, fontWeight: "800" }}
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, textAlign }}
             >
-              {t.quran_water_title}
+              {waterAyah
+                ? fill(t.quran_water_due, { count: number(dueAyahs.length) })
+                : t.quran_water_none}
             </AppText>
+            {waterAyah ? (
+              <ChunkyButton
+                label={t.quran_water_cta}
+                onPress={() => openMemorize(waterAyah)}
+              />
+            ) : null}
           </View>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {waterAyah
-              ? fill(t.quran_water_due, { count: number(dueAyahs.length) })
-              : t.quran_water_none}
-          </AppText>
-          {waterAyah ? (
-            <ChunkyButton
-              label={t.quran_water_cta}
-              onPress={() => openMemorize(waterAyah)}
-            />
-          ) : null}
-        </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={240}>
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <View style={[styles.cardHeader, { flexDirection: row }]}>
-            <BookOpen size={20} color={colors.primary} />
+        <GuideTarget id="garden.learn">
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <View style={[styles.cardHeader, { flexDirection: row }]}>
+              <BookOpen size={20} color={colors.primary} />
+              <AppText
+                variant="body"
+                style={{ color: colors.text, fontWeight: "800" }}
+              >
+                {t.quran_learn_title}
+              </AppText>
+            </View>
             <AppText
-              variant="body"
-              style={{ color: colors.text, fontWeight: "800" }}
+              variant="bodySmall"
+              style={{ color: colors.textSecondary, textAlign }}
             >
-              {t.quran_learn_title}
+              {nextNewAyah
+                ? fill(t.quran_learn_next, {
+                    ayah: number(nextNewAyah),
+                    surah:
+                      language === "fa"
+                        ? (surah?.name ?? "")
+                        : (surah?.transliteration ?? ""),
+                  })
+                : t.quran_learn_done}
             </AppText>
+            {nextNewAyah ? (
+              <ChunkyButton
+                label={t.quran_learn_cta}
+                onPress={() => openMemorize(nextNewAyah)}
+              />
+            ) : null}
           </View>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {nextNewAyah
-              ? fill(t.quran_learn_next, {
-                  ayah: number(nextNewAyah),
-                  surah:
-                    language === "fa"
-                      ? (surah?.name ?? "")
-                      : (surah?.transliteration ?? ""),
-                })
-              : t.quran_learn_done}
-          </AppText>
-          {nextNewAyah ? (
-            <ChunkyButton
-              label={t.quran_learn_cta}
-              onPress={() => openMemorize(nextNewAyah)}
-            />
-          ) : null}
-        </View>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={320}>

@@ -1,22 +1,18 @@
 import {
-  BarChart3,
   BookMarked,
   BookOpen,
   BookOpenText,
   Brain,
   CalendarCheck,
   CalendarDays,
-  CheckCheck,
+  ChevronsUpDown,
   CircleCheck,
   CircleHelp,
-  ChevronsUpDown,
   ClipboardCheck,
-  Compass,
   Droplets,
   Eye,
   EyeOff,
   FileDown,
-  Flame,
   Flower2,
   Gauge,
   Grid3x3,
@@ -27,8 +23,6 @@ import {
   ListChecks,
   ListFilter,
   ListOrdered,
-  Lock,
-  MousePointerClick,
   Palette,
   Play,
   Repeat,
@@ -39,7 +33,6 @@ import {
   Sprout,
   Star,
   Target,
-  Trash2,
   TrendingUp,
   TriangleAlert,
   Trophy,
@@ -52,15 +45,21 @@ import type { Language } from "@/core/types/index";
 /*
  * First-run guides.
  *
- * Everything the guides say lives in this file, so editing a text, adding a step or adding a
- * guide for a new page never touches the UI code.
+ * Every step points at a real element of the screen: the screen goes dark, the element stays bright,
+ * and a short explanation appears next to it. Elements are marked in the screens with
+ * <GuideTarget id="page.thing"> (see guideTargets.tsx) and referenced here by that id.
+ *
+ * Everything the guides say lives in this file, so editing a text, adding a step or adding a guide
+ * for a new page never touches the UI code.
  *
  * In the Persian strings "~" stands for the zero-width non-joiner (half space). It is converted
  * to U+200C when the module loads, so the sources stay readable and the characters are never lost.
  *
  * To add a guide for a new page:
- *   1. add its id to GuideId and its steps to GUIDES,
- *   2. map the route to the id in GUIDE_ROUTES.
+ *   1. wrap the elements to point at in <GuideTarget id="page.thing"> in that screen, and call
+ *      useGuideScroll() there if the screen scrolls,
+ *   2. add its id to GuideId and its steps to GUIDE_LIST,
+ *   3. map the route to the id in GUIDE_ROUTES.
  */
 
 export interface Localized {
@@ -68,22 +67,28 @@ export interface Localized {
   en: string;
 }
 
-export interface GuideItem {
-  icon: LucideIcon;
-  text: Localized;
-}
-
 export interface GuideStep {
   icon: LucideIcon;
+  /** Keep it to a few words. */
   title: Localized;
+  /** One idea, one or two short sentences. */
   body: Localized;
-  /** Short rows with an icon, used to list the controls of a page. */
-  items?: readonly GuideItem[];
-  /** Dim the whole screen except the bottom tab bar. */
-  spotlight?: "tabBar";
+  /**
+   * Element(s) to highlight. Several ids highlight everything around all of them.
+   * No target, or a target that is not on screen: the step is shown as a plain centered card.
+   */
+  target?: string | readonly string[];
+  /** Leave the step out entirely when its target is not on screen (empty states, data that is not there yet). */
+  optional?: boolean;
+  /** Never scroll the screen for this step (the tab bar). */
+  fixed?: boolean;
+  /** Extra space around the highlighted element. */
+  pad?: number;
+  /** Corner radius of the highlight. */
+  radius?: number;
   /** Label of the main button on the last step (default: "Got it"). */
   doneLabel?: Localized;
-  /** Last step only: also show a link that turns the page guides off for good. */
+  /** Also show a link that turns the page guides off for good. */
   offerDisable?: boolean;
 }
 
@@ -112,6 +117,9 @@ export interface GuideDef {
 
 const L = (fa: string, en: string): Localized => ({ fa, en });
 
+const TAB_PAD = 2;
+const TAB_RADIUS = 18;
+
 const GUIDE_LIST: readonly GuideDef[] = [
   {
     id: "tour",
@@ -120,70 +128,82 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: Sprout,
         title: L("به باغ حفظ قرآن خوش آمدی", "Welcome to Quran Garden"),
         body: L(
-          "اینجا آیه~ها را آرام و با مرور منظم حفظ می~کنی و گیاهت با هر آیه بزرگ~تر می~شود. بیا در چند قدم کوتاه با برنامه آشنا شویم.",
-          "Memorize verses calmly with regular review, and watch your plant grow with every verse. Let’s take a quick look around.",
+          "با هر آیه~ای که حفظ می~کنی، گیاهت رشد می~کند. بیا یک دقیقه با بخش~های برنامه آشنا شویم.",
+          "Every verse you memorize makes your plant grow. Let’s take a one-minute look around.",
         ),
+        offerDisable: true,
       },
       {
-        icon: Compass,
-        title: L("شش بخش اصلی", "The six main sections"),
+        icon: Sprout,
+        title: L("باغ من", "My garden"),
         body: L(
-          "با نوار پایین صفحه بین بخش~ها جابه~جا می~شوی. این نوار الان روشن شده است:",
-          "Use the bar at the bottom to move between sections. It is highlighted right now:",
+          "پیشرفتت اینجاست: گیاه، آبیاری روزانه و آیه~های تازه.",
+          "Your progress lives here: the plant, daily watering and new verses.",
         ),
-        spotlight: "tabBar",
-        items: [
-          {
-            icon: Sprout,
-            text: L(
-              "باغ من: رشد گیاه، آبیاری و آیه~های تازه",
-              "My garden: your plant, watering and new verses",
-            ),
-          },
-          {
-            icon: BookOpen,
-            text: L(
-              "حفظ: خواندن، پنهان~کردن و سنجش آیه~ها",
-              "Memorize: read, hide and test verses",
-            ),
-          },
-          {
-            icon: BookOpenText,
-            text: L(
-              "تفسیر: معنی و پیام سوره~ها به زبان ساده",
-              "Tafsir: the meaning of each surah in plain words",
-            ),
-          },
-          {
-            icon: Headphones,
-            text: L(
-              "تلاوت: شنیدن سوره~ها با صدای قاری~ها",
-              "Listen: surahs recited by different reciters",
-            ),
-          },
-          {
-            icon: ListOrdered,
-            text: L(
-              "فهرست: انتخاب سوره برای حفظ",
-              "Library: pick a surah to memorize",
-            ),
-          },
-          {
-            icon: Settings,
-            text: L(
-              "تنظیمات: حساب، تم، زبان و صدا",
-              "Settings: account, theme, language and sound",
-            ),
-          },
-        ],
+        target: "tab./",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
       },
       {
-        icon: CircleHelp,
-        title: L("یک راهنما برای هر صفحه", "A short guide for every page"),
+        icon: BookOpen,
+        title: L("حفظ", "Memorize"),
         body: L(
-          "اولین بار که وارد هر صفحه می~شوی، یک راهنمای کوتاه می~بینی. هر وقت خواستی از «تنظیمات» می~توانی راهنماها را دوباره ببینی.",
-          "The first time you open a page you will see a short guide. You can bring the guides back any time from Settings.",
+          "آیه~ها را بخوان، پنهان کن و خودت را بسنج.",
+          "Read verses, hide them and test yourself.",
         ),
+        target: "tab./memorize",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
+      },
+      {
+        icon: BookOpenText,
+        title: L("تفسیر", "Tafsir"),
+        body: L(
+          "معنی و پیام هر سوره را به زبان ساده بخوان.",
+          "Read the meaning of each surah in plain words.",
+        ),
+        target: "tab./tafsir",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
+      },
+      {
+        icon: Headphones,
+        title: L("تلاوت", "Listen"),
+        body: L(
+          "سوره~ها را با صدای قاری~های مختلف بشنو.",
+          "Listen to surahs recited by different reciters.",
+        ),
+        target: "tab./listen",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
+      },
+      {
+        icon: ListOrdered,
+        title: L("فهرست", "Library"),
+        body: L(
+          "سوره~ای را که می~خواهی حفظ کنی از اینجا انتخاب کن.",
+          "Pick the surah you want to memorize here.",
+        ),
+        target: "tab./library",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
+      },
+      {
+        icon: Settings,
+        title: L("تنظیمات", "Settings"),
+        body: L(
+          "حساب، تم، زبان، صدا و همین راهنما را اینجا پیدا می~کنی.",
+          "Account, theme, language, sound and this guide are all here.",
+        ),
+        target: "tab./settings",
+        fixed: true,
+        pad: TAB_PAD,
+        radius: TAB_RADIUS,
         doneLabel: L("شروع", "Start"),
         offerDisable: true,
       },
@@ -197,86 +217,63 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: Sprout,
         title: L("گیاه تو", "Your plant"),
         body: L(
-          "با هر آیه~ای که حفظ می~کنی گیاهت بزرگ~تر می~شود: دانه، جوانه، نهال، غنچه و گل. نوار زیر گیاه نشان می~دهد چند آیه تا مرحلهٔ بعد مانده است. اگر چند روز مرور نکنی، گیاه نمی~میرد؛ فقط کمی خم می~شود.",
-          "Every verse you learn makes your plant grow: seed, sprout, sapling, bud and flower. The bar under the plant shows how many verses are left until the next stage. If you skip a few days of review the plant never dies; it just droops a little.",
+          "با هر آیه~ای که حفظ می~کنی بزرگ~تر می~شود. اگر مرور را فراموش کنی نمی~میرد؛ فقط کمی خم می~شود.",
+          "It grows with every verse you learn. If you forget a review it never dies; it just droops a little.",
         ),
-      },
-      {
-        icon: Flower2,
-        title: L("برگ و شکوفه", "Leaves and blossoms"),
-        body: L(
-          "با حفظ سه آیهٔ اول، سه برگ روی گیاه درمی~آید. بعد از آن هر شکوفه یعنی یک~سوم سوره را حفظ کرده~ای و وقتی سه شکوفه باز شود، گلت کامل است. عددهای پایین صفحه آیه~های حفظ~شده، گل~ها و برگ~هایت را نشان می~دهند.",
-          "Learning your first three verses grows three leaves. After that, each blossom means you have memorized a third of the surah, and three blossoms make a complete flower. The numbers at the bottom count your learned verses, blossoms and leaves.",
-        ),
-      },
-      {
-        icon: Droplets,
-        title: L("آبیاری و آیه~های تازه", "Watering and new verses"),
-        body: L(
-          "مرور منظم حفظ را محکم می~کند و برنامه آن را برایت زمان~بندی می~کند.",
-          "Regular review makes memory stick, and the app schedules it for you.",
-        ),
-        items: [
-          {
-            icon: Droplets,
-            text: L(
-              "«آبیاری امروز»: آیه~هایی که وقت مرورشان رسیده؛ دکمهٔ آبیاری مستقیم به مرورشان می~برد",
-              "“Today’s watering”: verses due for review; the button takes you straight to them",
-            ),
-          },
-          {
-            icon: BookOpen,
-            text: L(
-              "«آیات تازه»: دکمهٔ یادگیری تو را به اولین آیه~ای می~برد که هنوز حفظ نکرده~ای",
-              "“New verses”: the button opens the first verse you have not learned yet",
-            ),
-          },
-        ],
+        target: "garden.plant",
+        radius: 24,
       },
       {
         icon: Star,
-        title: L("آیهٔ امروز و میان~برها", "Verse of the day and shortcuts"),
+        title: L("آیهٔ امروز", "Verse of the day"),
         body: L(
-          "بالای صفحه آیهٔ امروز را می~خوانی و با دکمهٔ پخش می~شنوی. کارت~های زیر آن تو را سریع به بخش~های دیگر می~برند:",
-          "Near the top you can read the verse of the day and play it. The cards below take you straight to other parts of the app:",
+          "هر روز یک آیه بخوان و با دکمهٔ پخش بشنو.",
+          "Read a new verse every day and play it with the button.",
         ),
-        items: [
-          {
-            icon: Play,
-            text: L(
-              "دکمهٔ پخش: شنیدن آیهٔ امروز",
-              "Play button: listen to the verse of the day",
-            ),
-          },
-          {
-            icon: BookOpenText,
-            text: L(
-              "تفسیر سوره: معنی و پیام آیه~ها",
-              "Surah tafsir: meaning and message",
-            ),
-          },
-          {
-            icon: Headphones,
-            text: L(
-              "شنیدن تلاوت: سوره~ها با صدای قاری",
-              "Listen: surahs by reciters",
-            ),
-          },
-          {
-            icon: Trophy,
-            text: L(
-              "کوییز: سنجش سوره و بهترین نمرهٔ تو",
-              "Quiz: test yourself and see your best score",
-            ),
-          },
-          {
-            icon: CalendarDays,
-            text: L(
-              "برنامهٔ حفظ: مقدار روزانه و تقویم",
-              "Memorization plan: daily amount and calendar",
-            ),
-          },
-        ],
+        target: "garden.daily",
+        radius: 22,
+      },
+      {
+        icon: Trophy,
+        title: L("میان~برها", "Shortcuts"),
+        body: L(
+          "تفسیر، تلاوت و کوییز پایان سوره فقط یک لمس فاصله دارند.",
+          "Tafsir, listening and the end-of-surah quiz are one tap away.",
+        ),
+        target: "garden.shortcuts",
+        radius: 22,
+      },
+      {
+        icon: CalendarDays,
+        title: L("برنامهٔ حفظ", "Memorization plan"),
+        body: L(
+          "مقدار حفظ روزانه و تاریخ پایان را مشخص کن.",
+          "Set how much to memorize each day and when to finish.",
+        ),
+        target: "garden.plan",
+        radius: 22,
+      },
+      {
+        icon: Droplets,
+        title: L("آبیاری امروز", "Today’s watering"),
+        body: L(
+          "آیه~هایی که وقت مرورشان رسیده اینجا هستند. مرور به~موقع حفظ را محکم می~کند.",
+          "Verses that are due for review show up here. Reviewing on time makes memory stick.",
+        ),
+        target: "garden.water",
+        radius: 22,
+        optional: true,
+      },
+      {
+        icon: BookOpen,
+        title: L("آیات تازه", "New verses"),
+        body: L(
+          "این دکمه تو را به اولین آیه~ای می~برد که هنوز حفظ نکرده~ای.",
+          "This button takes you to the first verse you have not learned yet.",
+        ),
+        target: "garden.learn",
+        radius: 22,
+        optional: true,
       },
     ],
   },
@@ -288,68 +285,72 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: Eye,
         title: L("چهار حالت حفظ", "Four ways to memorize"),
         body: L(
-          "نوار بالای صفحه حالت نمایش آیه را عوض می~کند. در حالت~های پنهان، روی کلمهٔ محو بزن تا ببینی~اش.",
-          "The bar at the top changes how the verse is shown. In the hidden modes, tap a blurred word to peek at it.",
+          "از کامل تا چالشی؛ هر چه جلوتر بروی، کلمه~های بیشتری پنهان می~شوند.",
+          "From Full to Challenge: the further you go, the more words are hidden.",
         ),
-        items: [
-          {
-            icon: BookOpen,
-            text: L("کامل: اول با دقت بخوان", "Full: read it carefully first"),
-          },
-          {
-            icon: Eye,
-            text: L(
-              "نیمه~پنهان: از هر سه کلمه فقط یکی دیده می~شود",
-              "Half hidden: only one word in three is visible",
-            ),
-          },
-          {
-            icon: EyeOff,
-            text: L(
-              "پنهان: همهٔ کلمه~ها محو می~شوند",
-              "Hidden: every word is blurred",
-            ),
-          },
-          {
-            icon: Flame,
-            text: L(
-              "چالشی: همه پنهان است و برای هر آیه فقط سه بار می~توانی نگاه کنی",
-              "Challenge: everything is hidden and you get only three peeks per verse",
-            ),
-          },
-        ],
+        target: "memorize.modes",
+        radius: 22,
+      },
+      {
+        icon: BookOpen,
+        title: L("صفحهٔ مصحف", "The Mushaf page"),
+        body: L(
+          "آیهٔ فعلی رنگی است. در حالت پنهان روی کلمهٔ محو بزن تا ببینی~اش.",
+          "The current verse is highlighted. In hidden modes, tap a blurred word to peek.",
+        ),
+        target: "memorize.page",
+        radius: 24,
       },
       {
         icon: Volume2,
         title: L("شنیدن آیه", "Listen to the verse"),
         body: L(
-          "دکمهٔ «شنیدن این آیه» همین آیه را با صدای قاری پخش می~کند. آیهٔ فعلی روی صفحهٔ مصحف رنگی می~شود تا بدانی کجا هستی. برای پخش، اینترنت لازم است.",
-          "“Listen to this verse” plays the current verse. The verse you are on is highlighted on the Mushaf page so you always know where you are. Playback needs an internet connection.",
+          "تلاوت همین آیه را بشنو (اینترنت لازم است).",
+          "Hear this verse recited (needs an internet connection).",
         ),
-      },
-      {
-        icon: CircleCheck,
-        title: L("یادم بود یا نیاز به مرور", "I remembered or needs review"),
-        body: L(
-          "در حالت کامل، اول «پنهان کن و امتحان بده» را بزن تا خودت را بسنجی. بعد از آن «یادم بود» آیه را حفظ~شده ثبت می~کند و گیاهت رشد می~کند. اگر آیه هنوز محکم نیست، «نیاز به مرور» را بزن تا برای مرور برگردد.",
-          "In Full mode, tap “Hide and test me” first to check yourself. After that, “I remembered” marks the verse as learned and your plant grows. If the verse is not solid yet, tap “Needs review” and it comes back for review.",
-        ),
+        target: "memorize.listen",
+        radius: 24,
       },
       {
         icon: Flower2,
         title: L("نقطه~های پیشرفت", "Progress dots"),
         body: L(
-          "ردیف نقطه~ها وضعیت هر آیه از این سوره را نشان می~دهد. برگ و شکوفه~های بالای آن~ها همان~هایی هستند که با حفظ این آیه~ها به گلت اضافه می~شوند.",
-          "The row of dots shows the status of each verse in the surah. The leaves and blossoms above them are the ones you will add to your plant by learning those verses.",
+          "هر نقطه یک آیه است. هر جا برگ یا شکوفه ببینی، همان~جا گیاهت رشد کرده است.",
+          "Each dot is a verse. Wherever you see a leaf or blossom, your plant grew right there.",
         ),
+        target: "memorize.dots",
+        radius: 20,
+      },
+      {
+        icon: CircleCheck,
+        title: L("یادم بود یا نیاز به مرور", "I remembered or needs review"),
+        body: L(
+          "اول خودت را بسنج؛ بعد آیه را حفظ~شده ثبت کن یا برای مرور برگردان.",
+          "Test yourself first, then mark the verse as learned or send it back for review.",
+        ),
+        target: "memorize.actions",
+        radius: 24,
       },
       {
         icon: ClipboardCheck,
-        title: L("آزمون و بخش~های کوتاه", "Exams and short sections"),
+        title: L("آزمون", "Exams"),
         body: L(
-          "دکمهٔ آزمون در بالای صفحه به آزمون~های حفظ و تفسیر می~رود. پایین صفحه، سوره به بخش~های کوتاه تقسیم شده؛ رنگ هر بخش با میزان تمرین عوض می~شود و می~توانی هر بخش را با صدای تکراری تمرین کنی.",
-          "The exam button at the top opens the memorization and tafsir exams. At the bottom the surah is split into short sections; each changes colour with your practice, and you can drill a section with repeated audio.",
+          "آزمون~های حفظ و تفسیر از این دکمه شروع می~شوند.",
+          "The memorization and tafsir exams start from this button.",
         ),
+        target: "memorize.exam",
+        radius: 22,
+      },
+      {
+        icon: Layers,
+        title: L("بخش~های کوتاه", "Short sections"),
+        body: L(
+          "سوره به بخش~های کوتاه تقسیم شده؛ هر بخش را با تکرار صوتی تمرین کن.",
+          "The surah is split into short sections; drill each one with repeated audio.",
+        ),
+        target: "memorize.sections",
+        radius: 22,
+        optional: true,
       },
     ],
   },
@@ -361,33 +362,44 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: BookOpenText,
         title: L("انتخاب سوره", "Choose a surah"),
         body: L(
-          "با دکمه~های بالای صفحه بین سوره~هایی که تفسیرشان آماده است جابه~جا شو. زیر آن~ها نام سوره، تعداد آیه~ها و مکی یا مدنی بودنش آمده است.",
-          "Use the buttons at the top to switch between the surahs that have a tafsir ready. Below them you see the surah name, its number of verses and whether it is Meccan or Medinan.",
+          "بین سوره~هایی که تفسیرشان آماده است جابه~جا شو.",
+          "Switch between the surahs that have a tafsir ready.",
         ),
+        target: "tafsir.switch",
+        radius: 22,
       },
       {
         icon: Play,
-        title: L("شنیدن سوره", "Listen to the surah"),
+        title: L("خلاصه و پخش", "Summary and playback"),
         body: L(
-          "دکمهٔ پخش کنار نام سوره، کل سوره را برایت پخش می~کند؛ هم~زمان می~توانی خلاصهٔ سوره را بخوانی.",
-          "The play button next to the surah name plays the whole surah while you read its summary.",
+          "خلاصهٔ سوره اینجاست؛ با دکمهٔ پخش کل سوره را هم می~شنوی.",
+          "The surah summary is here; the play button reads the whole surah to you.",
         ),
+        target: "tafsir.card",
+        radius: 24,
+        optional: true,
       },
       {
         icon: ChevronsUpDown,
         title: L("گروه~های آیه", "Verse groups"),
         body: L(
-          "آیه~ها در گروه~های کوتاه آمده~اند. روی هر گروه بزن تا متن عربی و معنی ساده~اش باز یا بسته شود.",
-          "Verses come in short groups. Tap a group to open or close its Arabic text and plain-language meaning.",
+          "روی هر گروه بزن تا متن عربی و معنی ساده~اش باز یا بسته شود.",
+          "Tap a group to open or close its Arabic text and plain meaning.",
         ),
+        target: "tafsir.group.0",
+        radius: 24,
+        optional: true,
       },
       {
         icon: Lightbulb,
         title: L("پیام~های سوره", "Lessons of the surah"),
         body: L(
-          "پایین صفحه درس~ها و پیام~های اصلی سوره را می~خوانی. این متن~ها خلاصه~ای ساده بر پایهٔ دیدگاه~های رایج مفسران هستند؛ برای مطالعهٔ دقیق به تفاسیر معتبر مراجعه کن.",
-          "At the bottom you read the main lessons of the surah. These texts are simple summaries of common views, so check reliable tafsir books for detailed study.",
+          "درس~های اصلی سوره؛ برای مطالعهٔ دقیق به تفاسیر معتبر هم مراجعه کن.",
+          "The main lessons of the surah. For detailed study, check reliable tafsir books too.",
         ),
+        target: "tafsir.lessons",
+        radius: 24,
+        optional: true,
       },
     ],
   },
@@ -397,35 +409,41 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: Headphones,
-        title: L("قاری و سوره", "Reciter and surah"),
-        body: L(
-          "از نوار قاری~ها یکی را انتخاب کن. پایین صفحه فهرست سوره~هاست؛ روی هر سوره بزن تا پخش شود و دوباره بزن تا متوقف شود. با کادر جستجو می~توانی سوره را سریع پیدا کنی.",
-          "Pick a reciter from the strip at the top. The list of surahs is further down: tap one to play it and tap again to pause. Use the search box to find a surah quickly.",
-        ),
-      },
-      {
-        icon: SkipForward,
-        title: L("کنترل پخش", "Player controls"),
-        body: L(
-          "نوار پیشرفت را لمس کن تا به هر جای سوره بروی. کنارش دکمه~های ده ثانیه جلو و عقب و سورهٔ قبل و بعد قرار دارند.",
-          "Tap the progress bar to jump anywhere in the surah. Next to the play button are 10-second back and forward buttons and previous and next surah.",
-        ),
-      },
-      {
-        icon: Repeat,
-        title: L("تکرار و سورهٔ بعد", "Repeat and next surah"),
-        body: L(
-          "«تکرار» همین سوره را دوباره پخش می~کند و «سورهٔ بعد» پس از پایان، خودکار سورهٔ بعدی را می~آورد. وقتی چیزی در حال پخش نیست، دکمهٔ «سوره~ای که حفظ می~کنی» سورهٔ فعلی~ات را یک~جا پخش می~کند.",
-          "“Repeat” plays the same surah again and “Next surah” continues with the following one when it ends. When nothing is playing, a button lets you play the surah you are memorizing in one tap.",
-        ),
+        title: L("انتخاب قاری", "Choose a reciter"),
+        body: L("یکی از قاری~ها را انتخاب کن.", "Pick one of the reciters."),
+        target: "listen.reciters",
+        radius: 20,
       },
       {
         icon: Play,
-        title: L("پخش در همهٔ صفحه~ها", "Playback everywhere"),
+        title: L("پخش~کننده", "The player"),
         body: L(
-          "اگر به صفحهٔ دیگری بروی پخش ادامه دارد و یک پخش~کنندهٔ کوچک بالای نوار پایین می~بینی. برای پخش، اینترنت لازم است.",
-          "If you go to another page playback continues, and a small player appears above the bottom bar. Playback needs an internet connection.",
+          "نوار را بکش تا به هر جای سوره بروی. ده ثانیه جلو و عقب، تکرار و سورهٔ بعد هم اینجاست. پخش اینترنت لازم دارد.",
+          "Drag the bar to jump anywhere. 10-second skips, repeat and next surah are here too. Playback needs internet.",
         ),
+        target: "listen.player",
+        radius: 24,
+      },
+      {
+        icon: Repeat,
+        title: L("تمرین بخش~ها", "Practice sections"),
+        body: L(
+          "هر بخش از سوره را جدا و با تکرار بشنو.",
+          "Listen to each section of the surah on its own, on repeat.",
+        ),
+        target: "listen.sections",
+        radius: 22,
+        optional: true,
+      },
+      {
+        icon: Search,
+        title: L("پیدا کردن سوره", "Find a surah"),
+        body: L(
+          "نام سوره را جستجو کن و در فهرست زیرش بزن تا پخش شود.",
+          "Search for a surah, then tap it in the list below to play it.",
+        ),
+        target: "listen.search",
+        radius: 22,
       },
     ],
   },
@@ -435,27 +453,33 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: Search,
-        title: L("جستجو و فیلتر", "Search and filters"),
+        title: L("جستجو", "Search"),
         body: L(
-          "نام سوره (فارسی یا انگلیسی) یا شمارهٔ آن را جستجو کن. با فیلترها فقط سوره~های «در حال حفظ» یا «حفظ~شده» را ببین.",
-          "Search by surah name (Persian or English) or by its number. Use the filters to see only the surahs you are learning or have finished.",
+          "نام فارسی یا انگلیسی یا شمارهٔ سوره را بنویس.",
+          "Type a surah’s Persian or English name, or its number.",
         ),
+        target: "library.search",
+        radius: 22,
+      },
+      {
+        icon: ListFilter,
+        title: L("فیلتر", "Filters"),
+        body: L(
+          "فقط سوره~های در حال حفظ یا حفظ~شده را ببین.",
+          "See only the surahs you are learning or have finished.",
+        ),
+        target: "library.filters",
+        radius: 22,
       },
       {
         icon: Sprout,
-        title: L("وضعیت هر سوره", "Status of each surah"),
-        body: L(
-          "گیاه کوچک کنار هر سوره (دانه، جوانه، برگ~دار یا گل~داده) و نوار زیر نامش، پیشرفت تو را در همان سوره نشان می~دهد.",
-          "The little plant beside each surah (seed, sprout, leafy or in flower) and the bar under its name show your progress in that surah.",
-        ),
-      },
-      {
-        icon: MousePointerClick,
         title: L("شروع حفظ", "Start memorizing"),
         body: L(
-          "روی یک سوره بزن تا همان سوره فعال شود و صفحهٔ حفظ از جایی که مانده~ای باز شود. سوره~هایی که «به~زودی» نوشته شده، هنوز آماده نیستند.",
-          "Tap a surah to make it your active one; the Memorize page opens where you left off. Surahs marked “Soon” are not ready yet.",
+          "روی هر سوره بزن تا فعال شود و صفحهٔ حفظ از جایی که مانده~ای باز شود. گیاه کوچک و نوارش پیشرفتت را نشان می~دهند.",
+          "Tap a surah to make it active; Memorize opens where you left off. The little plant and bar show your progress.",
         ),
+        target: "library.first",
+        radius: 20,
       },
     ],
   },
@@ -465,35 +489,43 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: UserRound,
-        title: L("حساب و همگام~سازی", "Account and sync"),
+        title: L("حساب", "Account"),
         body: L(
-          "با ورود به حساب، برنامه و پیشرفت حفظت روی سرور هم ذخیره می~شود و روی دستگاه~های دیگر هم داری~شان. ورود اختیاری است و بدون حساب هم می~توانی از برنامه استفاده کنی.",
-          "Sign in to also store your plan and progress on the server and use them on other devices. Signing in is optional; the app works without an account.",
+          "با ورود به حساب، پیشرفتت روی سرور هم ذخیره می~شود. ورود اختیاری است.",
+          "Sign in to also keep your progress on the server. Signing in is optional.",
         ),
+        target: "settings.account",
+        radius: 24,
       },
       {
         icon: Palette,
-        title: L("تم و زبان", "Theme and language"),
+        title: L("ظاهر و زبان", "Look and language"),
         body: L(
-          "از بین چهار تم رنگی و دو زبان فارسی و انگلیسی هر کدام را بخواهی انتخاب کن؛ فوراً اعمال می~شود.",
-          "Choose one of four colour themes and either Persian or English. The change applies right away.",
+          "تم رنگی و زبان (فارسی یا انگلیسی) را عوض کن؛ فوراً اعمال می~شود.",
+          "Change the colour theme and the language (Persian or English); it applies right away.",
         ),
+        target: ["settings.theme", "settings.language"],
+        radius: 24,
       },
       {
         icon: Volume2,
         title: L("صدای کلیک", "Click sounds"),
         body: L(
-          "صداهای خیلی کوتاه هنگام لمس گزینه~ها را با این کلید روشن یا خاموش کن.",
-          "Turn the very short sounds that play when you tap things on or off with this switch.",
+          "صداهای کوتاه هنگام لمس را روشن یا خاموش کن.",
+          "Turn the short tap sounds on or off.",
         ),
+        target: "settings.sound",
+        radius: 24,
       },
       {
         icon: CircleHelp,
-        title: L("راهنمای برنامه", "App guide"),
+        title: L("راهنما", "Guide"),
         body: L(
-          "پایین همین صفحه می~توانی معرفی برنامه را دوباره ببینی، راهنمای صفحه~ها را از نو فعال کنی یا کلاً خاموششان کنی.",
-          "At the bottom of this page you can replay the app introduction, bring the page guides back, or switch them off completely.",
+          "معرفی برنامه را دوباره ببین یا راهنمای صفحه~ها را روشن و خاموش کن.",
+          "Replay the app introduction or switch the page guides on and off.",
         ),
+        target: "settings.guide",
+        radius: 24,
       },
     ],
   },
@@ -503,56 +535,30 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: ClipboardCheck,
-        title: L("مرکز تمرین و آزمون", "Practice and exam hub"),
+        title: L("ابزارهای تمرین", "Practice tools"),
         body: L(
-          "از این صفحه به همهٔ ابزارهای تمرین و سنجش می~روی:",
-          "From this page you reach all the practice and assessment tools:",
+          "محدوده و آزمون، مرحله~ها، از حفظ، تاریخچهٔ خطا و گزارش تسلط؛ پنج راه برای محکم~کردن حفظ.",
+          "Range and exam, stages, recall, mistake history and mastery report: five ways to firm up your memory.",
         ),
-        items: [
-          {
-            icon: Target,
-            text: L(
-              "محدوده، تمرین و آزمون: بازهٔ آیه~ها را انتخاب کن؛ آزمون خودکار تصحیح می~شود",
-              "Range, practice and exam: choose the verses; the exam is graded automatically",
-            ),
-          },
-          {
-            icon: ListChecks,
-            text: L(
-              "آزمون مرحله~ای: چهار مرحله؛ قبولی در هر مرحله، مرحلهٔ بعد را باز می~کند",
-              "Staged exam: four stages; passing one unlocks the next",
-            ),
-          },
-          {
-            icon: Brain,
-            text: L(
-              "آزمون از حفظ: آیه پنهان است و از حافظه می~خوانی",
-              "Recall exam: the verse is hidden and you recite from memory",
-            ),
-          },
-          {
-            icon: TriangleAlert,
-            text: L(
-              "تاریخچهٔ خطا: اشتباهاتت را ببین و مرور کن",
-              "Mistake history: see and review your mistakes",
-            ),
-          },
-          {
-            icon: BarChart3,
-            text: L(
-              "گزارش تسلط: تسلط هر آیه و روند هفتگی",
-              "Mastery report: per-verse mastery and weekly trend",
-            ),
-          },
+        target: [
+          "exam.link./scope",
+          "exam.link./stages",
+          "exam.link./recall",
+          "exam.link./mistakes",
+          "exam.link./report",
         ],
+        radius: 24,
       },
       {
         icon: Trophy,
         title: L("آزمون~های آماده", "Ready-made exams"),
         body: L(
-          "زیر ابزارها، آزمون~های آماده را می~بینی؛ روی هر کدام تعداد پرسش و بهترین نتیجهٔ تو نوشته شده است. بزن تا شروع شود. دکمهٔ بالای صفحه تو را به صفحهٔ حفظ برمی~گرداند.",
-          "Below the tools you will find ready-made exams, each showing its number of questions and your best result. Tap one to begin. The button at the top takes you back to Memorize.",
+          "پایین~تر آزمون~های هر سوره است؛ تعداد پرسش و بهترین نتیجه~ات هم نوشته شده.",
+          "Further down are the exams for each surah, with their question count and your best result.",
         ),
+        target: "exam.item.0",
+        radius: 24,
+        optional: true,
       },
     ],
   },
@@ -562,35 +568,44 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: Target,
-        title: L("محدوده را مشخص کن", "Set your range"),
+        title: L("محدوده", "Range"),
         body: L(
-          "سوره و بازهٔ آیه~ها (از کدام آیه تا کدام آیه) را انتخاب کن، یا کل سوره را بگذار.",
-          "Choose the surah and the range of verses (from… to…), or use the whole surah.",
+          "سوره و بازهٔ آیه~ها را انتخاب کن، یا کل سوره را بگذار.",
+          "Choose the surah and the verse range, or use the whole surah.",
         ),
+        target: "scope.range",
+        radius: 24,
       },
       {
         icon: ListChecks,
         title: L("محفوظات من", "My memorized verses"),
         body: L(
-          "روی آیه~هایی که حفظ داری بزن؛ فقط همین~ها آزمون می~شوند. با «حفظ~شده~های برنامه» آیه~هایی را که برنامه ثبت کرده یک~جا انتخاب می~کنی.",
-          "Tap the verses you know; only those will be tested. “Learned in the app” selects everything the app has recorded in one go.",
+          "روی آیه~هایی که حفظ داری بزن؛ فقط همین~ها آزمون می~شوند.",
+          "Tap the verses you know; only those get tested.",
         ),
+        target: "scope.verses",
+        radius: 24,
       },
       {
         icon: SlidersHorizontal,
         title: L("تنظیم آزمون", "Exam settings"),
         body: L(
-          "تعداد پرسش~ها و نمرهٔ قبولی را تعیین کن. پاسخ~ها خودکار تصحیح می~شود و توضیح آزمون همه~چیز را خلاصه می~کند.",
-          "Set the number of questions and the pass mark. Answers are graded automatically and the exam description sums everything up.",
+          "تعداد پرسش~ها و نمرهٔ قبولی را تعیین کن.",
+          "Set the number of questions and the pass mark.",
         ),
+        target: "scope.exam",
+        radius: 24,
       },
       {
         icon: Play,
         title: L("شروع", "Start"),
         body: L(
-          "«تمرین و سپس آزمون» اول آیه~ها را با هم تمرین می~کند و بعد امتحانت می~گیرد. اگر بخواهی، فقط تمرین یا فقط آزمون را هم می~توانی انتخاب کنی.",
-          "“Practice, then exam” rehearses the verses first and then tests you. You can also pick practice only or exam only.",
+          "«تمرین و سپس آزمون» اول مرور می~کند و بعد امتحان می~گیرد. فقط تمرین یا فقط آزمون هم ممکن است.",
+          "“Practice, then exam” rehearses first and then tests you. Practice only or exam only also work.",
         ),
+        target: "scope.start",
+        radius: 28,
+        optional: true,
       },
     ],
   },
@@ -599,20 +614,25 @@ const GUIDE_LIST: readonly GuideDef[] = [
     id: "stages",
     steps: [
       {
+        icon: Target,
+        title: L("سورهٔ فعال", "Active surah"),
+        body: L(
+          "آزمون~ها برای سوره~ای است که الان حفظ می~کنی.",
+          "The exams are for the surah you are learning right now.",
+        ),
+        target: "stages.surah",
+        radius: 20,
+        optional: true,
+      },
+      {
         icon: ListChecks,
         title: L("چهار مرحله", "Four stages"),
         body: L(
-          "مرحله~ها از آسان به سخت~اند: آشنایی، ترتیب آیه~ها، ترکیبی و از حفظ. آزمون برای سوره~ای است که الان حفظ می~کنی و نامش بالای صفحه نوشته شده.",
-          "Stages go from easy to hard: warm-up, verse order, mixed and from memory. The exam is for the surah you are currently learning, whose name is shown at the top.",
+          "از آسان به سخت. با قبولی در هر مرحله، مرحلهٔ بعد باز می~شود و بهترین نمره~ات ثبت می~شود.",
+          "From easy to hard. Passing a stage unlocks the next one and your best score is saved.",
         ),
-      },
-      {
-        icon: Lock,
-        title: L("قفل و قبولی", "Locks and passing"),
-        body: L(
-          "هر مرحله با رسیدن به نمرهٔ قبولی باز می~شود. مرحلهٔ کم~رنگ با قفل هنوز بسته است و تیک سبز یعنی قبول شده~ای. بهترین نمره~ات هم ثبت می~شود و می~توانی هر وقت خواستی دوباره تلاش کنی.",
-          "A stage unlocks when you reach the pass mark. A faded stage with a lock is still closed, and a green tick means you passed. Your best score is saved and you can retry any time.",
-        ),
+        target: "stages.item.0",
+        radius: 24,
       },
     ],
   },
@@ -624,24 +644,38 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: EyeOff,
         title: L("شیوهٔ پنهان~کردن", "How verses are hidden"),
         body: L(
-          "انتخاب کن آیه~ها چطور پنهان شوند: همه پنهان، یک در میان، فقط کلمهٔ اول یا حرف اول هر کلمه. می~توانی همهٔ آیه~ها یا فقط آیه~های ضعیف را آزمون کنی.",
-          "Choose how verses are hidden: everything, every other word, the first word only or the first letter of each word. You can test all verses or only your weak ones.",
+          "همه پنهان، یک در میان، فقط کلمهٔ اول یا حرف اول هر کلمه.",
+          "Everything hidden, every other word, the first word only, or the first letter of each word.",
         ),
+        target: "recall.style",
+        radius: 22,
+        optional: true,
+      },
+      {
+        icon: Target,
+        title: L("چه چیزی آزمون شود؟", "What to test"),
+        body: L(
+          "همهٔ آیه~ها یا فقط آیه~های ضعیفت.",
+          "All verses, or only your weak ones.",
+        ),
+        target: "recall.scope",
+        radius: 22,
+        optional: true,
+      },
+      {
+        icon: Play,
+        title: L("شروع", "Start"),
+        body: L("وقتی آماده شدی شروع کن.", "Start whenever you are ready."),
+        target: "recall.start",
+        radius: 28,
+        optional: true,
       },
       {
         icon: Brain,
-        title: L("از حافظه بخوان", "Recite from memory"),
+        title: L("از حفظ بخوان", "Recite from memory"),
         body: L(
-          "آیه را از حفظ بخوان. اگر گیر کردی روی جای خالی بزن تا کمک بگیری؛ تعداد کمک~ها محدود است.",
-          "Recite the verse from memory. If you get stuck, tap a blank for help; the number of helps is limited.",
-        ),
-      },
-      {
-        icon: CheckCheck,
-        title: L("صادقانه ارزیابی کن", "Grade yourself honestly"),
-        body: L(
-          "با «نمایش آیه» متن اصلی را ببین و بعد «درست گفتم» یا «اشتباه کردم» را بزن. آیه~های اشتباه در تاریخچهٔ خطا ثبت می~شوند و در پایان فهرست~شان را برای مرور می~بینی.",
-          "Use “Show verse” to see the original, then tap “I got it right” or “I got it wrong”. Missed verses go to your mistake history and are listed at the end for review.",
+          "آیه را از حفظ بگو و اگر گیر کردی کمک بگیر. بعد با «نمایش آیه» بسنج و صادقانه «درست گفتم» یا «اشتباه کردم» را بزن؛ اشتباه~ها در تاریخچهٔ خطا ثبت می~شوند.",
+          "Say the verse from memory and ask for help if you get stuck. Then check with “Show verse” and honestly pick right or wrong; misses are saved to your mistake history.",
         ),
       },
     ],
@@ -652,27 +686,46 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: ListFilter,
-        title: L("خطاهایت", "Your mistakes"),
+        title: L("فیلتر خطاها", "Mistake filter"),
         body: L(
-          "هر آیه با تعداد دفعات اشتباه و تاریخ آخرین خطا آمده است. فیلتر بالا بین «نیاز به مرور» و «همه» جابه~جا می~شود.",
-          "Each verse shows how many times you missed it and when you last did. The filter at the top switches between “Needs review” and “All”.",
+          "بین خطاهای حل~نشده و همهٔ خطاها جابه~جا شو.",
+          "Switch between unresolved mistakes and all mistakes.",
         ),
+        target: "mistakes.filter",
+        radius: 22,
+      },
+      {
+        icon: Brain,
+        title: L("تمرین ضعیف~ها", "Practise the weak ones"),
+        body: L(
+          "همهٔ آیه~های ضعیف را پشت~سرهم از حفظ بخوان.",
+          "Recite all your weak verses one after another.",
+        ),
+        target: "mistakes.practice",
+        radius: 28,
+        optional: true,
+      },
+      {
+        icon: TriangleAlert,
+        title: L("هر خطا", "Each mistake"),
+        body: L(
+          "تعداد اشتباه و تاریخ آخرین خطا اینجاست. با دو پاسخ درست پشت~سرهم، خطا خودکار حل می~شود.",
+          "How often you missed it and when you last did. Two correct answers in a row resolve it.",
+        ),
+        target: "mistakes.item.0",
+        radius: 24,
+        optional: true,
       },
       {
         icon: CircleCheck,
-        title: L("حل شد", "Resolved"),
+        title: L("هنوز خطایی نیست", "No mistakes yet"),
         body: L(
-          "با دو پاسخ درست پشت~سرهم، خطا خودکار حل می~شود. اگر خودت مطمئنی، می~توانی خودت هم «حل شد» را بزنی. برای مرور هر آیه از «تمرین از حفظ» استفاده کن.",
-          "Two correct answers in a row resolve a mistake automatically. If you are sure, you can mark it resolved yourself. Use the recall button to practise any verse.",
+          "هر اشتباهی در آزمون~ها اینجا ثبت می~شود تا بعداً مرورش کنی.",
+          "Every mistake you make in an exam is saved here so you can review it later.",
         ),
-      },
-      {
-        icon: Trash2,
-        title: L("تمرین همه و پاک~کردن", "Practise all and clear"),
-        body: L(
-          "«تمرین همهٔ آیه~های ضعیف» همه را پشت~سرهم می~آورد. «پاک~کردن تاریخچه» هم فهرست خطاها و آمار آیه~ها را پاک می~کند، پس قبل از آن یک بار فکر کن.",
-          "“Practice all weak verses” runs through all of them. “Clear history” erases the mistake list and the verse statistics, so think twice before using it.",
-        ),
+        target: "mistakes.empty",
+        radius: 24,
+        optional: true,
       },
     ],
   },
@@ -684,25 +737,42 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: Gauge,
         title: L("تسلط کلی", "Overall mastery"),
         body: L(
-          "بالای صفحه درصد تسلط کلی و تعداد آیه~های حفظ~شده را می~بینی. سطح هر آیه از ضعیف تا مسلط است.",
-          "At the top you see your overall mastery and how many verses you have learned. Each verse has a level from weak to mastered.",
+          "درصد تسلط و تعداد آیه~های حفظ~شده را اینجا می~بینی.",
+          "See your mastery percentage and the number of learned verses here.",
         ),
+        target: "report.mastery",
+        radius: 24,
       },
       {
         icon: Grid3x3,
         title: L("نقشهٔ تسلط", "Mastery map"),
         body: L(
-          "هر خانه یک آیه است و رنگش سطح تسلط را نشان می~دهد. روی هر آیه بزن تا مرورش کنی. زیر آن، ضعیف~ترین آیه~ها برای تمرین بیشتر آمده~اند.",
-          "Each cell is a verse and its colour shows your mastery. Tap a verse to review it. Below, your weakest verses are listed for extra practice.",
+          "هر خانه یک آیه است؛ رنگش سطح تسلط را نشان می~دهد و با لمس آن، آیه را مرور می~کنی.",
+          "Each cell is a verse; its colour shows mastery, and tapping it reviews that verse.",
         ),
+        target: "report.grid",
+        radius: 24,
+      },
+      {
+        icon: TriangleAlert,
+        title: L("ضعیف~ترین آیه~ها", "Weakest verses"),
+        body: L(
+          "برای تمرین بیشتر از همین~جا شروع کن.",
+          "Start here for extra practice.",
+        ),
+        target: "report.weakest",
+        radius: 24,
+        optional: true,
       },
       {
         icon: TrendingUp,
         title: L("تحلیل پیشرفت", "Progress analysis"),
         body: L(
-          "دقت هفت روز گذشته، مقایسه با هفتهٔ قبل، دقت به تفکیک نوع پرسش و تعداد روزهای تمرین پشت~سرهم را می~بینی. برای ساخته شدن گزارش، اول یک آزمون بده.",
-          "You can see your accuracy over the last seven days, the comparison with the week before, accuracy by question type and your practice streak. Take an exam first to build the report.",
+          "دقت هفتهٔ گذشته، روزهای تمرین پشت~سرهم و دقت به تفکیک نوع پرسش.",
+          "Last week’s accuracy, your practice streak and accuracy by question type.",
         ),
+        target: "report.progress",
+        radius: 24,
       },
     ],
   },
@@ -712,26 +782,43 @@ const GUIDE_LIST: readonly GuideDef[] = [
     steps: [
       {
         icon: Layers,
-        title: L("تمرین آیه به آیه", "Verse by verse practice"),
+        title: L("آیه به آیه", "Verse by verse"),
         body: L(
-          "آیه~ها را یکی~یکی با دکمه~های قبلی و بعدی مرور کن. برای دیدن کلمهٔ پنهان روی جای خالی بزن.",
-          "Go through the verses one by one with the previous and next buttons. Tap a blank to reveal the hidden word.",
+          "هر آیه را بخوان؛ در سطح~های پنهان روی جای خالی بزن تا کلمه را ببینی.",
+          "Read each verse; at hidden levels, tap a blank to reveal the word.",
         ),
+        target: "session.card",
+        radius: 24,
+        optional: true,
       },
       {
         icon: SlidersHorizontal,
-        title: L("سخت~تر یا آسان~تر", "Harder or easier"),
+        title: L("سطح پنهان~کردن", "Hiding level"),
         body: L(
-          "هر وقت خواستی سطح پنهان~کردن را عوض کن: کامل، یک در میان، حرف اول یا پنهان.",
-          "Change the hiding level whenever you like: full, every other word, first letter or hidden.",
+          "هر وقت خواستی سخت~تر یا آسان~تر کن.",
+          "Make it harder or easier whenever you like.",
         ),
+        target: "session.levels",
+        radius: 22,
+        optional: true,
+      },
+      {
+        icon: SkipForward,
+        title: L("قبلی و بعدی", "Back and next"),
+        body: L(
+          "بین آیه~ها جابه~جا شو؛ در آخر می~توانی آزمون را شروع کنی.",
+          "Move between verses; at the end you can start the exam.",
+        ),
+        target: "session.nav",
+        radius: 22,
+        optional: true,
       },
       {
         icon: ClipboardCheck,
-        title: L("شروع آزمون", "Start the exam"),
+        title: L("آزمون", "The exam"),
         body: L(
-          "وقتی آماده شدی «شروع آزمون» را بزن. پاسخ~ها خودکار تصحیح می~شود و نمره و وضعیت هر آیه را می~بینی.",
-          "When you are ready, tap “Start exam”. Answers are graded automatically and you see your score and the result for each verse.",
+          "پاسخ~ها خودکار تصحیح می~شود و در پایان نمره و وضعیت هر آیه را می~بینی.",
+          "Answers are graded automatically, and at the end you see your score and the result of each verse.",
         ),
       },
     ],
@@ -744,33 +831,64 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: CalendarDays,
         title: L("برنامهٔ حفظ", "Memorization plan"),
         body: L(
-          "با ساخت برنامه، مقدار حفظ هر روز و تاریخ پایان مشخص می~شود. اگر هنوز برنامه~ای نداری، دکمهٔ «ساخت برنامه» را بزن.",
-          "A plan decides how much you memorize each day and when you finish. If you do not have one yet, tap “Create a plan”.",
+          "برنامه مشخص می~کند هر روز چقدر حفظ کنی و چه روزی تمام شود.",
+          "A plan decides how much you memorize each day and when you finish.",
         ),
+      },
+      {
+        icon: CalendarDays,
+        title: L("ساخت برنامه", "Create a plan"),
+        body: L(
+          "هنوز برنامه~ای نداری؛ مقدار روزانه و تاریخ هدف را مشخص کن.",
+          "You do not have a plan yet; set a daily amount and a target date.",
+        ),
+        target: "plan.empty",
+        radius: 24,
+        optional: true,
       },
       {
         icon: CircleCheck,
         title: L("برنامهٔ امروز", "Today’s plan"),
         body: L(
-          "کارت امروز نشان می~دهد چه آیه~هایی را حفظ و چه بخشی را مرور کنی. «شروع حفظ» تو را به صفحهٔ حفظ می~برد و «انجام شد» آن روز را تیک می~زند.",
-          "Today’s card shows what to memorize and what to review. “Start memorizing” opens the Memorize page and “Mark as done” ticks the day off.",
+          "ببین امروز چه چیزی حفظ و چه چیزی مرور کنی. «شروع حفظ» تو را به صفحهٔ حفظ می~برد و «انجام شد» روز را تیک می~زند.",
+          "See what to memorize and review today. “Start memorizing” opens Memorize and “Mark as done” ticks the day.",
         ),
+        target: "plan.today",
+        radius: 24,
+        optional: true,
+      },
+      {
+        icon: TrendingUp,
+        title: L("پیشرفت", "Progress"),
+        body: L(
+          "پیشرفت کل برنامه و تاریخ پایان اینجاست.",
+          "Your overall progress and the finish date are here.",
+        ),
+        target: "plan.progress",
+        radius: 24,
+        optional: true,
       },
       {
         icon: LayoutList,
-        title: L("تقویم و فهرست", "Calendar and list"),
+        title: L("تقویم یا فهرست", "Calendar or list"),
         body: L(
-          "با دکمه~های «تقویم» و «فهرست» نمای برنامه را عوض کن. روز~های حفظ، انجام~شده و امروز رنگ~های جدا دارند.",
-          "Switch between the “Calendar” and “List” views. Study days, finished days and today each have their own colour.",
+          "نمای برنامه را عوض کن؛ روزهای انجام~شده و امروز رنگ جدا دارند.",
+          "Switch the view; finished days and today have their own colours.",
         ),
+        target: "plan.view",
+        radius: 22,
+        optional: true,
       },
       {
         icon: FileDown,
-        title: L("خروجی و ویرایش", "Export and edit"),
+        title: L("خروجی", "Export"),
         body: L(
-          "برنامه را به صورت PDF یا Excel ذخیره کن یا برای دیگران بفرست. با «ویرایش» می~توانی آن را عوض کنی، ولی تیک روزهای انجام~شده پاک می~شود.",
-          "Save the plan as a PDF or Excel file, or send it to others. “Edit” lets you change it, but the ticks on finished days are cleared.",
+          "برنامه را به صورت PDF یا Excel ذخیره کن یا برای دیگران بفرست.",
+          "Save the plan as a PDF or Excel file, or send it to someone.",
         ),
+        target: "plan.export",
+        radius: 24,
+        optional: true,
       },
     ],
   },
@@ -782,33 +900,52 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: BookMarked,
         title: L("چه چیزی حفظ می~کنی؟", "What will you memorize?"),
         body: L(
-          "سوره~ها را انتخاب کن؛ می~توانی «سورهٔ فعلی» یا «جزء ۳۰» را یک~جا بزنی. ترتیب حفظ را تعیین کن و اگر خواستی بازهٔ آیه~ها را محدود کن.",
-          "Pick the surahs; you can choose “Current surah” or “Juz 30” in one tap. Set the memorization order and, if you want, narrow the range of verses.",
+          "سوره~ها، ترتیب حفظ و در صورت نیاز بازهٔ آیه~ها را انتخاب کن.",
+          "Choose the surahs, the order and, if you like, a range of verses.",
         ),
+        target: "planSetup.what",
+        radius: 24,
       },
       {
         icon: SlidersHorizontal,
-        title: L("برنامه چطور محاسبه شود؟", "How should it be calculated?"),
+        title: L("برنامه چطور محاسبه شود؟", "How to calculate it"),
         body: L(
-          "با «مقدار روزانه»، تعداد آیه در هر جلسه را تو تعیین می~کنی و تاریخ پایان محاسبه می~شود. با «تاریخ هدف»، تاریخ پایان را تو می~گذاری و مقدار هر جلسه محاسبه می~شود.",
-          "With “Daily amount” you choose the verses per session and the end date is calculated. With “Target date” you choose the end date and the amount per session is calculated.",
+          "با «مقدار روزانه»، تاریخ پایان محاسبه می~شود؛ با «تاریخ هدف»، مقدار هر جلسه.",
+          "With “Daily amount” the end date is calculated; with “Target date” the amount per session is.",
         ),
+        target: "planSetup.how",
+        radius: 24,
       },
       {
         icon: CalendarCheck,
         title: L("روزها و مرور", "Days and review"),
         body: L(
-          "تاریخ شروع و روزهای هفته~ای که حفظ می~کنی را انتخاب کن؛ بقیه روز استراحت هستند. می~توانی بخش جلسهٔ قبل را هم برای مرور در برنامه بیاوری.",
-          "Choose the start date and the weekdays you will study; the rest are rest days. You can also add the previous session’s portion to each session for review.",
+          "روزهای حفظ را انتخاب کن؛ بقیه استراحت~اند. می~توانی مرور جلسهٔ قبل را هم اضافه کنی.",
+          "Pick your study days; the rest are rest days. You can also add a review of the previous session.",
         ),
+        target: "planSetup.days",
+        radius: 24,
       },
       {
         icon: Eye,
-        title: L("پیش~نمایش و ذخیره", "Preview and save"),
+        title: L("پیش~نمایش", "Preview"),
         body: L(
-          "بخش «پیش~نمایش برنامه» خلاصه~ای از مجموع آیه~ها، تعداد جلسه~ها و تاریخ پایان را نشان می~دهد. اگر درست بود، برنامه را ذخیره کن.",
-          "The “Plan preview” section shows the total verses, the number of sessions and the end date. If it looks right, save the plan.",
+          "خلاصهٔ برنامه: مجموع آیه~ها، تعداد جلسه~ها و تاریخ پایان.",
+          "A summary of the plan: total verses, number of sessions and end date.",
         ),
+        target: "planSetup.preview",
+        radius: 24,
+      },
+      {
+        icon: CircleCheck,
+        title: L("ذخیره", "Save"),
+        body: L(
+          "اگر پیش~نمایش درست بود، برنامه را ذخیره کن.",
+          "If the preview looks right, save the plan.",
+        ),
+        target: "planSetup.save",
+        radius: 28,
+        optional: true,
       },
     ],
   },
@@ -832,10 +969,6 @@ export const GUIDES: Readonly<Record<GuideId, GuideDef>> = Object.fromEntries(
         title: localize(step.title),
         body: localize(step.body),
         doneLabel: step.doneLabel ? localize(step.doneLabel) : undefined,
-        items: step.items?.map((item) => ({
-          icon: item.icon,
-          text: localize(item.text),
-        })),
       })),
     },
   ]),
@@ -895,7 +1028,7 @@ const FA_UI: GuideUiText = {
   next: "بعدی",
   prev: "قبلی",
   done: "فهمیدم",
-  skip: "بستن راهنما",
+  skip: "رد کردن",
   stepOf: "{n} از {total}",
   disablePages: "راهنمای صفحه~ها را نشان نده",
   settingsTitle: "راهنمای برنامه",
@@ -913,7 +1046,7 @@ const EN_UI: GuideUiText = {
   next: "Next",
   prev: "Back",
   done: "Got it",
-  skip: "Close guide",
+  skip: "Skip",
   stepOf: "{n} of {total}",
   disablePages: "Don’t show page guides",
   settingsTitle: "App guide",

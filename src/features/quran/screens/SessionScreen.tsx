@@ -38,6 +38,7 @@ import {
   answerLogFor,
   type KindTallies,
 } from "@/features/quran/utils/session";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 type Phase = "loading" | "practice" | "quiz" | "result";
 type Mode = "both" | "exam" | "practice";
@@ -95,7 +96,7 @@ export default function SessionScreen() {
   const startExam = useCallback(() => {
     const count = Math.min(scope.questionCount, Math.max(ayahs.length * 3, 3));
     const built = buildQuiz(surahId, language, t, count, {
-      kinds: ["order", "next", "number", "page", "line"],
+      kinds: ["fill", "next", "number"],
       ayahs,
       lastAyah: range.to,
     });
@@ -267,114 +268,120 @@ export default function SessionScreen() {
             <ProgressBar value={(index + 1) / list.length} color={GOLD} />
           </View>
 
-          <Card>
-            <View style={[styles.verseHeader, { flexDirection: row }]}>
-              <Text
-                allowFontScaling={false}
-                style={[styles.surahName, { color: colors.text }]}
-              >
-                {surah?.name ?? ""}
-              </Text>
-              <View style={[styles.badge, { backgroundColor: colors.tintSoft }]}>
+          <GuideTarget id="session.card">
+            <Card>
+              <View style={[styles.verseHeader, { flexDirection: row }]}>
+                <Text
+                  allowFontScaling={false}
+                  style={[styles.surahName, { color: colors.text }]}
+                >
+                  {surah?.name ?? ""}
+                </Text>
+                <View style={[styles.badge, { backgroundColor: colors.tintSoft }]}>
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.onTint, fontWeight: "800" }}
+                  >
+                    {p("mistake_ayah", { ayah })}
+                  </AppText>
+                </View>
+              </View>
+
+              <View style={styles.verseBox}>
+                {hideStyle === null ? (
+                  <Text allowFontScaling={false} style={styles.verse}>
+                    {verse}
+                  </Text>
+                ) : (
+                  <View style={styles.words}>
+                    {words.map((item, position) => {
+                      const shown = !item.hidden || revealed.has(position);
+
+                      return shown ? (
+                        <Text key={position} allowFontScaling={false} style={styles.word}>
+                          {item.word}
+                        </Text>
+                      ) : (
+                        <Pressable
+                          key={position}
+                          accessibilityRole="button"
+                          onPress={() => {
+                            void Haptics.selectionAsync();
+                            setRevealed((previous) => new Set(previous).add(position));
+                          }}
+                          style={[
+                            styles.blank,
+                            {
+                              width: Math.max(44, Math.min(item.word.length * 9 + 20, 120)),
+                              backgroundColor: colors.tintSoft,
+                            },
+                          ]}
+                        >
+                          {item.hint ? (
+                            <Text allowFontScaling={false} style={styles.hint}>
+                              {item.hint}
+                            </Text>
+                          ) : null}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+
+              {hideStyle !== null ? (
                 <AppText
                   variant="caption"
-                  style={{ color: colors.onTint, fontWeight: "800" }}
+                  style={{ color: colors.textSecondary, textAlign }}
                 >
-                  {p("mistake_ayah", { ayah })}
+                  {p("session_tap_hint")}
                 </AppText>
-              </View>
-            </View>
+              ) : null}
 
-            <View style={styles.verseBox}>
-              {hideStyle === null ? (
-                <Text allowFontScaling={false} style={styles.verse}>
-                  {verse}
-                </Text>
-              ) : (
-                <View style={styles.words}>
-                  {words.map((item, position) => {
-                    const shown = !item.hidden || revealed.has(position);
-
-                    return shown ? (
-                      <Text key={position} allowFontScaling={false} style={styles.word}>
-                        {item.word}
-                      </Text>
-                    ) : (
-                      <Pressable
-                        key={position}
-                        accessibilityRole="button"
-                        onPress={() => {
-                          void Haptics.selectionAsync();
-                          setRevealed((previous) => new Set(previous).add(position));
-                        }}
-                        style={[
-                          styles.blank,
-                          {
-                            width: Math.max(44, Math.min(item.word.length * 9 + 20, 120)),
-                            backgroundColor: colors.tintSoft,
-                          },
-                        ]}
-                      >
-                        {item.hint ? (
-                          <Text allowFontScaling={false} style={styles.hint}>
-                            {item.hint}
-                          </Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })}
+              <GuideTarget id="session.levels">
+                <View style={[styles.chips, { flexDirection: row }]}>
+                  {LEVELS.map((item, position) => (
+                    <Chip
+                      key={item.key}
+                      label={p(`session_level_${item.key}`)}
+                      active={level === position}
+                      onPress={() => {
+                        setLevel(position);
+                        setRevealed(new Set());
+                      }}
+                    />
+                  ))}
                 </View>
-              )}
-            </View>
+              </GuideTarget>
+              <View style={[styles.navRow, { flexDirection: row }]}>
+                <View style={styles.navCell}>
+                  <PillButton
+                    label={p("session_easier")}
+                    onPress={() => changeLevel(-1)}
+                  />
+                </View>
+                <View style={styles.navCell}>
+                  <PillButton
+                    label={p("session_harder")}
+                    onPress={() => changeLevel(1)}
+                  />
+                </View>
+              </View>
+            </Card>
+          </GuideTarget>
 
-            {hideStyle !== null ? (
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {p("session_tap_hint")}
-              </AppText>
-            ) : null}
-
-            <View style={[styles.chips, { flexDirection: row }]}>
-              {LEVELS.map((item, position) => (
-                <Chip
-                  key={item.key}
-                  label={p(`session_level_${item.key}`)}
-                  active={level === position}
-                  onPress={() => {
-                    setLevel(position);
-                    setRevealed(new Set());
-                  }}
-                />
-              ))}
-            </View>
+          <GuideTarget id="session.nav">
             <View style={[styles.navRow, { flexDirection: row }]}>
               <View style={styles.navCell}>
-                <PillButton
-                  label={p("session_easier")}
-                  onPress={() => changeLevel(-1)}
-                />
+                <PillButton label={p("session_prev")} onPress={() => move(-1)} />
               </View>
               <View style={styles.navCell}>
-                <PillButton
-                  label={p("session_harder")}
-                  onPress={() => changeLevel(1)}
-                />
+                {index + 1 < list.length ? (
+                  <PillButton label={p("session_next")} onPress={() => move(1)} />
+                ) : null}
               </View>
             </View>
-          </Card>
-
-          <View style={[styles.navRow, { flexDirection: row }]}>
-            <View style={styles.navCell}>
-              <PillButton label={p("session_prev")} onPress={() => move(-1)} />
-            </View>
-            <View style={styles.navCell}>
-              {index + 1 < list.length ? (
-                <PillButton label={p("session_next")} onPress={() => move(1)} />
-              ) : null}
-            </View>
-          </View>
+          </GuideTarget>
           {index + 1 >= list.length ? (
             <ChunkyButton
               label={mode === "practice" ? p("session_finish_practice") : p("session_to_exam")}

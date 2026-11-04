@@ -18,6 +18,7 @@ import { usePT } from "@/features/quran/i18n/practice";
 import { usePractice } from "@/features/quran/state/practiceStore";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
 import { stageStatuses } from "@/features/quran/utils/stages";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 export default function StagesScreen() {
   const { colors } = useTheme();
@@ -52,20 +53,22 @@ export default function StagesScreen() {
     >
       {surah ? (
         <Rise delay={100}>
-          <View style={[styles.surahRow, { flexDirection: row }]}>
-            <Text
-              allowFontScaling={false}
-              style={[styles.surahName, { color: colors.text }]}
-            >
-              {surah.name}
-            </Text>
-            <AppText
-              variant="caption"
-              style={{ color: colors.textSecondary, textAlign }}
-            >
-              {p("stage_surah", { surah: isRTL ? surah.name : surah.transliteration })}
-            </AppText>
-          </View>
+          <GuideTarget id="stages.surah">
+            <View style={[styles.surahRow, { flexDirection: row }]}>
+              <Text
+                allowFontScaling={false}
+                style={[styles.surahName, { color: colors.text }]}
+              >
+                {surah.name}
+              </Text>
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign }}
+              >
+                {p("stage_surah", { surah: isRTL ? surah.name : surah.transliteration })}
+              </AppText>
+            </View>
+          </GuideTarget>
         </Rise>
       ) : null}
 
@@ -85,73 +88,75 @@ export default function StagesScreen() {
 
           return (
             <Rise key={spec.id} delay={140 + position * 60}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ disabled: locked }}
-                disabled={locked}
-                onPress={() => open(spec.id)}
-                style={[
-                  styles.stage,
-                  {
-                    backgroundColor: colors.surface,
-                    flexDirection: row,
-                    opacity: locked ? 0.55 : 1,
-                    borderColor: status.passed ? colors.success : "transparent",
-                  },
-                ]}
-              >
-                <View
+              <GuideTarget id={`stages.item.${position}`}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: locked }}
+                  disabled={locked}
+                  onPress={() => open(spec.id)}
                   style={[
-                    styles.badge,
+                    styles.stage,
                     {
-                      backgroundColor: status.passed
-                        ? colors.success
-                        : colors.tintSoft,
+                      backgroundColor: colors.surface,
+                      flexDirection: row,
+                      opacity: locked ? 0.55 : 1,
+                      borderColor: status.passed ? colors.success : "transparent",
                     },
                   ]}
                 >
-                  {status.passed ? (
-                    <Check size={24} color="#FFFFFF" />
-                  ) : locked ? (
-                    <Lock size={22} color={colors.textSecondary} />
-                  ) : (
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: status.passed
+                          ? colors.success
+                          : colors.tintSoft,
+                      },
+                    ]}
+                  >
+                    {status.passed ? (
+                      <Check size={24} color="#FFFFFF" />
+                    ) : locked ? (
+                      <Lock size={22} color={colors.textSecondary} />
+                    ) : (
+                      <AppText
+                        variant="h3"
+                        style={{ color: colors.onTint, fontWeight: "800" }}
+                      >
+                        {formatNumber(spec.id, language)}
+                      </AppText>
+                    )}
+                  </View>
+                  <View style={styles.stageText}>
                     <AppText
-                      variant="h3"
-                      style={{ color: colors.onTint, fontWeight: "800" }}
+                      variant="bodySmall"
+                      style={{ color: colors.text, fontWeight: "800", textAlign }}
                     >
-                      {formatNumber(spec.id, language)}
+                      {`${p("stage_n", { n: spec.id })} — ${p(`stage_${spec.id}_name`)}`}
                     </AppText>
-                  )}
-                </View>
-                <View style={styles.stageText}>
-                  <AppText
-                    variant="bodySmall"
-                    style={{ color: colors.text, fontWeight: "800", textAlign }}
-                  >
-                    {`${p("stage_n", { n: spec.id })} — ${p(`stage_${spec.id}_name`)}`}
-                  </AppText>
-                  <AppText
-                    variant="caption"
-                    style={{ color: colors.textSecondary, textAlign }}
-                  >
-                    {p(`stage_${spec.id}_desc`)}
-                  </AppText>
-                  <AppText
-                    variant="caption"
-                    style={{
-                      color: locked ? colors.textSecondary : colors.text,
-                      fontWeight: "700",
-                      textAlign,
-                    }}
-                  >
-                    {locked
-                      ? p("stage_locked")
-                      : status.bestPercent === null
-                        ? `${p("stage_not_tried")} · ${p("stage_pass", { percent: Math.round(spec.pass * 100) })}`
-                        : `${status.passed ? p("stage_passed") : p("stage_retry")} · ${p("stage_best", { percent: status.bestPercent })} · ${p("stage_pass", { percent: Math.round(spec.pass * 100) })}`}
-                  </AppText>
-                </View>
-              </Pressable>
+                    <AppText
+                      variant="caption"
+                      style={{ color: colors.textSecondary, textAlign }}
+                    >
+                      {p(`stage_${spec.id}_desc`)}
+                    </AppText>
+                    <AppText
+                      variant="caption"
+                      style={{
+                        color: locked ? colors.textSecondary : colors.text,
+                        fontWeight: "700",
+                        textAlign,
+                      }}
+                    >
+                      {locked
+                        ? p("stage_locked")
+                        : status.bestPercent === null
+                          ? `${p("stage_not_tried")} · ${p("stage_pass", { percent: Math.round(spec.pass * 100) })}`
+                          : `${status.passed ? p("stage_passed") : p("stage_retry")} · ${p("stage_best", { percent: status.bestPercent })} · ${p("stage_pass", { percent: Math.round(spec.pass * 100) })}`}
+                    </AppText>
+                  </View>
+                </Pressable>
+              </GuideTarget>
             </Rise>
           );
         })

@@ -32,6 +32,7 @@ import {
   useScope,
 } from "@/features/quran/state/scopeStore";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { GuideTarget } from "@/features/guide/guideTargets";
 
 function Stepper({
   label,
@@ -137,187 +138,195 @@ export default function ScopeScreen() {
       backTo="/exam"
     >
       <Rise delay={80}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("scope_surah")}
-          </AppText>
-          <View style={[styles.chips, { flexDirection: row }]}>
-            {SCOPE_SURAHS.map((id) => {
-              const info = getSurah(id);
+        <GuideTarget id="scope.range">
+          <Card>
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.text, fontWeight: "800", textAlign }}
+            >
+              {p("scope_surah")}
+            </AppText>
+            <View style={[styles.chips, { flexDirection: row }]}>
+              {SCOPE_SURAHS.map((id) => {
+                const info = getSurah(id);
 
-              return (
-                <Chip
-                  key={id}
-                  label={info ? (isRTL ? info.name : info.transliteration) : String(id)}
-                  active={id === surahId}
-                  onPress={() => void setScopeSurah(id)}
-                />
-              );
-            })}
-          </View>
+                return (
+                  <Chip
+                    key={id}
+                    label={info ? (isRTL ? info.name : info.transliteration) : String(id)}
+                    active={id === surahId}
+                    onPress={() => void setScopeSurah(id)}
+                  />
+                );
+              })}
+            </View>
 
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("scope_range")}
-          </AppText>
-          <View style={[styles.steppers, { flexDirection: row }]}>
-            <Stepper
-              label={p("scope_from")}
-              value={from}
-              min={1}
-              max={to}
-              onChange={(next) => void setScopeRange(surahId, next, to)}
-            />
-            <Stepper
-              label={p("scope_to")}
-              value={to}
-              min={from}
-              max={total}
-              onChange={(next) => void setScopeRange(surahId, from, next)}
-            />
-          </View>
-          <View style={[styles.chips, { flexDirection: row }]}>
-            <Chip
-              label={p("scope_whole")}
-              active={from === 1 && to === total}
-              onPress={() => void setScopeRange(surahId, 1, total)}
-            />
-          </View>
-        </Card>
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.text, fontWeight: "800", textAlign }}
+            >
+              {p("scope_range")}
+            </AppText>
+            <View style={[styles.steppers, { flexDirection: row }]}>
+              <Stepper
+                label={p("scope_from")}
+                value={from}
+                min={1}
+                max={to}
+                onChange={(next) => void setScopeRange(surahId, next, to)}
+              />
+              <Stepper
+                label={p("scope_to")}
+                value={to}
+                min={from}
+                max={total}
+                onChange={(next) => void setScopeRange(surahId, from, next)}
+              />
+            </View>
+            <View style={[styles.chips, { flexDirection: row }]}>
+              <Chip
+                label={p("scope_whole")}
+                active={from === 1 && to === total}
+                onPress={() => void setScopeRange(surahId, 1, total)}
+              />
+            </View>
+          </Card>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={140}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("scope_memorized")}
-          </AppText>
-          <AppText
-            variant="caption"
-            style={{ color: colors.textSecondary, textAlign }}
-          >
-            {p("scope_memorized_hint")}
-          </AppText>
+        <GuideTarget id="scope.verses">
+          <Card>
+            <AppText
+              variant="bodySmall"
+              style={{ color: colors.text, fontWeight: "800", textAlign }}
+            >
+              {p("scope_memorized")}
+            </AppText>
+            <AppText
+              variant="caption"
+              style={{ color: colors.textSecondary, textAlign }}
+            >
+              {p("scope_memorized_hint")}
+            </AppText>
 
-          <View style={[styles.grid, { flexDirection: row }]}>
-            {inRange.map((ayah) => {
-              const on = selection.includes(ayah);
+            <View style={[styles.grid, { flexDirection: row }]}>
+              {inRange.map((ayah) => {
+                const on = selection.includes(ayah);
 
-              return (
-                <Pressable
-                  key={ayah}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}
-                  onPress={() => void toggleScopeAyah(surahId, ayah)}
-                  style={[
-                    styles.cell,
-                    { backgroundColor: on ? colors.primary : colors.tintSoft },
-                  ]}
-                >
-                  <AppText
-                    variant="caption"
-                    style={{
-                      color: on ? colors.onPrimary : colors.onTint,
-                      fontWeight: "800",
-                    }}
+                return (
+                  <Pressable
+                    key={ayah}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    onPress={() => void toggleScopeAyah(surahId, ayah)}
+                    style={[
+                      styles.cell,
+                      { backgroundColor: on ? colors.primary : colors.tintSoft },
+                    ]}
                   >
-                    {number(ayah)}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <AppText
+                      variant="caption"
+                      style={{
+                        color: on ? colors.onPrimary : colors.onTint,
+                        fontWeight: "800",
+                      }}
+                    >
+                      {number(ayah)}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <View style={[styles.chips, { flexDirection: row }]}>
-            <Chip
-              label={p("scope_select_all")}
-              active={false}
-              onPress={() => void setScopeSelection(surahId, inRange)}
-            />
-            <Chip
-              label={p("scope_none")}
-              active={false}
-              onPress={() => void setScopeSelection(surahId, [])}
-            />
-            {learnedInApp.length > 0 ? (
+            <View style={[styles.chips, { flexDirection: row }]}>
               <Chip
-                label={p("scope_app_learned")}
+                label={p("scope_select_all")}
                 active={false}
-                onPress={() => void setScopeSelection(surahId, learnedInApp)}
+                onPress={() => void setScopeSelection(surahId, inRange)}
               />
-            ) : null}
-          </View>
-          <AppText
-            variant="caption"
-            style={{ color: ready ? colors.textSecondary : colors.error, textAlign }}
-          >
-            {ready ? p("scope_selected", { n: selection.length }) : p("scope_need_selection")}
-          </AppText>
-        </Card>
+              <Chip
+                label={p("scope_none")}
+                active={false}
+                onPress={() => void setScopeSelection(surahId, [])}
+              />
+              {learnedInApp.length > 0 ? (
+                <Chip
+                  label={p("scope_app_learned")}
+                  active={false}
+                  onPress={() => void setScopeSelection(surahId, learnedInApp)}
+                />
+              ) : null}
+            </View>
+            <AppText
+              variant="caption"
+              style={{ color: ready ? colors.textSecondary : colors.error, textAlign }}
+            >
+              {ready ? p("scope_selected", { n: selection.length }) : p("scope_need_selection")}
+            </AppText>
+          </Card>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={200}>
-        <Card>
-          <AppText
-            variant="bodySmall"
-            style={{ color: colors.text, fontWeight: "800", textAlign }}
-          >
-            {p("scope_exam_settings")}
-          </AppText>
-          <AppText variant="caption" style={{ color: colors.textSecondary, textAlign }}>
-            {p("scope_questions")}
-          </AppText>
-          <View style={[styles.chips, { flexDirection: row }]}>
-            {QUESTION_COUNTS.map((count) => (
-              <Chip
-                key={count}
-                label={number(count)}
-                active={scope.questionCount === count}
-                onPress={() => void setExamSettings(count, scope.passPercent)}
-              />
-            ))}
-          </View>
-          <AppText variant="caption" style={{ color: colors.textSecondary, textAlign }}>
-            {p("scope_pass")}
-          </AppText>
-          <View style={[styles.chips, { flexDirection: row }]}>
-            {PASS_MARKS.map((mark) => (
-              <Chip
-                key={mark}
-                label={`${number(mark)}٪`}
-                active={scope.passPercent === mark}
-                onPress={() => void setExamSettings(scope.questionCount, mark)}
-              />
-            ))}
-          </View>
-
-          <View style={[styles.descBox, { borderColor: colors.border }]}>
+        <GuideTarget id="scope.exam">
+          <Card>
             <AppText
-              variant="caption"
+              variant="bodySmall"
               style={{ color: colors.text, fontWeight: "800", textAlign }}
             >
-              {p("scope_description")}
+              {p("scope_exam_settings")}
             </AppText>
-            <AppText
-              variant="caption"
-              style={{ color: colors.textSecondary, textAlign, lineHeight: 22 }}
-            >
-              {description}
+            <AppText variant="caption" style={{ color: colors.textSecondary, textAlign }}>
+              {p("scope_questions")}
             </AppText>
-          </View>
-        </Card>
+            <View style={[styles.chips, { flexDirection: row }]}>
+              {QUESTION_COUNTS.map((count) => (
+                <Chip
+                  key={count}
+                  label={number(count)}
+                  active={scope.questionCount === count}
+                  onPress={() => void setExamSettings(count, scope.passPercent)}
+                />
+              ))}
+            </View>
+            <AppText variant="caption" style={{ color: colors.textSecondary, textAlign }}>
+              {p("scope_pass")}
+            </AppText>
+            <View style={[styles.chips, { flexDirection: row }]}>
+              {PASS_MARKS.map((mark) => (
+                <Chip
+                  key={mark}
+                  label={`${number(mark)}٪`}
+                  active={scope.passPercent === mark}
+                  onPress={() => void setExamSettings(scope.questionCount, mark)}
+                />
+              ))}
+            </View>
+
+            <View style={[styles.descBox, { borderColor: colors.border }]}>
+              <AppText
+                variant="caption"
+                style={{ color: colors.text, fontWeight: "800", textAlign }}
+              >
+                {p("scope_description")}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign, lineHeight: 22 }}
+              >
+                {description}
+              </AppText>
+            </View>
+          </Card>
+        </GuideTarget>
       </Rise>
 
       {ready ? (
         <>
-          <ChunkyButton label={p("scope_start_both")} onPress={() => go("both")} />
+          <GuideTarget id="scope.start">
+            <ChunkyButton label={p("scope_start_both")} onPress={() => go("both")} />
+          </GuideTarget>
           <PillButton label={p("scope_start_exam")} onPress={() => go("exam")} />
           <PillButton label={p("scope_start_practice")} onPress={() => go("practice")} />
         </>
