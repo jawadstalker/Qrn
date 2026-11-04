@@ -18,8 +18,8 @@ import { normalizeRoute } from "@/core/navigation/routes";
 import { useTheme } from "@/core/theme/ThemeContext";
 import { AppText } from "@/shared/components/ui/AppText";
 
-const BAR_HEIGHT = 72;
-const HIDDEN_ROUTES = [
+export const BAR_HEIGHT = 72;
+export const HIDDEN_ROUTES: readonly string[] = [
   "/moment",
   "/quiz",
   "/exam-play",

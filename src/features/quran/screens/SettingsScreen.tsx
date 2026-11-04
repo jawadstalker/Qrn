@@ -1,7 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, UserRound } from "lucide-react-native";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  RotateCcw,
+  UserRound,
+} from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/features/auth/AuthContext";
 import { useDirection } from "@/core/i18n/useDirection";
@@ -12,6 +18,8 @@ import type { Language } from "@/core/types/index";
 import { useSound } from "@/shared/audio/SoundContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
+import { GUIDE_UI } from "@/features/guide/guideContent";
+import { useGuide } from "@/features/guide/GuideContext";
 
 const SWATCH_SIZE = 44;
 const LANGUAGES: readonly { id: Language; label: string }[] = [
@@ -38,6 +46,9 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { status, user } = useAuth();
   const Chevron = isRTL ? ChevronLeft : ChevronRight;
+  const { pagesEnabled, setPagesEnabled, resetPageGuides, start } = useGuide();
+  const [guidesReset, setGuidesReset] = useState(false);
+  const guideText = GUIDE_UI[language];
 
   return (
     <ScrollView
@@ -233,6 +244,115 @@ export default function SettingsScreen() {
           </View>
         </Card>
       </Rise>
+
+      <Rise delay={320}>
+        <Card>
+          <AppText
+            variant="body"
+            style={{ color: colors.text, textAlign, fontWeight: "800" }}
+          >
+            {guideText.settingsTitle}
+          </AppText>
+          <View style={[styles.switchRow, { flexDirection: row }]}>
+            <View style={styles.switchText}>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+              >
+                {guideText.pagesTitle}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign }}
+              >
+                {guideText.pagesHint}
+              </AppText>
+            </View>
+            <Switch
+              value={pagesEnabled}
+              onValueChange={(next) => {
+                setPagesEnabled(next);
+                setGuidesReset(false);
+                if (next) {
+                  play("select");
+                }
+              }}
+              accessibilityLabel={guideText.pagesTitle}
+              trackColor={{ true: colors.primary, false: colors.track }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={guideText.replayTitle}
+            onPress={() => {
+              play("select");
+              start("tour");
+            }}
+            style={({ pressed }) => [
+              styles.guideRow,
+              { flexDirection: row, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <View
+              style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
+            >
+              <CircleHelp size={20} color={colors.onTint} />
+            </View>
+            <View style={styles.switchText}>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+              >
+                {guideText.replayTitle}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign }}
+              >
+                {guideText.replayHint}
+              </AppText>
+            </View>
+            <Chevron size={20} color={colors.textTertiary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={guideText.resetTitle}
+            onPress={() => {
+              play("select");
+              resetPageGuides();
+              setGuidesReset(true);
+            }}
+            style={({ pressed }) => [
+              styles.guideRow,
+              { flexDirection: row, opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <View
+              style={[styles.guideIcon, { backgroundColor: colors.tintSoft }]}
+            >
+              <RotateCcw size={20} color={colors.onTint} />
+            </View>
+            <View style={styles.switchText}>
+              <AppText
+                variant="bodySmall"
+                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+              >
+                {guideText.resetTitle}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{
+                  color: guidesReset ? colors.success : colors.textSecondary,
+                  textAlign,
+                }}
+              >
+                {guidesReset ? guideText.resetDone : guideText.resetHint}
+              </AppText>
+            </View>
+          </Pressable>
+        </Card>
+      </Rise>
     </ScrollView>
   );
 }
@@ -301,5 +421,17 @@ const styles = StyleSheet.create({
   switchText: {
     flex: 1,
     gap: 2,
+  },
+  guideRow: {
+    alignItems: "center",
+    gap: 12,
+    minHeight: 52,
+  },
+  guideIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

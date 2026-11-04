@@ -20,6 +20,8 @@ import { MiniPlayer } from "@/features/quran/components/MiniPlayer";
 import { QuranTabBar } from "@/features/quran/components/QuranTabBar";
 import { BrandSplash } from "@/features/quran/components/BrandSplash";
 import { SplashIntro } from "@/features/quran/components/SplashIntro";
+import { GuideHost } from "@/features/guide/GuideHost";
+import { GuideProvider } from "@/features/guide/GuideContext";
 import { MemorizationPlanProvider } from "@/features/quran/state/MemorizationPlanContext";
 import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
@@ -33,7 +35,7 @@ function DataGate({ children }: { children: React.ReactNode }) {
   return <React.Fragment key={dataEpoch}>{children}</React.Fragment>;
 }
 
-function Shell() {
+function Shell({ guideEnabled }: { guideEnabled: boolean }) {
   const { colors, isDark } = useTheme();
 
   return (
@@ -44,6 +46,7 @@ function Shell() {
       </View>
       <MiniPlayer />
       <QuranTabBar />
+      <GuideHost enabled={guideEnabled} />
     </View>
   );
 }
@@ -81,17 +84,19 @@ export default function RootLayout() {
         <ThemeProvider>
           <LanguageProvider>
             <SoundProvider>
-              <AuthProvider>
-                <DataGate>
-                  <QuranProgressProvider>
-                    <MemorizationPlanProvider>
-                      <RecitationProvider>
-                        <Shell />
-                      </RecitationProvider>
-                    </MemorizationPlanProvider>
-                  </QuranProgressProvider>
-                </DataGate>
-              </AuthProvider>
+              <GuideProvider>
+                <AuthProvider>
+                  <DataGate>
+                    <QuranProgressProvider>
+                      <MemorizationPlanProvider>
+                        <RecitationProvider>
+                          <Shell guideEnabled={splashStage === "done"} />
+                        </RecitationProvider>
+                      </MemorizationPlanProvider>
+                    </QuranProgressProvider>
+                  </DataGate>
+                </AuthProvider>
+              </GuideProvider>
               {splashStage === "done" ? null : (
                 <>
                   <BrandSplash
