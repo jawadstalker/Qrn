@@ -124,7 +124,7 @@ export default function MemorizeScreen() {
       ),
     [learnedCount, recordFor, verses],
   );
-  const [mode, setMode] = useState<Mode>("half");
+  const [mode, setMode] = useState<Mode>("full");
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
   const [peeks, setPeeks] = useState(0);
   const number = (value: number) => formatNumber(value, language);
