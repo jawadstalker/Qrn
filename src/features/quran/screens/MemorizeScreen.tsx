@@ -67,7 +67,7 @@ function hiddenIndicesFor(
 
   verses.forEach((verse) => {
     for (let index = verse.from; index < verse.to; index += 1) {
-      if (index === verse.markerIndex) {
+      if (index === verse.markerIndex && mode !== "challenge") {
         continue;
       }
 
@@ -400,6 +400,7 @@ export default function MemorizeScreen() {
               recitingAyah={recitingAyah}
               recitingLineRef={recitingLine}
               hiddenIndices={hidden}
+              hideVerseMarkers={mode === "challenge"}
               onRevealWord={reveal}
               accessibilityLabel={fill(t.quran_page_label, {
                 page: number(page.pageNumber),
