@@ -25,7 +25,13 @@ import {
  * features/auth/config.ts, so a guide that was seen is not replayed after logging out, and signing in
  * on a second phone shows the guides there once.
  */
-const STORAGE_KEY = "@quran_garden_guide_v1";
+const STORAGE_KEY = "@quran_garden_guide_v2";
+/**
+ * The first version of the guides (text cards) stored its flags under this key. The guides were
+ * redesigned (spotlight on the real elements), so those flags must not hide the new ones: the old key
+ * is ignored and removed.
+ */
+const LEGACY_STORAGE_KEY = "@quran_garden_guide_v1";
 
 type Seen = Partial<Record<GuideId, true>>;
 
@@ -126,6 +132,8 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const load = async () => {
+      AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(() => undefined);
+
       try {
         const stored = parseStored(await AsyncStorage.getItem(STORAGE_KEY));
 
