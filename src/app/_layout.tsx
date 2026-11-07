@@ -16,6 +16,7 @@ import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
 import { LanguageProvider } from "@/core/i18n/LanguageContext";
 import { ThemeProvider, useTheme } from "@/core/theme/ThemeContext";
 import { SoundProvider } from "@/shared/audio/SoundContext";
+import { DailyReminders } from "@/features/quran/components/DailyReminders";
 import { MiniPlayer } from "@/features/quran/components/MiniPlayer";
 import { QuranTabBar } from "@/features/quran/components/QuranTabBar";
 import { BrandSplash } from "@/features/quran/components/BrandSplash";
@@ -44,6 +45,7 @@ function Shell({ guideEnabled }: { guideEnabled: boolean }) {
       <View style={styles.content}>
         <Stack screenOptions={{ headerShown: false, animation: "none" }} />
       </View>
+      <DailyReminders />
       <MiniPlayer />
       <QuranTabBar />
       <GuideHost enabled={guideEnabled} />

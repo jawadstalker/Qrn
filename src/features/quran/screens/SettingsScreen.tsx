@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -18,6 +18,13 @@ import type { Language } from "@/core/types/index";
 import { useSound } from "@/shared/audio/SoundContext";
 import { AppText } from "@/shared/components/ui/AppText";
 import { Rise } from "@/shared/motion/motion";
+import {
+  getRemindersEnabled,
+  hasNotificationPermission,
+  loadRemindersEnabled,
+  requestNotificationPermission,
+  setRemindersEnabled,
+} from "@/features/quran/notifications/reminders";
 import { GUIDE_UI } from "@/features/guide/guideContent";
 import { useGuide } from "@/features/guide/GuideContext";
 import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
@@ -51,6 +58,24 @@ export default function SettingsScreen() {
   const [guidesReset, setGuidesReset] = useState(false);
   const guideText = GUIDE_UI[language];
   const guideScroll = useGuideScroll();
+  const [remindersOn, setRemindersOn] = useState(getRemindersEnabled());
+  const [permissionDenied, setPermissionDenied] = useState(false);
+
+  useEffect(() => {
+    loadRemindersEnabled().then(setRemindersOn);
+    hasNotificationPermission().then((granted) =>
+      setPermissionDenied(!granted),
+    );
+  }, []);
+
+  const toggleReminders = async (next: boolean) => {
+    setRemindersOn(next);
+    await setRemindersEnabled(next);
+
+    if (next) {
+      setPermissionDenied(!(await requestNotificationPermission()));
+    }
+  };
 
   return (
     <ScrollView
@@ -97,7 +122,9 @@ export default function SettingsScreen() {
                 variant="body"
                 style={{ color: colors.text, textAlign, fontWeight: "800" }}
               >
-                {status === "in" ? t.auth_account_title : t.auth_account_card_title}
+                {status === "in"
+                  ? t.auth_account_title
+                  : t.auth_account_card_title}
               </AppText>
               <AppText
                 variant="caption"
@@ -254,6 +281,42 @@ export default function SettingsScreen() {
             </View>
           </Card>
         </GuideTarget>
+      </Rise>
+
+      <Rise delay={280}>
+        <Card>
+          <View style={[styles.switchRow, { flexDirection: row }]}>
+            <View style={styles.switchText}>
+              <AppText
+                variant="body"
+                style={{ color: colors.text, textAlign, fontWeight: "800" }}
+              >
+                {t.quran_reminders}
+              </AppText>
+              <AppText
+                variant="caption"
+                style={{ color: colors.textSecondary, textAlign }}
+              >
+                {t.quran_reminders_hint}
+              </AppText>
+              {remindersOn && permissionDenied ? (
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.textSecondary, textAlign }}
+                >
+                  {t.quran_reminders_denied}
+                </AppText>
+              ) : null}
+            </View>
+            <Switch
+              value={remindersOn}
+              onValueChange={(next) => void toggleReminders(next)}
+              accessibilityLabel={t.quran_reminders}
+              trackColor={{ true: colors.primary, false: colors.track }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </Card>
       </Rise>
 
       <Rise delay={320}>
