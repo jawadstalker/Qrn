@@ -13,6 +13,13 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -101,6 +108,98 @@ export default function MemorizeScreen() {
   const scrollY = useRef(0);
   const guideScroll = useGuideScroll(scrollRef);
   const recitingLine = useRef<View>(null);
+  // Zoom state
+  const zoomScale = useSharedValue(1);
+  const savedZoomScale = useSharedValue(1);
+
+  // Pan state
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const zoomAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: zoomScale.value },
+    ],
+  }));
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      const nextScale = savedZoomScale.value * event.scale;
+
+      zoomScale.value = Math.min(Math.max(nextScale, 1), 3);
+    })
+    .onEnd(() => {
+      savedZoomScale.value = zoomScale.value;
+
+      if (zoomScale.value <= 1) {
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+
+        savedTranslateX.value = 0;
+        savedTranslateY.value = 0;
+      }
+    });
+
+  const panGesture = Gesture.Pan()
+    .maxPointers(1)
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      if (zoomScale.value <= 1) return;
+
+      translateX.value =
+        savedTranslateX.value + event.translationX;
+
+      translateY.value =
+        savedTranslateY.value + event.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const mushafGesture = Gesture.Simultaneous(
+    pinchGesture,
+    panGesture,
+  );
+  const zoomIn = () => {
+    const nextScale = Math.min(zoomScale.value + 0.25, 3);
+
+    zoomScale.value = withSpring(nextScale);
+    savedZoomScale.value = nextScale;
+  };
+
+  const zoomOut = () => {
+    const nextScale = Math.max(zoomScale.value - 0.25, 1);
+
+    zoomScale.value = withSpring(nextScale);
+    savedZoomScale.value = nextScale;
+
+    if (nextScale === 1) {
+      translateX.value = withSpring(0);
+      translateY.value = withSpring(0);
+
+      savedTranslateX.value = 0;
+      savedTranslateY.value = 0;
+    }
+  };
+
+  const resetZoom = () => {
+    zoomScale.value = withSpring(1);
+    savedZoomScale.value = 1;
+
+    translateX.value = withSpring(0);
+    translateY.value = withSpring(0);
+
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
   const params = useLocalSearchParams<{ ayah?: string }>();
   const { mushaf, currentAyah, remember, needsReview, recordFor, learnedCount } =
     useQuranProgress();
@@ -391,21 +490,61 @@ export default function MemorizeScreen() {
 
       <Rise delay={160}>
         <GuideTarget id="memorize.page">
-          <View style={[styles.paper, { padding: PAPER_PADDING }]}>
-            <MushafPage
-              key={page.pageNumber}
-              page={page}
-              width={pageWidth}
-              highlightAyah={current}
-              recitingAyah={recitingAyah}
-              recitingLineRef={recitingLine}
-              hiddenIndices={hidden}
-              onRevealWord={reveal}
-              accessibilityLabel={fill(t.quran_page_label, {
-                page: number(page.pageNumber),
-                surah: surah?.transliteration ?? "",
-              })}
-            />
+          <View
+            style={{
+              height: 50,
+              backgroundColor: "yellow",
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 20,
+              zIndex: 10,
+            }}
+          >
+            <Pressable onPress={zoomOut}>
+              <Text style={{ color: "black", fontSize: 24 }}>−</Text>
+            </Pressable>
+
+            <Pressable onPress={resetZoom}>
+              <Text style={{ color: "black", fontSize: 14 }}>بازنشانی</Text>
+            </Pressable>
+
+            <Pressable onPress={zoomIn}>
+              <Text style={{ color: "black", fontSize: 24 }}>+</Text>
+            </Pressable>
+          </View>
+          <View
+            style={[
+              styles.paper,
+              {
+                padding: PAPER_PADDING,
+                overflow: "hidden",
+              },
+            ]}
+          >
+            <GestureDetector gesture={mushafGesture}>
+              <Animated.View
+                style={[
+                  { width: pageWidth },
+                  zoomAnimatedStyle,
+                ]}
+              >
+                <MushafPage
+                  key={page.pageNumber}
+                  page={page}
+                  width={pageWidth}
+                  highlightAyah={current}
+                  recitingAyah={recitingAyah}
+                  recitingLineRef={recitingLine}
+                  hiddenIndices={hidden}
+                  onRevealWord={reveal}
+                  accessibilityLabel={fill(t.quran_page_label, {
+                    page: number(page.pageNumber),
+                    surah: surah?.transliteration ?? "",
+                  })}
+                />
+              </Animated.View>
+            </GestureDetector>
           </View>
         </GuideTarget>
       </Rise>
