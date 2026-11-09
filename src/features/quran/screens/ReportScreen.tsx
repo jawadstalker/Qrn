@@ -36,9 +36,11 @@ import {
 import { GuideTarget } from "@/features/guide/guideTargets";
 
 const KINDS: readonly PracticeKind[] = [
-  "fill",
+  "order",
   "next",
   "number",
+  "page",
+  "line",
   "concept",
   "recall",
 ];

@@ -12,6 +12,17 @@ export const translations = {
     theme_night_hint: "تیره و کم\u200cخیرگی برای عصر",
     sound_effects: "صدای کلیک",
     sound_effects_hint: "صداهای بسیار کوتاه هنگام لمس گزینه\u200cها",
+    quran_reminders: "یادآوری روزانه",
+    quran_reminders_hint:
+      "اگر در طول روز وارد اپ نشوی، دو بار (ظهر و عصر) تسک‌های امروزت را یادآوری می‌کنیم",
+    quran_reminders_denied:
+      "اجازهٔ اعلان در تنظیمات گوشی خاموش است؛ از آنجا روشنش کن",
+    reminder_midday:
+      "تسک‌های امروزت منتظرند؛ چند دقیقه برای نهالت وقت بگذار",
+    reminder_evening:
+      "هنوز سراغ تسک‌های امروزت نیامده‌ای؛ قبل از پایان روز یک مرور کوتاه کن",
+    reminder_midday_session: "تسک امروز: {portion}",
+    reminder_evening_session: "هنوز تسک امروزت مانده: {portion}",
     quran_title: "باغ حفظ قرآن",
     quran_garden: "باغ من",
     quran_memorize: "حفظ",
@@ -347,6 +358,17 @@ export const translations = {
     theme_night_hint: "Dark, low glare for the evening",
     sound_effects: "Click sounds",
     sound_effects_hint: "Very short sounds when you tap options",
+    quran_reminders: "Daily reminders",
+    quran_reminders_hint:
+      "If you have not opened the app during the day, we remind you of your tasks twice (midday and evening)",
+    quran_reminders_denied:
+      "Notifications are turned off in your phone settings; turn them on there",
+    reminder_midday:
+      "Your tasks for today are waiting; give your sapling a few minutes",
+    reminder_evening:
+      "You have not done today's tasks yet; a short review before the day ends",
+    reminder_midday_session: "Today's task: {portion}",
+    reminder_evening_session: "Today's task is still waiting: {portion}",
     quran_title: "Quran Garden",
     quran_garden: "My garden",
     quran_memorize: "Memorize",

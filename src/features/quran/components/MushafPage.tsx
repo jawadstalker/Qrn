@@ -46,6 +46,7 @@ interface MushafPageProps {
   /** Receives the first line of the reciting verse so the screen can scroll to it. */
   recitingLineRef?: RefObject<View | null>;
   hiddenIndices: ReadonlySet<number>;
+  hideVerseMarkers?: boolean;
   onRevealWord: (index: number) => void;
   accessibilityLabel: string;
 }
@@ -57,6 +58,7 @@ export function MushafPage({
   recitingAyah,
   recitingLineRef,
   hiddenIndices,
+  hideVerseMarkers = false,
   onRevealWord,
   accessibilityLabel,
 }: MushafPageProps) {
@@ -134,7 +136,7 @@ export function MushafPage({
     >
       {Array.from({ length: line.to - line.from }, (_, offset) => {
         const index = line.from + offset;
-        const hidden = hiddenIndices.has(index) && !markers.has(index);
+        const hidden = hiddenIndices.has(index) &&  (!markers.has(index) || hideVerseMarkers);
         const reciting =
           recitingAyah !== undefined && verseByIndex[index] === recitingAyah;
         const highlighted = verseByIndex[index] === highlightAyah;

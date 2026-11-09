@@ -74,7 +74,7 @@ function hiddenIndicesFor(
 
   verses.forEach((verse) => {
     for (let index = verse.from; index < verse.to; index += 1) {
-      if (index === verse.markerIndex) {
+      if (index === verse.markerIndex && mode !== "challenge") {
         continue;
       }
 
@@ -223,7 +223,7 @@ export default function MemorizeScreen() {
       ),
     [learnedCount, recordFor, verses],
   );
-  const [mode, setMode] = useState<Mode>("half");
+  const [mode, setMode] = useState<Mode>("full");
   const [revealed, setRevealed] = useState<ReadonlySet<number>>(new Set());
   const [peeks, setPeeks] = useState(0);
   const number = (value: number) => formatNumber(value, language);
@@ -490,63 +490,65 @@ export default function MemorizeScreen() {
 
       <Rise delay={160}>
         <GuideTarget id="memorize.page">
-          <View
-            style={{
-              height: 50,
-              backgroundColor: "yellow",
-              flexDirection: "row",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 20,
-              zIndex: 10,
-            }}
-          >
-            <Pressable onPress={zoomOut}>
-              <Text style={{ color: "black", fontSize: 24 }}>−</Text>
-            </Pressable>
+  <View
+    style={{
+      height: 50,
+      backgroundColor: "yellow",
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 20,
+      zIndex: 10,
+    }}
+  >
+    <Pressable onPress={zoomOut}>
+      <Text style={{ color: "black", fontSize: 24 }}>−</Text>
+    </Pressable>
 
-            <Pressable onPress={resetZoom}>
-              <Text style={{ color: "black", fontSize: 14 }}>بازنشانی</Text>
-            </Pressable>
+    <Pressable onPress={resetZoom}>
+      <Text style={{ color: "black", fontSize: 14 }}>بازنشانی</Text>
+    </Pressable>
 
-            <Pressable onPress={zoomIn}>
-              <Text style={{ color: "black", fontSize: 24 }}>+</Text>
-            </Pressable>
-          </View>
-          <View
-            style={[
-              styles.paper,
-              {
-                padding: PAPER_PADDING,
-                overflow: "hidden",
-              },
-            ]}
-          >
-            <GestureDetector gesture={mushafGesture}>
-              <Animated.View
-                style={[
-                  { width: pageWidth },
-                  zoomAnimatedStyle,
-                ]}
-              >
-                <MushafPage
-                  key={page.pageNumber}
-                  page={page}
-                  width={pageWidth}
-                  highlightAyah={current}
-                  recitingAyah={recitingAyah}
-                  recitingLineRef={recitingLine}
-                  hiddenIndices={hidden}
-                  onRevealWord={reveal}
-                  accessibilityLabel={fill(t.quran_page_label, {
-                    page: number(page.pageNumber),
-                    surah: surah?.transliteration ?? "",
-                  })}
-                />
-              </Animated.View>
-            </GestureDetector>
-          </View>
-        </GuideTarget>
+    <Pressable onPress={zoomIn}>
+      <Text style={{ color: "black", fontSize: 24 }}>+</Text>
+    </Pressable>
+  </View>
+
+  <View
+    style={[
+      styles.paper,
+      {
+        padding: PAPER_PADDING,
+        overflow: "hidden",
+      },
+    ]}
+  >
+    <GestureDetector gesture={mushafGesture}>
+      <Animated.View
+        style={[
+          { width: pageWidth },
+          zoomAnimatedStyle,
+        ]}
+      >
+        <MushafPage
+          key={page.pageNumber}
+          page={page}
+          width={pageWidth}
+          highlightAyah={current}
+          recitingAyah={recitingAyah}
+          recitingLineRef={recitingLine}
+          hiddenIndices={hidden}
+          hideVerseMarkers={mode === "challenge"}
+          onRevealWord={reveal}
+          accessibilityLabel={fill(t.quran_page_label, {
+            page: number(page.pageNumber),
+            surah: surah?.transliteration ?? "",
+          })}
+        />
+      </Animated.View>
+    </GestureDetector>
+  </View>
+</GuideTarget>
       </Rise>
 
       <Rise delay={220}>
