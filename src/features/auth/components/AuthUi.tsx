@@ -148,6 +148,7 @@ interface FieldProps
     | "onSubmitEditing"
     | "keyboardType"
     | "editable"
+    | "maxLength"
   > {
   label: string;
   icon: LucideIcon;

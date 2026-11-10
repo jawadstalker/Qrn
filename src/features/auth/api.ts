@@ -20,6 +20,13 @@ export interface AuthResult {
   user: AuthUser;
 }
 
+export interface RegisterResult {
+  verificationRequired: true;
+  email: string;
+}
+
+export type MailLang = "fa" | "en";
+
 export interface SyncItem {
   value: string;
   updatedAt: number;
@@ -83,13 +90,25 @@ async function request<T>(
 }
 
 export const api = {
-  register: (email: string, password: string, device: string) =>
-    request<AuthResult>("POST", "/auth/register", {
-      body: { email, password, device },
+  register: (email: string, password: string, lang: MailLang) =>
+    request<RegisterResult>("POST", "/auth/register", {
+      body: { email, password, lang },
     }),
-  login: (email: string, password: string, device: string) =>
+  verifyEmail: (email: string, code: string, device: string) =>
+    request<AuthResult>("POST", "/auth/verify", {
+      body: { email, code, device },
+    }),
+  resendCode: (email: string, lang: MailLang) =>
+    request<{ ok: true }>("POST", "/auth/resend", { body: { email, lang } }),
+  forgotPassword: (email: string, lang: MailLang) =>
+    request<{ ok: true }>("POST", "/auth/forgot", { body: { email, lang } }),
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    request<{ ok: true }>("POST", "/auth/reset", {
+      body: { email, code, newPassword },
+    }),
+  login: (email: string, password: string, device: string, lang: MailLang) =>
     request<AuthResult>("POST", "/auth/login", {
-      body: { email, password, device },
+      body: { email, password, device, lang },
     }),
   logout: (token: string) =>
     request<{ ok: true }>("POST", "/auth/logout", { token }),

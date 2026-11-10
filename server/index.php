@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require __DIR__ . '/src/Http.php';
 require __DIR__ . '/src/Db.php';
+require __DIR__ . '/src/Mailer.php';
+require __DIR__ . '/src/Codes.php';
 require __DIR__ . '/src/Auth.php';
 require __DIR__ . '/src/Sync.php';
 
@@ -36,8 +38,27 @@ try {
     switch ($route) {
         case 'POST /auth/register':
             $b = Http::body();
-            $r = $auth->register(Auth::normalizeEmail($b['email'] ?? null), Auth::checkPassword($b['password'] ?? null), is_string($b['device'] ?? null) ? $b['device'] : null);
+            $r = $auth->register(Auth::normalizeEmail($b['email'] ?? null), Auth::checkPassword($b['password'] ?? null), Auth::lang($b['lang'] ?? null));
             Http::json(201, $r);
+
+        case 'POST /auth/verify':
+            $b = Http::body();
+            Http::json(200, $auth->verifyEmail(Auth::normalizeEmail($b['email'] ?? null), $b['code'] ?? null, is_string($b['device'] ?? null) ? $b['device'] : null));
+
+        case 'POST /auth/resend':
+            $b = Http::body();
+            $auth->resendVerification(Auth::normalizeEmail($b['email'] ?? null), Auth::lang($b['lang'] ?? null));
+            Http::json(200, ['ok' => true]);
+
+        case 'POST /auth/forgot':
+            $b = Http::body();
+            $auth->forgotPassword(Auth::normalizeEmail($b['email'] ?? null), Auth::lang($b['lang'] ?? null));
+            Http::json(200, ['ok' => true]);
+
+        case 'POST /auth/reset':
+            $b = Http::body();
+            $auth->resetPassword(Auth::normalizeEmail($b['email'] ?? null), $b['code'] ?? null, Auth::checkPassword($b['newPassword'] ?? null));
+            Http::json(200, ['ok' => true]);
 
         case 'POST /auth/login':
             $b = Http::body();
@@ -45,7 +66,7 @@ try {
             if (!is_string($pw) || $pw === '' || strlen($pw) > 200) {
                 throw new ApiError(401, 'bad_credentials', 'Email or password is incorrect.');
             }
-            Http::json(200, $auth->login(Auth::normalizeEmail($b['email'] ?? null), $pw, is_string($b['device'] ?? null) ? $b['device'] : null));
+            Http::json(200, $auth->login(Auth::normalizeEmail($b['email'] ?? null), $pw, is_string($b['device'] ?? null) ? $b['device'] : null, Auth::lang($b['lang'] ?? null)));
 
         case 'POST /auth/logout':
             $u = $auth->authenticate();

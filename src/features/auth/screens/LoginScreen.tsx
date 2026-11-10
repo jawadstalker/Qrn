@@ -1,8 +1,9 @@
 import React, { useRef, useState } from "react";
 import { type TextInput } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Lock, Mail } from "lucide-react-native";
 import { useLanguage } from "@/core/i18n/LanguageContext";
+import { ApiError } from "@/features/auth/api";
 import { useAuth } from "@/features/auth/AuthContext";
 import { errorKey, isValidEmail } from "@/features/auth/errors";
 import {
@@ -20,7 +21,10 @@ export default function LoginScreen() {
   const router = useRouter();
   const goBack = useGoBack();
   const passwordRef = useRef<TextInput>(null);
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams<{ reset?: string; email?: string }>();
+  const [email, setEmail] = useState(
+    typeof params.email === "string" ? params.email : "",
+  );
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -40,10 +44,20 @@ export default function LoginScreen() {
 
     setBusy(true);
 
+    const normalized = email.trim().toLowerCase();
+
     try {
-      await login(email.trim().toLowerCase(), password);
+      await login(normalized, password);
       goBack();
     } catch (error) {
+      if (error instanceof ApiError && error.code === "email_not_verified") {
+        router.replace({
+          pathname: "/verify-email",
+          params: { email: normalized },
+        });
+        return;
+      }
+
       setFailure(t[errorKey(error)]);
     } finally {
       setBusy(false);
@@ -52,6 +66,9 @@ export default function LoginScreen() {
 
   return (
     <AuthScaffold title={t.auth_login_title} subtitle={t.auth_login_subtitle}>
+      {params.reset === "1" ? (
+        <Banner kind="success" text={t.auth_reset_done} />
+      ) : null}
       {failure ? <Banner kind="error" text={failure} /> : null}
 
       <AuthField
@@ -89,6 +106,16 @@ export default function LoginScreen() {
         onPress={() => void submit()}
       />
 
+      <AuthLink
+        label={t.auth_forgot_link}
+        muted
+        onPress={() =>
+          router.push({
+            pathname: "/forgot-password",
+            params: { email: email.trim().toLowerCase() },
+          })
+        }
+      />
       <AuthLink
         label={t.auth_to_register}
         onPress={() => router.replace("/register")}

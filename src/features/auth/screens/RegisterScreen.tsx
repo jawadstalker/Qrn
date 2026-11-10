@@ -57,9 +57,14 @@ export default function RegisterScreen() {
 
     setBusy(true);
 
+    const normalized = email.trim().toLowerCase();
+
     try {
-      await register(email.trim().toLowerCase(), password);
-      goBack();
+      await register(normalized, password);
+      router.replace({
+        pathname: "/verify-email",
+        params: { email: normalized },
+      });
     } catch (error) {
       setFailure(t[errorKey(error)]);
     } finally {
@@ -124,12 +129,6 @@ export default function RegisterScreen() {
         onPress={() => void submit()}
       />
 
-      <AppText
-        variant="caption"
-        style={{ color: colors.textTertiary, textAlign }}
-      >
-        {t.auth_forgot_note}
-      </AppText>
       <AppText
         variant="caption"
         style={{ color: colors.textTertiary, textAlign }}

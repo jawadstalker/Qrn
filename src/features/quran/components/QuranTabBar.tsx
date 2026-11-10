@@ -30,6 +30,9 @@ export const HIDDEN_ROUTES: readonly string[] = [
   "/plan-setup",
   "/login",
   "/register",
+  "/verify-email",
+  "/forgot-password",
+  "/reset-password",
   "/account",
 ];
 /** Practice pages that live under the Memorize tab. */

@@ -10,7 +10,14 @@ import React, {
 } from "react";
 import { AppState, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api, ApiError, type AuthResult, type AuthUser } from "@/features/auth/api";
+import { useLanguage } from "@/core/i18n/LanguageContext";
+import {
+  api,
+  ApiError,
+  type AuthResult,
+  type AuthUser,
+  type MailLang,
+} from "@/features/auth/api";
 import { STORAGE } from "@/features/auth/config";
 import { reloadStores } from "@/features/auth/reloadStores";
 import {
@@ -30,8 +37,18 @@ interface AuthValue {
   lastSyncAt: number | null;
   /** Changes whenever data from the server replaced local data; the app remounts on it. */
   dataEpoch: number;
+  /** Creates the account and emails a code. There is no session until the code is verified. */
   register: (email: string, password: string) => Promise<void>;
+  /** Throws an ApiError with code "email_not_verified" when the email still needs its code. */
   login: (email: string, password: string) => Promise<void>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
+  resendCode: (email: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (
+    email: string,
+    code: string,
+    newPassword: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -46,6 +63,8 @@ function deviceName(): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { language } = useLanguage();
+  const mailLang: MailLang = language === "en" ? "en" : "fa";
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
@@ -181,16 +200,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, password: string) => {
-      await startSession(await api.register(email, password, deviceName()));
+      await api.register(email, password, mailLang);
     },
-    [startSession],
+    [mailLang],
   );
 
   const login = useCallback(
     async (email: string, password: string) => {
-      await startSession(await api.login(email, password, deviceName()));
+      await startSession(
+        await api.login(email, password, deviceName(), mailLang),
+      );
+    },
+    [startSession, mailLang],
+  );
+
+  const verifyEmail = useCallback(
+    async (email: string, code: string) => {
+      await startSession(await api.verifyEmail(email, code, deviceName()));
     },
     [startSession],
+  );
+
+  const resendCode = useCallback(
+    async (email: string) => {
+      await api.resendCode(email, mailLang);
+    },
+    [mailLang],
+  );
+
+  const forgotPassword = useCallback(
+    async (email: string) => {
+      await api.forgotPassword(email, mailLang);
+    },
+    [mailLang],
+  );
+
+  const resetPassword = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      await api.resetPassword(email, code, newPassword);
+    },
+    [],
   );
 
   const logout = useCallback(async () => {
@@ -239,6 +288,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dataEpoch,
       register,
       login,
+      verifyEmail,
+      resendCode,
+      forgotPassword,
+      resetPassword,
       logout,
       changePassword,
       deleteAccount,
@@ -252,6 +305,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dataEpoch,
       register,
       login,
+      verifyEmail,
+      resendCode,
+      forgotPassword,
+      resetPassword,
       logout,
       changePassword,
       deleteAccount,
