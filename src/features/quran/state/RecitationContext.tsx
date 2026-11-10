@@ -22,6 +22,7 @@ import {
 } from "@/features/quran/data/reciters";
 import { SURAHS } from "@/features/quran/data/surahs";
 import { logAyahReps } from "@/features/quran/state/sectionStore";
+import { downloadManager } from "@/features/quran/audio/downloadManager";
 
 export type PlaybackTarget =
   | { kind: "surah"; surahId: number }
@@ -93,6 +94,11 @@ function sourceFor(
   ayah?: number,
 ): string {
   if (target.kind === "surah") {
+    // Check if offline downloaded file exists
+    const local = downloadManager.getCachedUriSync(target.surahId, reciterId);
+    if (local) {
+      return local;
+    }
     return getReciter(reciterId).surahUrl(target.surahId);
   }
 
