@@ -1,2616 +1,795 @@
-diff --git a/src/app/_layout.tsx b/src/app/_layout.tsx
-index 040d68b..c061282 100644
---- a/src/app/_layout.tsx
-+++ b/src/app/_layout.tsx
-@@ -26,6 +26,8 @@ import { GuideProvider } from "@/features/guide/GuideContext";
- import { MemorizationPlanProvider } from "@/features/quran/state/MemorizationPlanContext";
- import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
- import { RecitationProvider } from "@/features/quran/state/RecitationContext";
-+import { FavoritesProvider } from "@/features/quran/state/FavoritesContext";
-+import { DownloadProvider } from "@/features/quran/audio/DownloadContext";
+diff --git a/package-lock.json b/package-lock.json
+index 9401358..ce1f62b 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -2953,7 +2953,7 @@
+       "version": "19.0.14",
+       "resolved": "https://registry.npmjs.org/@types/react/-/react-19.0.14.tgz",
+       "integrity": "sha512-ixLZ7zG7j1fM0DijL9hDArwhwcCb4vqmePgwtV0GfnkHRSCUEv4LvzarcTdhoqgyMznUx/EhoTUv31CKZzkQlw==",
+-      "dev": true,
++      "devOptional": true,
+       "license": "MIT",
+       "dependencies": {
+         "csstype": "^3.0.2"
+@@ -4212,7 +4212,7 @@
+       "version": "3.2.3",
+       "resolved": "https://registry.npmjs.org/csstype/-/csstype-3.2.3.tgz",
+       "integrity": "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==",
+-      "dev": true,
++      "devOptional": true,
+       "license": "MIT"
+     },
+     "node_modules/debug": {
+diff --git a/src/features/quran/screens/MemorizeScreen.tsx b/src/features/quran/screens/MemorizeScreen.tsx
+index 5e8d32b..cfb19db 100644
+--- a/src/features/quran/screens/MemorizeScreen.tsx
++++ b/src/features/quran/screens/MemorizeScreen.tsx
+@@ -16,6 +16,7 @@ import {
+ import { Gesture, GestureDetector } from "react-native-gesture-handler";
  
- SplashScreen.preventAutoHideAsync().catch(() => undefined);
- 
-@@ -92,7 +94,11 @@ export default function RootLayout() {
-                     <QuranProgressProvider>
-                       <MemorizationPlanProvider>
-                         <RecitationProvider>
--                          <Shell guideEnabled={splashStage === "done"} />
-+                          <FavoritesProvider>
-+                            <DownloadProvider>
-+                              <Shell guideEnabled={splashStage === "done"} />
-+                            </DownloadProvider>
-+                          </FavoritesProvider>
-                         </RecitationProvider>
-                       </MemorizationPlanProvider>
-                     </QuranProgressProvider>
-diff --git a/src/app/downloads.tsx b/src/app/downloads.tsx
-new file mode 100644
-index 0000000..fc6ac3b
---- /dev/null
-+++ b/src/app/downloads.tsx
-@@ -0,0 +1 @@
-+export { default } from "@/features/quran/screens/DownloadsScreen";
-diff --git a/src/app/favorites.tsx b/src/app/favorites.tsx
-new file mode 100644
-index 0000000..af6d0ec
---- /dev/null
-+++ b/src/app/favorites.tsx
-@@ -0,0 +1 @@
-+export { default } from "@/features/quran/screens/FavoritesScreen";
-diff --git a/src/core/i18n/translations.ts b/src/core/i18n/translations.ts
-index 5072062..6ece41f 100644
---- a/src/core/i18n/translations.ts
-+++ b/src/core/i18n/translations.ts
-@@ -365,6 +365,45 @@ export const translations = {
-     auth_err_code_expired: "کد منقضی شده است؛ کد جدید بگیر",
-     auth_err_mail_failed: "ارسال ایمیل انجام نشد؛ کمی بعد دوباره امتحان کن",
-     auth_err_email_not_verified: "ایمیلت هنوز تأیید نشده است",
-+    lib_downloads: "دانلودها",
-+    lib_favorites: "علاقه‌مندی‌ها",
-+    quran_filter_favorites: "علاقه‌مندی",
-+    dl_title: "دانلودهای من",
-+    dl_download: "دانلود",
-+    dl_downloaded: "دانلود شد",
-+    dl_downloading: "در حال دانلود",
-+    dl_a11y_download: "دانلود صوت سوره برای شنیدن آفلاین",
-+    dl_a11y_cancel: "لغو دانلود",
-+    dl_a11y_downloaded: "صوت سوره دانلود شده است؛ برای حذف بزن",
-+    dl_a11y_retry: "دانلود ناموفق بود؛ برای تلاش دوباره بزن",
-+    dl_retry: "تلاش دوباره",
-+    dl_failed: "دانلود انجام نشد. اینترنت را بررسی کن و دوباره امتحان کن",
-+    dl_delete_title: "حذف فایل دانلودشده؟",
-+    dl_delete_body: "صوت سوره {surah} از حافظه‌ی گوشی پاک می‌شود. هر وقت خواستی می‌توانی دوباره دانلودش کنی.",
-+    dl_delete_confirm: "حذف",
-+    dl_cancel: "انصراف",
-+    dl_total_size: "حجم فایل‌های آفلاین",
-+    dl_count_saved: "{count} سوره ذخیره شده",
-+    dl_delete_all: "حذف همه",
-+    dl_delete_all_title: "همه‌ی دانلودها حذف شوند؟",
-+    dl_delete_all_body: "همه‌ی فایل‌های صوتی دانلودشده از حافظه‌ی گوشی پاک می‌شوند.",
-+    dl_empty_title: "هنوز فایلی دانلود نشده است",
-+    dl_empty_body: "کنار هر سوره در فهرست، آیکون دانلود را بزن تا برای شنیدن بدون اینترنت ذخیره شود.",
-+    dl_batch_juz30: "دانلود جزء ۳۰",
-+    dl_batch_progress: "در حال دانلود {done} از {total}",
-+    dl_batch_done: "همه‌ی سوره‌های جزء ۳۰ دانلود شدند",
-+    dl_batch_stop: "توقف",
-+    dl_offline_hint: "سوره‌های دانلودشده بدون اینترنت پخش می‌شوند.",
-+    dl_play: "پخش",
-+    dl_pause: "توقف پخش",
-+    fav_title: "علاقه‌مندی‌های من",
-+    fav_add: "افزودن به علاقه‌مندی‌ها",
-+    fav_remove: "حذف از علاقه‌مندی‌ها",
-+    fav_empty_title: "هنوز سوره‌ای به علاقه‌مندی‌ها اضافه نشده است",
-+    fav_empty_body: "آیکون قلب کنار هر سوره را بزن تا اینجا ذخیره شود.",
-+    fav_go_library: "رفتن به فهرست",
-+    fav_memorize: "حفظ این سوره",
-+    fav_listen: "شنیدن این سوره",
-   },
-   en: {
-     theme: "Theme",
-@@ -733,5 +772,44 @@ export const translations = {
-     auth_err_code_expired: "The code has expired. Request a new one",
-     auth_err_mail_failed: "Could not send the email. Try again shortly",
-     auth_err_email_not_verified: "Your email is not verified yet",
-+    lib_downloads: "Downloads",
-+    lib_favorites: "Favorites",
-+    quran_filter_favorites: "Favorites",
-+    dl_title: "My downloads",
-+    dl_download: "Download",
-+    dl_downloaded: "Downloaded",
-+    dl_downloading: "Downloading",
-+    dl_a11y_download: "Download this surah's audio for offline listening",
-+    dl_a11y_cancel: "Cancel download",
-+    dl_a11y_downloaded: "Audio is downloaded. Tap to remove",
-+    dl_a11y_retry: "Download failed. Tap to try again",
-+    dl_retry: "Try again",
-+    dl_failed: "The download failed. Check your connection and try again",
-+    dl_delete_title: "Remove the downloaded file?",
-+    dl_delete_body: "The audio of {surah} will be removed from this device. You can download it again any time.",
-+    dl_delete_confirm: "Remove",
-+    dl_cancel: "Cancel",
-+    dl_total_size: "Offline audio size",
-+    dl_count_saved: "{count} surahs saved",
-+    dl_delete_all: "Remove all",
-+    dl_delete_all_title: "Remove all downloads?",
-+    dl_delete_all_body: "All downloaded audio files will be removed from this device.",
-+    dl_empty_title: "Nothing downloaded yet",
-+    dl_empty_body: "Tap the download icon next to a surah in the library to save it for listening without internet.",
-+    dl_batch_juz30: "Download Juz 30",
-+    dl_batch_progress: "Downloading {done} of {total}",
-+    dl_batch_done: "All Juz 30 surahs are downloaded",
-+    dl_batch_stop: "Stop",
-+    dl_offline_hint: "Downloaded surahs play without internet.",
-+    dl_play: "Play",
-+    dl_pause: "Pause",
-+    fav_title: "My favorites",
-+    fav_add: "Add to favorites",
-+    fav_remove: "Remove from favorites",
-+    fav_empty_title: "No favorite surahs yet",
-+    fav_empty_body: "Tap the heart next to a surah to keep it here.",
-+    fav_go_library: "Go to the library",
-+    fav_memorize: "Memorize this surah",
-+    fav_listen: "Listen to this surah",
-   },
- };
-diff --git a/src/features/quran/audio/DownloadContext.tsx b/src/features/quran/audio/DownloadContext.tsx
-new file mode 100644
-index 0000000..287ab91
---- /dev/null
-+++ b/src/features/quran/audio/DownloadContext.tsx
-@@ -0,0 +1,185 @@
-+import React, {
-+  createContext,
-+  useCallback,
-+  useContext,
-+  useEffect,
-+  useMemo,
-+  useState,
-+  type ReactNode,
-+} from "react";
-+import * as Haptics from "expo-haptics";
-+import {
-+  DownloadCancelledError,
-+  downloadManager,
-+  getDownloadId,
-+  type ActiveDownloadProgress,
-+  type AudioDownloadRecord,
-+} from "./downloadManager";
-+
-+export type DownloadState = "idle" | "downloading" | "downloaded" | "error";
-+
-+export interface DownloadStatus {
-+  state: DownloadState;
-+  /** 0..1, only meaningful while downloading. */
-+  progress: number;
-+  record: AudioDownloadRecord | null;
-+}
-+
-+interface DownloadContextValue {
-+  downloads: AudioDownloadRecord[];
-+  activeDownloads: Record<string, ActiveDownloadProgress>;
-+  totalDownloadSize: number;
-+  /** Resolves true when the file is saved, false when it failed or was cancelled. Never throws. */
-+  downloadSurah: (surahId: number, reciterId: string) => Promise<boolean>;
-+  cancelDownload: (surahId: number, reciterId: string) => Promise<void>;
-+  deleteDownload: (surahId: number, reciterId: string) => Promise<void>;
-+  deleteAllDownloads: () => Promise<void>;
-+  clearDownloadError: (surahId: number, reciterId: string) => void;
-+  getDownloadStatus: (surahId: number, reciterId: string) => DownloadStatus;
-+}
-+
-+const DownloadContext = createContext<DownloadContextValue | undefined>(
-+  undefined,
-+);
-+
-+function haptic(kind: "tap" | "success" | "error") {
-+  try {
-+    if (kind === "tap") {
-+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-+    } else {
-+      void Haptics.notificationAsync(
-+        kind === "success"
-+          ? Haptics.NotificationFeedbackType.Success
-+          : Haptics.NotificationFeedbackType.Error,
-+      );
-+    }
-+  } catch {
-+    // Haptics are a bonus.
-+  }
-+}
-+
-+export function DownloadProvider({ children }: { children: ReactNode }) {
-+  const [downloads, setDownloads] = useState<AudioDownloadRecord[]>([]);
-+  const [activeDownloads, setActiveDownloads] = useState<
-+    Record<string, ActiveDownloadProgress>
-+  >({});
-+
-+  useEffect(
-+    () =>
-+      downloadManager.subscribe((snapshot) => {
-+        setDownloads(snapshot.records);
-+        setActiveDownloads(snapshot.active);
-+      }),
-+    [],
-+  );
-+
-+  const totalDownloadSize = useMemo(
-+    () => downloads.reduce((sum, item) => sum + (item.fileSize || 0), 0),
-+    [downloads],
-+  );
-+
-+  const downloadSurah = useCallback(
-+    async (surahId: number, reciterId: string): Promise<boolean> => {
-+      haptic("tap");
-+
-+      try {
-+        await downloadManager.startDownload(surahId, reciterId);
-+        haptic("success");
-+
-+        return true;
-+      } catch (error) {
-+        if (!(error instanceof DownloadCancelledError)) {
-+          haptic("error");
-+        }
-+
-+        return false;
-+      }
-+    },
-+    [],
-+  );
-+
-+  const cancelDownload = useCallback(
-+    (surahId: number, reciterId: string) =>
-+      downloadManager.cancelDownload(surahId, reciterId),
-+    [],
-+  );
-+
-+  const deleteDownload = useCallback(
-+    (surahId: number, reciterId: string) =>
-+      downloadManager.deleteRecord(surahId, reciterId),
-+    [],
-+  );
-+
-+  const deleteAllDownloads = useCallback(
-+    () => downloadManager.deleteAllDownloads(),
-+    [],
-+  );
-+
-+  const clearDownloadError = useCallback(
-+    (surahId: number, reciterId: string) =>
-+      downloadManager.clearError(surahId, reciterId),
-+    [],
-+  );
-+
-+  const getDownloadStatus = useCallback(
-+    (surahId: number, reciterId: string): DownloadStatus => {
-+      const id = getDownloadId(surahId, reciterId);
-+      const active = activeDownloads[id];
-+      const record = downloads.find((item) => item.id === id) ?? null;
-+
-+      if (active?.status === "downloading") {
-+        return { state: "downloading", progress: active.progress, record };
-+      }
-+
-+      if (record) {
-+        return { state: "downloaded", progress: 1, record };
-+      }
-+
-+      if (active?.status === "error") {
-+        return { state: "error", progress: 0, record: null };
-+      }
-+
-+      return { state: "idle", progress: 0, record: null };
-+    },
-+    [activeDownloads, downloads],
-+  );
-+
-+  const value = useMemo(
-+    () => ({
-+      downloads,
-+      activeDownloads,
-+      totalDownloadSize,
-+      downloadSurah,
-+      cancelDownload,
-+      deleteDownload,
-+      deleteAllDownloads,
-+      clearDownloadError,
-+      getDownloadStatus,
-+    }),
-+    [
-+      downloads,
-+      activeDownloads,
-+      totalDownloadSize,
-+      downloadSurah,
-+      cancelDownload,
-+      deleteDownload,
-+      deleteAllDownloads,
-+      clearDownloadError,
-+      getDownloadStatus,
-+    ],
-+  );
-+
-+  return (
-+    <DownloadContext.Provider value={value}>{children}</DownloadContext.Provider>
-+  );
-+}
-+
-+export function useDownload(): DownloadContextValue {
-+  const context = useContext(DownloadContext);
-+
-+  if (!context) {
-+    throw new Error("useDownload must be used within DownloadProvider");
-+  }
-+
-+  return context;
-+}
-diff --git a/src/features/quran/audio/downloadManager.ts b/src/features/quran/audio/downloadManager.ts
-new file mode 100644
-index 0000000..e51b5eb
---- /dev/null
-+++ b/src/features/quran/audio/downloadManager.ts
-@@ -0,0 +1,497 @@
-+import { Platform } from "react-native";
-+import * as FileSystem from "expo-file-system";
-+import AsyncStorage from "@react-native-async-storage/async-storage";
-+import { getReciter } from "@/features/quran/data/reciters";
-+
-+export interface AudioDownloadRecord {
-+  id: string; // `${reciterId}_${surahId}`
-+  surahId: number;
-+  reciterId: string;
-+  localUri: string;
-+  fileSize: number; // bytes
-+  downloadedAt: number; // timestamp
-+}
-+
-+export interface ActiveDownloadProgress {
-+  id: string;
-+  surahId: number;
-+  reciterId: string;
-+  progress: number; // 0..1
-+  totalBytes: number;
-+  downloadedBytes: number;
-+  status: "downloading" | "error";
-+}
-+
-+export interface DownloadSnapshot {
-+  records: AudioDownloadRecord[];
-+  active: Record<string, ActiveDownloadProgress>;
-+}
-+
-+/** Thrown by startDownload when the person cancelled it. It is not a failure. */
-+export class DownloadCancelledError extends Error {
-+  constructor() {
-+    super("cancelled");
-+    this.name = "DownloadCancelledError";
-+  }
-+}
-+
-+const METADATA_KEY = "@quran_audio_downloads_v2";
-+/** Older builds (feature-task) stored records here, with a quality suffix in the id. */
-+const LEGACY_METADATA_KEY = "@quran_audio_downloads_v1";
-+/** A real surah recording is never smaller than this; smaller means an error page was saved. */
-+const MIN_VALID_BYTES = 20 * 1024;
-+/** Progress updates reach the UI at most this often (ms). */
-+const EMIT_INTERVAL = 120;
-+
-+export function getDownloadId(surahId: number, reciterId: string): string {
-+  return `${reciterId}_${surahId}`;
-+}
-+
-+export function getAudioDownloadUrl(surahId: number, reciterId: string): string {
-+  return getReciter(reciterId).surahUrl(surahId);
-+}
-+
-+export function formatBytes(bytes: number): string {
-+  if (bytes <= 0 || !Number.isFinite(bytes)) {
-+    return "0 MB";
-+  }
-+
-+  const megabytes = bytes / (1024 * 1024);
-+
-+  if (megabytes < 1) {
-+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-+  }
-+
-+  return `${megabytes.toFixed(1)} MB`;
-+}
-+
-+const isNative = () => Platform.OS !== "web" && !!FileSystem.documentDirectory;
-+
-+class DownloadManager {
-+  private records: AudioDownloadRecord[] = [];
-+  private progress: Record<string, ActiveDownloadProgress> = {};
-+  private resumables = new Map<string, FileSystem.DownloadResumable>();
-+  private inFlight = new Map<string, Promise<AudioDownloadRecord>>();
-+  private cancelled = new Set<string>();
-+  private listeners = new Set<(snapshot: DownloadSnapshot) => void>();
-+  private initPromise: Promise<void> | null = null;
-+  private lastEmit = 0;
-+
-+  private audioDir(): string {
-+    return `${FileSystem.documentDirectory ?? ""}quran_audio/`;
-+  }
-+
-+  /** Loads the saved list once. Safe to call from anywhere, any number of times. */
-+  init(): Promise<void> {
-+    if (!this.initPromise) {
-+      this.initPromise = this.load();
-+    }
-+
-+    return this.initPromise;
-+  }
-+
-+  private async load(): Promise<void> {
-+    try {
-+      if (isNative()) {
-+        const info = await FileSystem.getInfoAsync(this.audioDir());
-+
-+        if (!info.exists) {
-+          await FileSystem.makeDirectoryAsync(this.audioDir(), {
-+            intermediates: true,
-+          });
-+        }
-+      }
-+
-+      const stored =
-+        (await AsyncStorage.getItem(METADATA_KEY)) ??
-+        (await AsyncStorage.getItem(LEGACY_METADATA_KEY));
-+      const parsed: unknown = stored ? JSON.parse(stored) : [];
-+      const valid: AudioDownloadRecord[] = [];
-+
-+      if (Array.isArray(parsed)) {
-+        for (const item of parsed as Partial<AudioDownloadRecord>[]) {
-+          if (
-+            typeof item?.surahId !== "number" ||
-+            typeof item.reciterId !== "string" ||
-+            typeof item.localUri !== "string"
-+          ) {
-+            continue;
-+          }
-+
-+          // Browser object URLs die with the page, so they cannot be kept across launches.
-+          if (item.localUri.startsWith("blob:")) {
-+            continue;
-+          }
-+
-+          if (isNative()) {
-+            const info = await FileSystem.getInfoAsync(item.localUri);
-+
-+            if (!info.exists) {
-+              continue;
-+            }
-+          }
-+
-+          const id = getDownloadId(item.surahId, item.reciterId);
-+
-+          if (!valid.some((record) => record.id === id)) {
-+            valid.push({
-+              id,
-+              surahId: item.surahId,
-+              reciterId: item.reciterId,
-+              localUri: item.localUri,
-+              fileSize: typeof item.fileSize === "number" ? item.fileSize : 0,
-+              downloadedAt:
-+                typeof item.downloadedAt === "number" ? item.downloadedAt : 0,
-+            });
-+          }
-+        }
-+      }
-+
-+      this.records = valid;
-+    } catch {
-+      this.records = [];
-+    }
-+
-+    this.emit(true);
-+  }
-+
-+  private async persist(): Promise<void> {
-+    try {
-+      const keep = this.records.filter(
-+        (record) => !record.localUri.startsWith("blob:"),
-+      );
-+
-+      await AsyncStorage.setItem(METADATA_KEY, JSON.stringify(keep));
-+    } catch {
-+      // The files are still on disk; the list is rebuilt from what was saved last.
-+    }
-+  }
-+
-+  private snapshot(): DownloadSnapshot {
-+    return { records: [...this.records], active: { ...this.progress } };
-+  }
-+
-+  private emit(force = false): void {
-+    const now = Date.now();
-+
-+    if (!force && now - this.lastEmit < EMIT_INTERVAL) {
-+      return;
-+    }
-+
-+    this.lastEmit = now;
-+
-+    const snapshot = this.snapshot();
-+
-+    this.listeners.forEach((listener) => {
-+      try {
-+        listener(snapshot);
-+      } catch {
-+        // One broken listener must not stop the others.
-+      }
-+    });
-+  }
-+
-+  subscribe(listener: (snapshot: DownloadSnapshot) => void): () => void {
-+    this.listeners.add(listener);
-+    listener(this.snapshot());
-+    void this.init();
-+
-+    return () => {
-+      this.listeners.delete(listener);
-+    };
-+  }
-+
-+  getRecords(): AudioDownloadRecord[] {
-+    return [...this.records];
-+  }
-+
-+  /** The playable local file of a surah, or null. Used by the player; synchronous on purpose. */
-+  getCachedUriSync(surahId: number, reciterId?: string): string | null {
-+    const match = this.records.find(
-+      (record) =>
-+        record.surahId === surahId &&
-+        (reciterId === undefined || record.reciterId === reciterId),
-+    );
-+
-+    return match ? match.localUri : null;
-+  }
-+
-+  isDownloading(surahId: number, reciterId: string): boolean {
-+    return this.inFlight.has(getDownloadId(surahId, reciterId));
-+  }
-+
-+  startDownload(
-+    surahId: number,
-+    reciterId: string,
-+  ): Promise<AudioDownloadRecord> {
-+    const id = getDownloadId(surahId, reciterId);
-+    const running = this.inFlight.get(id);
-+
-+    // A second tap while the first is running joins it instead of starting a second copy.
-+    if (running) {
-+      return running;
-+    }
-+
-+    const job = this.run(surahId, reciterId).finally(() => {
-+      this.inFlight.delete(id);
-+      this.resumables.delete(id);
-+      this.cancelled.delete(id);
-+    });
-+
-+    this.inFlight.set(id, job);
-+
-+    return job;
-+  }
-+
-+  private fail(id: string, surahId: number, reciterId: string): void {
-+    this.progress[id] = {
-+      id,
-+      surahId,
-+      reciterId,
-+      progress: 0,
-+      totalBytes: 0,
-+      downloadedBytes: 0,
-+      status: "error",
-+    };
-+    this.emit(true);
-+  }
-+
-+  private async run(
-+    surahId: number,
-+    reciterId: string,
-+  ): Promise<AudioDownloadRecord> {
-+    await this.init();
-+
-+    const id = getDownloadId(surahId, reciterId);
-+    const existing = this.records.find((record) => record.id === id);
-+
-+    if (existing) {
-+      return existing;
-+    }
-+
-+    const url = getAudioDownloadUrl(surahId, reciterId);
-+
-+    this.progress[id] = {
-+      id,
-+      surahId,
-+      reciterId,
-+      progress: 0,
-+      totalBytes: 0,
-+      downloadedBytes: 0,
-+      status: "downloading",
-+    };
-+    this.emit(true);
-+
-+    try {
-+      const record = isNative()
-+        ? await this.downloadNative(id, surahId, reciterId, url)
-+        : await this.downloadWeb(id, surahId, reciterId, url);
-+
-+      if (this.cancelled.has(id)) {
-+        throw new DownloadCancelledError();
-+      }
-+
-+      this.records = [...this.records.filter((item) => item.id !== id), record];
-+      delete this.progress[id];
-+      this.emit(true);
-+      void this.persist();
-+
-+      return record;
-+    } catch (error) {
-+      if (this.cancelled.has(id) || error instanceof DownloadCancelledError) {
-+        delete this.progress[id];
-+        this.emit(true);
-+
-+        throw new DownloadCancelledError();
-+      }
-+
-+      this.fail(id, surahId, reciterId);
-+
-+      throw error;
-+    }
-+  }
-+
-+  private async downloadNative(
-+    id: string,
-+    surahId: number,
-+    reciterId: string,
-+    url: string,
-+  ): Promise<AudioDownloadRecord> {
-+    const finalUri = `${this.audioDir()}${id}.mp3`;
-+    // Downloaded under a temporary name, so a half-finished file is never mistaken for a good one.
-+    const partUri = `${finalUri}.part`;
-+
-+    await FileSystem.deleteAsync(partUri, { idempotent: true });
-+
-+    const resumable = FileSystem.createDownloadResumable(
-+      url,
-+      partUri,
-+      {},
-+      (event) => {
-+        const total = event.totalBytesExpectedToWrite;
-+        const written = event.totalBytesWritten;
-+
-+        this.progress[id] = {
-+          id,
-+          surahId,
-+          reciterId,
-+          progress: total > 0 ? Math.min(written / total, 0.99) : 0,
-+          totalBytes: total,
-+          downloadedBytes: written,
-+          status: "downloading",
-+        };
-+        this.emit();
-+      },
-+    );
-+
-+    this.resumables.set(id, resumable);
-+
-+    let result: FileSystem.FileSystemDownloadResult | undefined;
-+
-+    try {
-+      result = await resumable.downloadAsync();
-+    } catch (error) {
-+      await FileSystem.deleteAsync(partUri, { idempotent: true });
-+
-+      throw error;
-+    }
-+
-+    // Paused (cancelled) downloads resolve with nothing.
-+    if (this.cancelled.has(id) || !result) {
-+      await FileSystem.deleteAsync(partUri, { idempotent: true });
-+
-+      throw new DownloadCancelledError();
-+    }
-+
-+    // The server answered, but with an error page (404, 500...) that expo saved as if it was audio.
-+    if (result.status < 200 || result.status >= 300) {
-+      await FileSystem.deleteAsync(partUri, { idempotent: true });
-+
-+      throw new Error(`HTTP ${result.status}`);
-+    }
-+
-+    const info = await FileSystem.getInfoAsync(partUri);
-+    const size = info.exists && "size" in info ? (info.size ?? 0) : 0;
-+
-+    if (size < MIN_VALID_BYTES) {
-+      await FileSystem.deleteAsync(partUri, { idempotent: true });
-+
-+      throw new Error("file too small");
-+    }
-+
-+    await FileSystem.deleteAsync(finalUri, { idempotent: true });
-+    await FileSystem.moveAsync({ from: partUri, to: finalUri });
-+
-+    return {
-+      id,
-+      surahId,
-+      reciterId,
-+      localUri: finalUri,
-+      fileSize: size,
-+      downloadedAt: Date.now(),
-+    };
-+  }
-+
-+  /** Browsers have no document folder: keep the file as an in-memory object URL for this visit. */
-+  private async downloadWeb(
-+    id: string,
-+    surahId: number,
-+    reciterId: string,
-+    url: string,
-+  ): Promise<AudioDownloadRecord> {
-+    const response = await fetch(url);
-+
-+    if (!response.ok) {
-+      throw new Error(`HTTP ${response.status}`);
-+    }
-+
-+    const blob = await response.blob();
-+
-+    if (blob.size < MIN_VALID_BYTES) {
-+      throw new Error("file too small");
-+    }
-+
-+    return {
-+      id,
-+      surahId,
-+      reciterId,
-+      localUri: URL.createObjectURL(blob),
-+      fileSize: blob.size,
-+      downloadedAt: Date.now(),
-+    };
-+  }
-+
-+  async cancelDownload(surahId: number, reciterId: string): Promise<void> {
-+    const id = getDownloadId(surahId, reciterId);
-+    const resumable = this.resumables.get(id);
-+
-+    if (!this.inFlight.has(id)) {
-+      // A failed download only leaves its error flag behind; cancelling clears it.
-+      delete this.progress[id];
-+      this.emit(true);
-+
-+      return;
-+    }
-+
-+    this.cancelled.add(id);
-+
-+    try {
-+      await resumable?.pauseAsync();
-+    } catch {
-+      // The download may have just finished; the cancelled flag decides what happens next.
-+    }
-+  }
-+
-+  clearError(surahId: number, reciterId: string): void {
-+    const id = getDownloadId(surahId, reciterId);
-+
-+    if (this.progress[id]?.status === "error") {
-+      delete this.progress[id];
-+      this.emit(true);
-+    }
-+  }
-+
-+  async deleteRecord(surahId: number, reciterId: string): Promise<void> {
-+    await this.init();
-+
-+    const id = getDownloadId(surahId, reciterId);
-+    const target = this.records.find((record) => record.id === id);
-+
-+    if (!target) {
-+      return;
-+    }
-+
-+    await this.removeFile(target);
-+    this.records = this.records.filter((record) => record.id !== id);
-+    this.emit(true);
-+    await this.persist();
-+  }
-+
-+  async deleteAllDownloads(): Promise<void> {
-+    await this.init();
-+
-+    const all = [...this.records];
-+
-+    this.records = [];
-+    this.emit(true);
-+    await Promise.all(all.map((record) => this.removeFile(record)));
-+    await this.persist();
-+  }
-+
-+  private async removeFile(record: AudioDownloadRecord): Promise<void> {
-+    try {
-+      if (record.localUri.startsWith("blob:")) {
-+        URL.revokeObjectURL(record.localUri);
-+      } else if (isNative()) {
-+        await FileSystem.deleteAsync(record.localUri, { idempotent: true });
-+      }
-+    } catch {
-+      // A file that is already gone is the goal anyway.
-+    }
-+  }
-+}
-+
-+export const downloadManager = new DownloadManager();
-+
-+// Start reading the saved list as soon as the app loads, so offline files are found when playing.
-+void downloadManager.init();
-diff --git a/src/features/quran/components/DownloadButton.tsx b/src/features/quran/components/DownloadButton.tsx
-new file mode 100644
-index 0000000..2e98d68
---- /dev/null
-+++ b/src/features/quran/components/DownloadButton.tsx
-@@ -0,0 +1,203 @@
-+import React, { useCallback } from "react";
-+import {
-+  ActivityIndicator,
-+  Pressable,
-+  StyleSheet,
-+  View,
-+  type StyleProp,
-+  type ViewStyle,
-+} from "react-native";
-+import Svg, { Circle } from "react-native-svg";
-+import {
-+  CircleAlert,
-+  CircleCheck,
-+  Download,
-+  X,
-+} from "lucide-react-native";
-+import { useDownload } from "@/features/quran/audio/DownloadContext";
-+import { getSurah } from "@/features/quran/data/surahs";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+import { fill } from "@/features/quran/utils/fill";
-+import { confirmAction } from "@/features/quran/utils/confirm";
-+
-+interface DownloadButtonProps {
-+  surahId: number;
-+  reciterId: string;
-+  /** Icon size; the touch circle is 18 larger. */
-+  size?: number;
-+  style?: StyleProp<ViewStyle>;
-+}
-+
-+const DONE = "#10B981";
-+const BUSY = "#3B82F6";
-+const FAILED = "#EF4444";
-+const RING_STROKE = 2.5;
-+
-+/**
-+ * One tap on the audio of a surah:
-+ *   idle        -> starts the download
-+ *   downloading -> a progress ring; tapping cancels
-+ *   downloaded  -> a green check; tapping asks before removing the file
-+ *   error       -> a red mark; tapping tries again
-+ */
-+export function DownloadButton({
-+  surahId,
-+  reciterId,
-+  size = 20,
-+  style,
-+}: DownloadButtonProps) {
-+  const { colors } = useTheme();
-+  const { t, language } = useLanguage();
-+  const {
-+    getDownloadStatus,
-+    downloadSurah,
-+    cancelDownload,
-+    deleteDownload,
-+    clearDownloadError,
-+  } = useDownload();
-+  const status = getDownloadStatus(surahId, reciterId);
-+  const circle = size + 18;
-+  const radius = (circle - RING_STROKE) / 2;
-+  const circumference = 2 * Math.PI * radius;
-+
-+  const handlePress = useCallback(async () => {
-+    if (status.state === "downloading") {
-+      await cancelDownload(surahId, reciterId);
-+
-+      return;
-+    }
-+
-+    if (status.state === "downloaded") {
-+      const surah = getSurah(surahId);
-+      const confirmed = await confirmAction({
-+        title: t.dl_delete_title,
-+        message: fill(t.dl_delete_body, {
-+          surah: (language === "fa" ? surah?.name : surah?.transliteration) ?? "",
-+        }),
-+        confirmLabel: t.dl_delete_confirm,
-+        cancelLabel: t.dl_cancel,
-+        destructive: true,
-+      });
-+
-+      if (confirmed) {
-+        await deleteDownload(surahId, reciterId);
-+      }
-+
-+      return;
-+    }
-+
-+    if (status.state === "error") {
-+      clearDownloadError(surahId, reciterId);
-+    }
-+
-+    await downloadSurah(surahId, reciterId);
-+  }, [
-+    cancelDownload,
-+    clearDownloadError,
-+    deleteDownload,
-+    downloadSurah,
-+    language,
-+    reciterId,
-+    status.state,
-+    surahId,
-+    t,
-+  ]);
-+
-+  const label =
-+    status.state === "downloading"
-+      ? `${t.dl_a11y_cancel} (${Math.round(status.progress * 100)}%)`
-+      : status.state === "downloaded"
-+        ? t.dl_a11y_downloaded
-+        : status.state === "error"
-+          ? t.dl_a11y_retry
-+          : t.dl_a11y_download;
-+  const background =
-+    status.state === "downloaded"
-+      ? "rgba(16, 185, 129, 0.14)"
-+      : status.state === "downloading"
-+        ? "rgba(59, 130, 246, 0.12)"
-+        : status.state === "error"
-+          ? "rgba(239, 68, 68, 0.12)"
-+          : colors.tintSoft;
-+
-+  return (
-+    <Pressable
-+      accessibilityRole="button"
-+      accessibilityLabel={label}
-+      accessibilityState={{ busy: status.state === "downloading" }}
-+      hitSlop={6}
-+      onPress={(event) => {
-+        event.stopPropagation();
-+        void handlePress();
-+      }}
-+      style={({ pressed }) => [
-+        styles.button,
-+        {
-+          width: circle,
-+          height: circle,
-+          borderRadius: circle / 2,
-+          backgroundColor: background,
-+          opacity: pressed ? 0.7 : 1,
-+        },
-+        style,
-+      ]}
-+    >
-+      {status.state === "downloading" ? (
-+        <View style={[styles.center, { width: circle, height: circle }]}>
-+          <Svg
-+            width={circle}
-+            height={circle}
-+            style={StyleSheet.absoluteFill}
-+            pointerEvents="none"
-+          >
-+            <Circle
-+              cx={circle / 2}
-+              cy={circle / 2}
-+              r={radius}
-+              stroke="rgba(59, 130, 246, 0.2)"
-+              strokeWidth={RING_STROKE}
-+              fill="none"
-+            />
-+            {status.progress > 0 ? (
-+              <Circle
-+                cx={circle / 2}
-+                cy={circle / 2}
-+                r={radius}
-+                stroke={BUSY}
-+                strokeWidth={RING_STROKE}
-+                strokeLinecap="round"
-+                fill="none"
-+                strokeDasharray={`${circumference} ${circumference}`}
-+                strokeDashoffset={circumference * (1 - status.progress)}
-+                transform={`rotate(-90 ${circle / 2} ${circle / 2})`}
-+              />
-+            ) : null}
-+          </Svg>
-+          {status.progress > 0 ? (
-+            <X size={size - 4} color={BUSY} />
-+          ) : (
-+            <ActivityIndicator size="small" color={BUSY} />
-+          )}
-+        </View>
-+      ) : status.state === "downloaded" ? (
-+        <CircleCheck size={size} color={DONE} />
-+      ) : status.state === "error" ? (
-+        <CircleAlert size={size} color={FAILED} />
-+      ) : (
-+        <Download size={size} color={colors.textSecondary} />
-+      )}
-+    </Pressable>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  button: {
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+  center: {
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+});
-diff --git a/src/features/quran/components/FavoriteButton.tsx b/src/features/quran/components/FavoriteButton.tsx
-new file mode 100644
-index 0000000..272a7ef
---- /dev/null
-+++ b/src/features/quran/components/FavoriteButton.tsx
-@@ -0,0 +1,88 @@
-+import React, { useEffect, useRef } from "react";
-+import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-+import Animated, {
-+  useAnimatedStyle,
-+  useSharedValue,
-+  withSequence,
-+  withTiming,
-+} from "react-native-reanimated";
-+import { Heart } from "lucide-react-native";
-+import { useFavorites } from "@/features/quran/state/FavoritesContext";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+
-+interface FavoriteButtonProps {
-+  surahId: number;
-+  /** Icon size; the touch circle is 18 larger, the same as the download button. */
-+  size?: number;
-+  style?: StyleProp<ViewStyle>;
-+}
-+
-+const RED = "#EF4444";
-+
-+export function FavoriteButton({ surahId, size = 20, style }: FavoriteButtonProps) {
-+  const { isFavorite, toggleFavorite } = useFavorites();
-+  const { colors } = useTheme();
-+  const { t } = useLanguage();
-+  const active = isFavorite(surahId);
-+  const circle = size + 18;
-+  const scale = useSharedValue(1);
-+  const first = useRef(true);
-+
-+  // The heart pops when it is switched on or off (not when the list first appears).
-+  useEffect(() => {
-+    if (first.current) {
-+      first.current = false;
-+
-+      return;
-+    }
-+
-+    scale.value = withSequence(
-+      withTiming(active ? 1.3 : 0.85, { duration: 110 }),
-+      withTiming(1, { duration: 140 }),
-+    );
-+  }, [active, scale]);
-+
-+  const popStyle = useAnimatedStyle(() => ({
-+    transform: [{ scale: scale.value }],
-+  }));
-+
-+  return (
-+    <Pressable
-+      accessibilityRole="button"
-+      accessibilityLabel={active ? t.fav_remove : t.fav_add}
-+      accessibilityState={{ selected: active }}
-+      hitSlop={6}
-+      onPress={(event) => {
-+        event.stopPropagation();
-+        void toggleFavorite(surahId);
-+      }}
-+      style={({ pressed }) => [
-+        styles.button,
-+        {
-+          width: circle,
-+          height: circle,
-+          borderRadius: circle / 2,
-+          backgroundColor: active ? "rgba(239, 68, 68, 0.14)" : colors.tintSoft,
-+          opacity: pressed ? 0.7 : 1,
-+        },
-+        style,
-+      ]}
-+    >
-+      <Animated.View style={popStyle}>
-+        <Heart
-+          size={size}
-+          color={active ? RED : colors.textSecondary}
-+          fill={active ? RED : "none"}
-+        />
-+      </Animated.View>
-+    </Pressable>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  button: {
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+});
-diff --git a/src/features/quran/components/QuranCoverMark.tsx b/src/features/quran/components/QuranCoverMark.tsx
-index 0adf6c6..22a18c8 100644
---- a/src/features/quran/components/QuranCoverMark.tsx
-+++ b/src/features/quran/components/QuranCoverMark.tsx
-@@ -87,11 +87,19 @@ const BAND_HEIGHT = 11.2;
- interface QuranCoverMarkProps {
-   /** Width of the whole mark (spine + cover). The height follows. */
-   width: number;
-+  /**
-+   * Spine on the right, as on a Quran. Only the layout is mirrored: the tooling on the cover keeps
-+   * reading the right way round.
-+   */
-+  spineRight?: boolean;
- }
- 
--export function QuranCoverMark({ width }: QuranCoverMarkProps) {
-+export function QuranCoverMark({ width, spineRight = false }: QuranCoverMarkProps) {
-   const height = width / COVER_MARK_ASPECT;
--  const centerX = SPINE_WIDTH + COVER_ART_WIDTH / 2;
-+  // Where the cover starts and where the spine starts, on the mark's grid.
-+  const coverX = spineRight ? 0 : SPINE_WIDTH;
-+  const spineX = spineRight ? COVER_ART_WIDTH : 0;
-+  const centerX = coverX + COVER_ART_WIDTH / 2;
-   const centerY = COVER_ART_HEIGHT / 2;
- 
-   return (
-@@ -136,7 +144,7 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
-       </Defs>
- 
-       <Rect
--        x={0}
-+        x={spineX}
-         y={0}
-         width={SPINE_WIDTH}
-         height={COVER_ART_HEIGHT}
-@@ -145,7 +153,7 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
-       {BAND_Y.map((y) => (
-         <Rect
-           key={y}
--          x={0}
-+          x={spineRight ? spineX - 1.3 : 0}
-           y={y - BAND_HEIGHT / 2}
-           width={SPINE_WIDTH + 1.3}
-           height={BAND_HEIGHT}
-@@ -153,13 +161,13 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
-         />
-       ))}
-       <Rect
--        x={SPINE_WIDTH}
-+        x={coverX}
-         y={0}
-         width={COVER_ART_WIDTH}
-         height={COVER_ART_HEIGHT}
-         fill="url(#cover-leather)"
-       />
--      <G transform={`translate(${SPINE_WIDTH} 0)`}>
-+      <G transform={`translate(${coverX} 0)`}>
-         <Path d={COVER_ART_PATH} fill="url(#cover-gold)" fillRule="evenodd" />
-       </G>
-     </Svg>
-diff --git a/src/features/quran/components/QuranTabBar.tsx b/src/features/quran/components/QuranTabBar.tsx
-index adbf56c..daf3f97 100644
---- a/src/features/quran/components/QuranTabBar.tsx
-+++ b/src/features/quran/components/QuranTabBar.tsx
-@@ -37,6 +37,8 @@ export const HIDDEN_ROUTES: readonly string[] = [
- ];
- /** Practice pages that live under the Memorize tab. */
- const MEMORIZE_ROUTES = ["/exam", "/stages", "/mistakes", "/report", "/scope"];
-+/** Pages reached from the Library tab. */
-+const LIBRARY_ROUTES = ["/downloads", "/favorites"];
- 
- interface TabSpec {
-   route: "/" | "/memorize" | "/tafsir" | "/listen" | "/library" | "/settings";
-@@ -81,7 +83,8 @@ export function QuranTabBar() {
-       {TABS.map((tab) => {
-         const active =
-           pathname === tab.route ||
--          (tab.route === "/memorize" && MEMORIZE_ROUTES.includes(pathname));
-+          (tab.route === "/memorize" && MEMORIZE_ROUTES.includes(pathname)) ||
-+          (tab.route === "/library" && LIBRARY_ROUTES.includes(pathname));
-         const color = active ? colors.primary : colors.textSecondary;
-         const Icon = tab.icon;
- 
-diff --git a/src/features/quran/components/ScreenHeader.tsx b/src/features/quran/components/ScreenHeader.tsx
-new file mode 100644
-index 0000000..11cdb95
---- /dev/null
-+++ b/src/features/quran/components/ScreenHeader.tsx
-@@ -0,0 +1,73 @@
-+import React, { type ReactNode } from "react";
-+import { Pressable, StyleSheet, View } from "react-native";
-+import { useRouter } from "expo-router";
-+import { ArrowLeft, ArrowRight } from "lucide-react-native";
-+import { useDirection } from "@/core/i18n/useDirection";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+import { AppText } from "@/shared/components/ui/AppText";
-+
-+interface ScreenHeaderProps {
-+  title: string;
-+  /** Small element on the trailing side (a count badge, say). */
-+  trailing?: ReactNode;
-+}
-+
-+/** Back button + title, for the pages reached from the library. */
-+export function ScreenHeader({ title, trailing }: ScreenHeaderProps) {
-+  const { colors } = useTheme();
-+  const { t } = useLanguage();
-+  const { row, isRTL } = useDirection();
-+  const router = useRouter();
-+
-+  const goBack = () => {
-+    if (router.canGoBack()) {
-+      router.back();
-+    } else {
-+      router.replace("/library");
-+    }
-+  };
-+
-+  return (
-+    <View style={[styles.bar, { flexDirection: row }]}>
-+      <Pressable
-+        accessibilityRole="button"
-+        accessibilityLabel={t.quran_back}
-+        onPress={goBack}
-+        hitSlop={10}
-+        style={styles.side}
-+      >
-+        {isRTL ? (
-+          <ArrowRight size={22} color={colors.text} />
-+        ) : (
-+          <ArrowLeft size={22} color={colors.text} />
-+        )}
-+      </Pressable>
-+
-+      <AppText
-+        variant="h2"
-+        accessibilityRole="header"
-+        style={{ color: colors.text, fontWeight: "800" }}
-+      >
-+        {title}
-+      </AppText>
-+
-+      <View style={styles.side}>{trailing}</View>
-+    </View>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  bar: {
-+    alignItems: "center",
-+    justifyContent: "space-between",
-+    paddingHorizontal: 20,
-+    paddingVertical: 12,
-+  },
-+  side: {
-+    minWidth: 34,
-+    minHeight: 34,
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+});
-diff --git a/src/features/quran/components/SplashFinish.tsx b/src/features/quran/components/SplashFinish.tsx
-index 82d4a9d..6a76fec 100644
---- a/src/features/quran/components/SplashFinish.tsx
-+++ b/src/features/quran/components/SplashFinish.tsx
-@@ -51,6 +51,8 @@ interface SplashFinishProps {
-   /** Width of the flat cover mark (spine + cover) on screen. */
-   markWidth: number;
-   times: SplashFinishTimes;
-+  /** Spine on the right: the art starts at the left edge of the mark (it is not flipped). */
-+  mirrored?: boolean;
- }
- 
- const clamp01 = (value: number) => {
-@@ -65,6 +67,7 @@ export function SplashFinish({
-   height,
-   markWidth,
-   times,
-+  mirrored = false,
- }: SplashFinishProps) {
-   const scale = markWidth / COVER_MARK_WIDTH;
-   const markHeight = markWidth / COVER_MARK_ASPECT;
-@@ -182,11 +185,11 @@ export function SplashFinish({
-       {artPath ? (
-         <Group
-           transform={[
--            { translateX: left + SPINE_WIDTH * scale },
-+            // Spine on the right: the art starts at the left edge. Otherwise it follows the spine.
-+            { translateX: left + (mirrored ? 0 : SPINE_WIDTH * scale) },
-             { translateY: top },
-             { scale },
-           ]}
--          clip={artPath}
-         >
-           <Group
-             opacity={goldOpacity}
-diff --git a/src/features/quran/components/SplashIntro.tsx b/src/features/quran/components/SplashIntro.tsx
-index a3bfcdc..333f358 100644
---- a/src/features/quran/components/SplashIntro.tsx
-+++ b/src/features/quran/components/SplashIntro.tsx
-@@ -25,7 +25,7 @@ import {
-   COVER_MARK_ASPECT,
-   QuranCoverMark,
- } from "@/features/quran/components/QuranCoverMark";
--import { USE_3D_SPLASH } from "@/features/quran/config";
-+import { OPEN_FROM_RIGHT, USE_3D_SPLASH } from "@/features/quran/config";
- import {
-   FLATTEN_END,
-   GL_FADE_END,
-@@ -412,7 +412,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
- 
-         {glActive ? (
-           <Animated.View
--            style={[StyleSheet.absoluteFill, glStyle]}
-+            style={[StyleSheet.absoluteFill, mirror, glStyle]}
-             pointerEvents="none"
-           >
-             <GLView
-@@ -501,7 +501,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
-           ]}
-         >
-           <Animated.View style={breatheStyle}>
--            <QuranCoverMark width={markWidth} />
-+            <QuranCoverMark width={markWidth} spineRight={OPEN_FROM_RIGHT} />
-           </Animated.View>
-         </Animated.View>
- 
-@@ -512,6 +512,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
-               width={width}
-               height={height}
-               markWidth={markWidth}
-+              mirrored={OPEN_FROM_RIGHT}
-               times={{
-                 glintStart: GLINT_START,
-                 glintEnd: GLINT_END,
-@@ -540,6 +541,13 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
- }
- 
- const GLOW = 360;
-+/**
-+ * The 3D book is built with its spine on the left (like a Latin book). A Quran has its spine on the
-+ * right, so only the 3D layer is flipped: the cover then opens from the right. Its printed
-+ * textures are flipped back inside splashScene.ts, so the writing is not reversed. The flat cover
-+ * that replaces the 3D book at the end is drawn with the spine on the right instead of being flipped.
-+ */
-+const mirror = OPEN_FROM_RIGHT ? { transform: [{ scaleX: -1 }] } : undefined;
- 
- const styles = StyleSheet.create({
-   container: {
-diff --git a/src/features/quran/components/SurahListRow.tsx b/src/features/quran/components/SurahListRow.tsx
-new file mode 100644
-index 0000000..ad8a3a0
---- /dev/null
-+++ b/src/features/quran/components/SurahListRow.tsx
-@@ -0,0 +1,91 @@
-+import React, { type ReactNode } from "react";
-+import { StyleSheet, Text, View } from "react-native";
-+import { useDirection } from "@/core/i18n/useDirection";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { formatNumber } from "@/core/i18n/format";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+import { AppText } from "@/shared/components/ui/AppText";
-+import {
-+  GOLD,
-+  GOLD_DARK,
-+  StarBadge,
-+} from "@/features/quran/components/QuranDecor";
-+import { type SurahInfo } from "@/features/quran/data/surahs";
-+
-+interface SurahListRowProps {
-+  surah: SurahInfo;
-+  /** Second line under the name. Defaults to the transliteration and verse count. */
-+  subtitle?: string;
-+  /** Action buttons, laid out in a row on the trailing side. */
-+  children?: ReactNode;
-+}
-+
-+/** One surah in the Favorites and Downloads lists, so both look and behave the same. */
-+export function SurahListRow({ surah, subtitle, children }: SurahListRowProps) {
-+  const { colors } = useTheme();
-+  const { t, language } = useLanguage();
-+  const { row, textAlign, isRTL } = useDirection();
-+  const number = (value: number) => formatNumber(value, language);
-+
-+  return (
-+    <View
-+      style={[
-+        styles.row,
-+        { backgroundColor: colors.surface, flexDirection: row },
-+      ]}
-+    >
-+      <StarBadge
-+        size={40}
-+        label={number(surah.id)}
-+        color={GOLD}
-+        labelColor={GOLD_DARK}
-+      />
-+
-+      <View style={styles.text}>
-+        <Text
-+          allowFontScaling={false}
-+          numberOfLines={1}
-+          style={[
-+            styles.arabicName,
-+            { color: colors.text, textAlign: isRTL ? "right" : "left" },
-+          ]}
-+        >
-+          {surah.name}
-+        </Text>
-+        <AppText
-+          variant="caption"
-+          numberOfLines={1}
-+          style={{ color: colors.textSecondary, textAlign }}
-+        >
-+          {subtitle ??
-+            `${surah.transliteration} · ${number(surah.verses)} ${t.quran_verses_word}`}
-+        </AppText>
-+      </View>
-+
-+      <View style={[styles.actions, { flexDirection: row }]}>{children}</View>
-+    </View>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  row: {
-+    padding: 12,
-+    borderRadius: 18,
-+    alignItems: "center",
-+    gap: 10,
-+  },
-+  text: {
-+    flex: 1,
-+    gap: 2,
-+  },
-+  arabicName: {
-+    fontFamily: "UthmanicHafs",
-+    fontSize: 22,
-+    lineHeight: 34,
-+    includeFontPadding: false,
-+  },
-+  actions: {
-+    alignItems: "center",
-+    gap: 6,
-+  },
-+});
-diff --git a/src/features/quran/config.ts b/src/features/quran/config.ts
-index d773d67..41a252d 100644
---- a/src/features/quran/config.ts
-+++ b/src/features/quran/config.ts
-@@ -1,3 +1,8 @@
- export const USE_3D_PLANT = true;
- /** Play the 5-second 3D Quran intro on launch. Off = a short static logo splash. */
- export const USE_3D_SPLASH = true;
-+/**
-+ * The Quran is a right-to-left book: its spine is on the right and the cover opens from the right,
-+ * swinging to the right. true = the intro is the mirror image of a Latin book. false = the original.
-+ */
-+export const OPEN_FROM_RIGHT = true;
-diff --git a/src/features/quran/screens/DownloadsScreen.tsx b/src/features/quran/screens/DownloadsScreen.tsx
-new file mode 100644
-index 0000000..f3acfe6
---- /dev/null
-+++ b/src/features/quran/screens/DownloadsScreen.tsx
-@@ -0,0 +1,471 @@
-+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-+import { FlatList, Pressable, StyleSheet, View } from "react-native";
-+import { useRouter } from "expo-router";
-+import { useSafeAreaInsets } from "react-native-safe-area-context";
-+import {
-+  CloudDownload,
-+  HardDrive,
-+  Pause,
-+  Play,
-+  Square,
-+  Trash2,
-+} from "lucide-react-native";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { formatNumber } from "@/core/i18n/format";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+import { AppText } from "@/shared/components/ui/AppText";
-+import { useDownload } from "@/features/quran/audio/DownloadContext";
-+import {
-+  formatBytes,
-+  type AudioDownloadRecord,
-+} from "@/features/quran/audio/downloadManager";
-+import { FavoriteButton } from "@/features/quran/components/FavoriteButton";
-+import { ScreenHeader } from "@/features/quran/components/ScreenHeader";
-+import { SurahListRow } from "@/features/quran/components/SurahListRow";
-+import { getReciter } from "@/features/quran/data/reciters";
-+import { JUZ30_SURAHS, getSurah } from "@/features/quran/data/surahs";
-+import { useRecitation } from "@/features/quran/state/RecitationContext";
-+import { confirmAction } from "@/features/quran/utils/confirm";
-+import { fill } from "@/features/quran/utils/fill";
-+
-+interface BatchState {
-+  done: number;
-+  total: number;
-+}
-+
-+export default function DownloadsScreen() {
-+  const { colors } = useTheme();
-+  const { t, language } = useLanguage();
-+  const insets = useSafeAreaInsets();
-+  const router = useRouter();
-+  const {
-+    downloads,
-+    totalDownloadSize,
-+    downloadSurah,
-+    deleteDownload,
-+    deleteAllDownloads,
-+    cancelDownload,
-+  } = useDownload();
-+  const { playSurah, toggle, target, playing, reciterId } = useRecitation();
-+  const number = (value: number) => formatNumber(value, language);
-+  const playingSurahId = target?.kind === "surah" ? target.surahId : undefined;
-+
-+  const [batch, setBatch] = useState<BatchState | null>(null);
-+  const [batchFailed, setBatchFailed] = useState(false);
-+  const stopBatch = useRef(false);
-+  const mounted = useRef(true);
-+
-+  useEffect(
-+    () => () => {
-+      mounted.current = false;
-+      stopBatch.current = true;
-+    },
-+    [],
-+  );
-+
-+  const sorted = useMemo(
-+    () => [...downloads].sort((a, b) => a.surahId - b.surahId),
-+    [downloads],
-+  );
-+
-+  /** Downloads the surahs of Juz 30 one after another, skipping what is already saved. */
-+  const startBatch = useCallback(async () => {
-+    const have = new Set(
-+      downloads
-+        .filter((item) => item.reciterId === reciterId)
-+        .map((item) => item.surahId),
-+    );
-+    const queue = JUZ30_SURAHS.filter((surah) => !have.has(surah.id));
-+
-+    if (queue.length === 0) {
-+      return;
-+    }
-+
-+    stopBatch.current = false;
-+    setBatchFailed(false);
-+    setBatch({ done: 0, total: queue.length });
-+
-+    let failed = false;
-+
-+    for (let index = 0; index < queue.length; index += 1) {
-+      if (stopBatch.current) {
-+        break;
-+      }
-+
-+      const ok = await downloadSurah(queue[index]!.id, reciterId);
-+
-+      if (!ok && !stopBatch.current) {
-+        failed = true;
-+      }
-+
-+      if (mounted.current) {
-+        setBatch({ done: index + 1, total: queue.length });
-+      }
-+    }
-+
-+    if (mounted.current) {
-+      setBatch(null);
-+      setBatchFailed(failed);
-+    }
-+  }, [downloads, downloadSurah, reciterId]);
-+
-+  const stopBatchDownload = useCallback(async () => {
-+    stopBatch.current = true;
-+
-+    // The surah being downloaded right now is cancelled too, so stopping feels immediate.
-+    await Promise.all(
-+      JUZ30_SURAHS.map((surah) => cancelDownload(surah.id, reciterId)),
-+    );
-+  }, [cancelDownload, reciterId]);
-+
-+  const removeOne = useCallback(
-+    async (record: AudioDownloadRecord) => {
-+      const surah = getSurah(record.surahId);
-+      const confirmed = await confirmAction({
-+        title: t.dl_delete_title,
-+        message: fill(t.dl_delete_body, {
-+          surah: (language === "fa" ? surah?.name : surah?.transliteration) ?? "",
-+        }),
-+        confirmLabel: t.dl_delete_confirm,
-+        cancelLabel: t.dl_cancel,
-+        destructive: true,
-+      });
-+
-+      if (confirmed) {
-+        await deleteDownload(record.surahId, record.reciterId);
-+      }
-+    },
-+    [deleteDownload, language, t],
-+  );
-+
-+  const removeAll = useCallback(async () => {
-+    const confirmed = await confirmAction({
-+      title: t.dl_delete_all_title,
-+      message: t.dl_delete_all_body,
-+      confirmLabel: t.dl_delete_confirm,
-+      cancelLabel: t.dl_cancel,
-+      destructive: true,
-+    });
-+
-+    if (confirmed) {
-+      await deleteAllDownloads();
-+    }
-+  }, [deleteAllDownloads, t]);
-+
-+  const allJuz30Saved = JUZ30_SURAHS.every((surah) =>
-+    downloads.some(
-+      (item) => item.surahId === surah.id && item.reciterId === reciterId,
-+    ),
-+  );
-+
-+  const renderItem = ({ item }: { item: AudioDownloadRecord }) => {
-+    const surah = getSurah(item.surahId);
-+
-+    if (!surah) {
-+      return null;
-+    }
-+
-+    const reciter = getReciter(item.reciterId);
-+    const isCurrent = playingSurahId === item.surahId;
-+    const isPlaying = isCurrent && playing;
-+
-+    return (
-+      <SurahListRow
-+        surah={surah}
-+        subtitle={`${language === "fa" ? reciter.fa : reciter.en} · ${formatBytes(item.fileSize)}`}
-+      >
-+        <Pressable
-+          accessibilityRole="button"
-+          accessibilityLabel={isPlaying ? t.dl_pause : t.dl_play}
-+          onPress={() => (isCurrent ? toggle() : playSurah(item.surahId))}
-+          hitSlop={6}
-+          style={[
-+            styles.iconButton,
-+            { backgroundColor: isPlaying ? colors.primary : colors.tintSoft },
-+          ]}
-+        >
-+          {isPlaying ? (
-+            <Pause size={18} color="#FFFFFF" fill="#FFFFFF" />
-+          ) : (
-+            <Play size={18} color={colors.primary} />
-+          )}
-+        </Pressable>
-+
-+        <FavoriteButton surahId={item.surahId} size={18} />
-+
-+        <Pressable
-+          accessibilityRole="button"
-+          accessibilityLabel={t.dl_delete_confirm}
-+          onPress={() => void removeOne(item)}
-+          hitSlop={6}
-+          style={[styles.iconButton, { backgroundColor: "rgba(239,68,68,0.12)" }]}
-+        >
-+          <Trash2 size={17} color="#EF4444" />
-+        </Pressable>
-+      </SurahListRow>
-+    );
-+  };
-+
-+  const header = (
-+    <View style={styles.headerBlock}>
-+      <View style={[styles.summary, { backgroundColor: colors.surface }]}>
-+        <View style={[styles.summaryIcon, { backgroundColor: colors.tintSoft }]}>
-+          <HardDrive size={22} color={colors.primary} />
-+        </View>
-+        <View style={styles.summaryText}>
-+          <AppText variant="caption" style={{ color: colors.textSecondary }}>
-+            {t.dl_total_size}
-+          </AppText>
-+          <AppText variant="h3" style={{ color: colors.text, fontWeight: "800" }}>
-+            {formatBytes(totalDownloadSize)}
-+          </AppText>
-+          <AppText variant="caption" style={{ color: colors.textSecondary }}>
-+            {fill(t.dl_count_saved, { count: number(downloads.length) })}
-+          </AppText>
-+        </View>
-+        {downloads.length > 0 ? (
-+          <Pressable
-+            accessibilityRole="button"
-+            onPress={() => void removeAll()}
-+            hitSlop={8}
-+            style={styles.removeAll}
-+          >
-+            <Trash2 size={16} color="#EF4444" />
-+            <AppText variant="caption" style={{ color: "#EF4444", fontWeight: "700" }}>
-+              {t.dl_delete_all}
-+            </AppText>
-+          </Pressable>
-+        ) : null}
-+      </View>
-+
-+      {batch ? (
-+        <View style={[styles.batch, { backgroundColor: colors.surface }]}>
-+          <View style={styles.batchTop}>
-+            <AppText variant="body" style={{ color: colors.text, fontWeight: "700" }}>
-+              {fill(t.dl_batch_progress, {
-+                done: number(batch.done),
-+                total: number(batch.total),
-+              })}
-+            </AppText>
-+            <Pressable
-+              accessibilityRole="button"
-+              onPress={() => void stopBatchDownload()}
-+              hitSlop={8}
-+              style={styles.stop}
-+            >
-+              <Square size={13} color="#EF4444" fill="#EF4444" />
-+              <AppText variant="caption" style={{ color: "#EF4444", fontWeight: "700" }}>
-+                {t.dl_batch_stop}
-+              </AppText>
-+            </Pressable>
-+          </View>
-+          <View style={[styles.track, { backgroundColor: colors.tintSoft }]}>
-+            <View
-+              style={[
-+                styles.fillBar,
-+                {
-+                  backgroundColor: colors.primary,
-+                  width: `${Math.round((batch.done / batch.total) * 100)}%`,
-+                },
-+              ]}
-+            />
-+          </View>
-+        </View>
-+      ) : (
-+        <Pressable
-+          accessibilityRole="button"
-+          disabled={allJuz30Saved}
-+          onPress={() => void startBatch()}
-+          style={({ pressed }) => [
-+            styles.batchButton,
-+            {
-+              backgroundColor: allJuz30Saved ? colors.tintSoft : colors.primary,
-+              opacity: pressed ? 0.85 : 1,
-+            },
-+          ]}
-+        >
-+          <CloudDownload
-+            size={18}
-+            color={allJuz30Saved ? colors.textSecondary : "#FFFFFF"}
-+          />
-+          <AppText
-+            variant="body"
-+            style={{
-+              color: allJuz30Saved ? colors.textSecondary : "#FFFFFF",
-+              fontWeight: "800",
-+            }}
-+          >
-+            {allJuz30Saved ? t.dl_batch_done : t.dl_batch_juz30}
-+          </AppText>
-+        </Pressable>
-+      )}
-+
-+      {batchFailed ? (
-+        <AppText variant="caption" style={styles.error}>
-+          {t.dl_failed}
-+        </AppText>
-+      ) : null}
-+    </View>
-+  );
-+
-+  return (
-+    <View
-+      style={[
-+        styles.container,
-+        { backgroundColor: colors.background, paddingTop: insets.top },
-+      ]}
-+    >
-+      <ScreenHeader title={t.dl_title} />
-+
-+      <FlatList
-+        contentContainerStyle={styles.content}
-+        data={sorted}
-+        keyExtractor={(item) => item.id}
-+        renderItem={renderItem}
-+        showsVerticalScrollIndicator={false}
-+        ListHeaderComponent={header}
-+        ListEmptyComponent={
-+          <View style={[styles.empty, { backgroundColor: colors.surface }]}>
-+            <CloudDownload size={44} color={colors.primary} opacity={0.7} />
-+            <AppText
-+              variant="body"
-+              style={{ color: colors.text, fontWeight: "700", textAlign: "center" }}
-+            >
-+              {t.dl_empty_title}
-+            </AppText>
-+            <AppText
-+              variant="caption"
-+              style={{ color: colors.textSecondary, textAlign: "center" }}
-+            >
-+              {t.dl_empty_body}
-+            </AppText>
-+            <Pressable
-+              accessibilityRole="button"
-+              onPress={() => router.replace("/library")}
-+              style={[styles.emptyButton, { backgroundColor: colors.tintSoft }]}
-+            >
-+              <AppText
-+                variant="caption"
-+                style={{ color: colors.primary, fontWeight: "800" }}
-+              >
-+                {t.fav_go_library}
-+              </AppText>
-+            </Pressable>
-+          </View>
-+        }
-+        ListFooterComponent={
-+          downloads.length > 0 ? (
-+            <AppText
-+              variant="caption"
-+              style={[styles.hint, { color: colors.textSecondary }]}
-+            >
-+              {t.dl_offline_hint}
-+            </AppText>
-+          ) : null
-+        }
-+      />
-+    </View>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  container: {
-+    flex: 1,
-+  },
-+  content: {
-+    paddingHorizontal: 20,
-+    paddingTop: 6,
-+    paddingBottom: 32,
-+    gap: 10,
-+  },
-+  headerBlock: {
-+    gap: 10,
-+    marginBottom: 4,
-+  },
-+  summary: {
-+    flexDirection: "row",
-+    alignItems: "center",
-+    gap: 12,
-+    padding: 14,
-+    borderRadius: 20,
-+  },
-+  summaryIcon: {
-+    width: 46,
-+    height: 46,
-+    borderRadius: 23,
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+  summaryText: {
-+    flex: 1,
-+    gap: 1,
-+  },
-+  removeAll: {
-+    flexDirection: "row",
-+    alignItems: "center",
-+    gap: 4,
-+    paddingHorizontal: 8,
-+    paddingVertical: 6,
-+  },
-+  batchButton: {
-+    flexDirection: "row",
-+    alignItems: "center",
-+    justifyContent: "center",
-+    gap: 8,
-+    height: 50,
-+    borderRadius: 16,
-+  },
-+  batch: {
-+    padding: 14,
-+    borderRadius: 18,
-+    gap: 10,
-+  },
-+  batchTop: {
-+    flexDirection: "row",
-+    alignItems: "center",
-+    justifyContent: "space-between",
-+    gap: 10,
-+  },
-+  stop: {
-+    flexDirection: "row",
-+    alignItems: "center",
-+    gap: 5,
-+  },
-+  track: {
-+    height: 8,
-+    borderRadius: 4,
-+    overflow: "hidden",
-+  },
-+  fillBar: {
-+    height: 8,
-+    borderRadius: 4,
-+  },
-+  error: {
-+    color: "#EF4444",
-+    textAlign: "center",
-+  },
-+  iconButton: {
-+    width: 36,
-+    height: 36,
-+    borderRadius: 18,
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+  empty: {
-+    marginTop: 10,
-+    padding: 32,
-+    borderRadius: 24,
-+    alignItems: "center",
-+    gap: 12,
-+  },
-+  emptyButton: {
-+    marginTop: 6,
-+    paddingHorizontal: 18,
-+    paddingVertical: 10,
-+    borderRadius: 14,
-+  },
-+  hint: {
-+    textAlign: "center",
-+    marginTop: 8,
-+  },
-+});
-diff --git a/src/features/quran/screens/FavoritesScreen.tsx b/src/features/quran/screens/FavoritesScreen.tsx
-new file mode 100644
-index 0000000..386ff48
---- /dev/null
-+++ b/src/features/quran/screens/FavoritesScreen.tsx
-@@ -0,0 +1,170 @@
-+import React from "react";
-+import { FlatList, Pressable, StyleSheet, View } from "react-native";
-+import { useRouter } from "expo-router";
-+import { useSafeAreaInsets } from "react-native-safe-area-context";
-+import { BookOpen, Heart, Pause, Play } from "lucide-react-native";
-+import { useLanguage } from "@/core/i18n/LanguageContext";
-+import { formatNumber } from "@/core/i18n/format";
-+import { useTheme } from "@/core/theme/ThemeContext";
-+import { AppText } from "@/shared/components/ui/AppText";
-+import { DownloadButton } from "@/features/quran/components/DownloadButton";
-+import { FavoriteButton } from "@/features/quran/components/FavoriteButton";
-+import { ScreenHeader } from "@/features/quran/components/ScreenHeader";
-+import { SurahListRow } from "@/features/quran/components/SurahListRow";
-+import { type SurahInfo } from "@/features/quran/data/surahs";
-+import { useFavorites } from "@/features/quran/state/FavoritesContext";
-+import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
-+import { useRecitation } from "@/features/quran/state/RecitationContext";
-+
-+export default function FavoritesScreen() {
-+  const { colors } = useTheme();
-+  const { t, language } = useLanguage();
-+  const insets = useSafeAreaInsets();
-+  const router = useRouter();
-+  const { getFavoriteSurahs, favoriteCount } = useFavorites();
-+  const { setSurah } = useQuranProgress();
-+  const { playSurah, toggle, target, playing, reciterId } = useRecitation();
-+  const favoriteSurahs = getFavoriteSurahs();
-+  const playingSurahId = target?.kind === "surah" ? target.surahId : undefined;
-+
-+  const renderItem = ({ item }: { item: SurahInfo }) => {
-+    const isCurrent = playingSurahId === item.id;
-+    const isPlaying = isCurrent && playing;
-+
-+    return (
-+      <SurahListRow surah={item}>
-+        <Pressable
-+          accessibilityRole="button"
-+          accessibilityLabel={t.fav_memorize}
-+          onPress={() => {
-+            setSurah(item.id);
-+            router.push("/memorize");
-+          }}
-+          hitSlop={6}
-+          style={[styles.iconButton, { backgroundColor: colors.tintSoft }]}
-+        >
-+          <BookOpen size={18} color={colors.primary} />
-+        </Pressable>
-+
-+        <Pressable
-+          accessibilityRole="button"
-+          accessibilityLabel={isPlaying ? t.dl_pause : t.fav_listen}
-+          onPress={() => (isCurrent ? toggle() : playSurah(item.id))}
-+          hitSlop={6}
-+          style={[
-+            styles.iconButton,
-+            { backgroundColor: isPlaying ? colors.primary : colors.tintSoft },
-+          ]}
-+        >
-+          {isPlaying ? (
-+            <Pause size={18} color="#FFFFFF" fill="#FFFFFF" />
-+          ) : (
-+            <Play size={18} color={colors.primary} />
-+          )}
-+        </Pressable>
-+
-+        <DownloadButton surahId={item.id} reciterId={reciterId} size={18} />
-+        <FavoriteButton surahId={item.id} size={18} />
-+      </SurahListRow>
-+    );
-+  };
-+
-+  return (
-+    <View
-+      style={[
-+        styles.container,
-+        { backgroundColor: colors.background, paddingTop: insets.top },
-+      ]}
-+    >
-+      <ScreenHeader
-+        title={t.fav_title}
-+        trailing={
-+          favoriteCount > 0 ? (
-+            <View style={[styles.badge, { backgroundColor: colors.tintSoft }]}>
-+              <AppText
-+                variant="caption"
-+                style={{ color: colors.primary, fontWeight: "800" }}
-+              >
-+                {formatNumber(favoriteCount, language)}
-+              </AppText>
-+            </View>
-+          ) : null
-+        }
-+      />
-+
-+      <FlatList
-+        contentContainerStyle={styles.content}
-+        data={favoriteSurahs}
-+        keyExtractor={(item) => String(item.id)}
-+        renderItem={renderItem}
-+        showsVerticalScrollIndicator={false}
-+        ListEmptyComponent={
-+          <View style={[styles.empty, { backgroundColor: colors.surface }]}>
-+            <Heart size={44} color="#EF4444" opacity={0.7} />
-+            <AppText
-+              variant="body"
-+              style={{ color: colors.text, fontWeight: "700", textAlign: "center" }}
-+            >
-+              {t.fav_empty_title}
-+            </AppText>
-+            <AppText
-+              variant="caption"
-+              style={{ color: colors.textSecondary, textAlign: "center" }}
-+            >
-+              {t.fav_empty_body}
-+            </AppText>
-+            <Pressable
-+              accessibilityRole="button"
-+              onPress={() => router.replace("/library")}
-+              style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-+            >
-+              <AppText
-+                variant="caption"
-+                style={{ color: "#FFFFFF", fontWeight: "800" }}
-+              >
-+                {t.fav_go_library}
-+              </AppText>
-+            </Pressable>
-+          </View>
-+        }
-+      />
-+    </View>
-+  );
-+}
-+
-+const styles = StyleSheet.create({
-+  container: {
-+    flex: 1,
-+  },
-+  content: {
-+    paddingHorizontal: 20,
-+    paddingTop: 6,
-+    paddingBottom: 32,
-+    gap: 10,
-+  },
-+  badge: {
-+    paddingHorizontal: 10,
-+    paddingVertical: 4,
-+    borderRadius: 12,
-+  },
-+  iconButton: {
-+    width: 36,
-+    height: 36,
-+    borderRadius: 18,
-+    alignItems: "center",
-+    justifyContent: "center",
-+  },
-+  empty: {
-+    marginTop: 20,
-+    padding: 32,
-+    borderRadius: 24,
-+    alignItems: "center",
-+    gap: 12,
-+  },
-+  emptyButton: {
-+    marginTop: 6,
-+    paddingHorizontal: 18,
-+    paddingVertical: 10,
-+    borderRadius: 14,
-+  },
-+});
-diff --git a/src/features/quran/screens/QuranLibraryScreen.tsx b/src/features/quran/screens/QuranLibraryScreen.tsx
-index d7b3170..5a07ece 100644
---- a/src/features/quran/screens/QuranLibraryScreen.tsx
-+++ b/src/features/quran/screens/QuranLibraryScreen.tsx
-@@ -9,7 +9,7 @@ import {
-   type ListRenderItemInfo,
- } from "react-native";
- import { useRouter } from "expo-router";
--import { Search } from "lucide-react-native";
-+import { CloudDownload, Heart, Search } from "lucide-react-native";
+ import Animated, {
++  runOnJS,
+   useAnimatedStyle,
+   useSharedValue,
+   withSpring,
+@@ -28,6 +29,8 @@ import {
+   Flower2,
+   Leaf,
+   Volume2,
++  Maximize,
++  Plus, Minus,
+ } from "lucide-react-native";
  import { useSafeAreaInsets } from "react-native-safe-area-context";
  import { useDirection } from "@/core/i18n/useDirection";
- import { useLanguage } from "@/core/i18n/LanguageContext";
-@@ -22,12 +22,16 @@ import {
- } from "@/features/quran/components/MiniPlant";
- import { JUZ30_SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
- import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
-+import { useFavorites } from "@/features/quran/state/FavoritesContext";
-+import { FavoriteButton } from "@/features/quran/components/FavoriteButton";
-+import { DownloadButton } from "@/features/quran/components/DownloadButton";
-+import { useRecitation } from "@/features/quran/state/RecitationContext";
- import { SectionMiniBar } from "@/features/quran/components/SectionMiniBar";
- import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
- 
--type Filter = "all" | "learning" | "done";
-+type Filter = "all" | "learning" | "done" | "favorites";
- 
--const FILTERS: readonly Filter[] = ["all", "learning", "done"];
-+const FILTERS: readonly Filter[] = ["all", "learning", "done", "favorites"];
- const ORNAMENT_SIZE = 40;
- const ORNAMENT_COLOR = "#C9B27A";
- const ORNAMENT_TEXT = "#7A5F22";
-@@ -47,6 +51,8 @@ export default function QuranLibraryScreen() {
-   const guideScroll = useGuideScroll();
-   const router = useRouter();
-   const { statsFor, setSurah } = useQuranProgress();
-+  const { isFavorite, favoriteCount } = useFavorites();
-+  const { reciterId } = useRecitation();
-   const [query, setQuery] = useState("");
-   const [filter, setFilter] = useState<Filter>("all");
-   const number = (value: number) => formatNumber(value, language);
-@@ -101,13 +107,14 @@ export default function QuranLibraryScreen() {
-       const state = rowStates.get(surah.id);
-       const matchesFilter =
-         filter === "all" ||
-+        (filter === "favorites" && isFavorite(surah.id)) ||
-         (state !== undefined &&
-           ((filter === "learning" && state.isLearning) ||
-             (filter === "done" && state.isDone)));
- 
-       return matchesQuery && matchesFilter;
-     });
--  }, [query, filter, rowStates]);
-+  }, [query, filter, rowStates, isFavorite]);
- 
-   const renderRow = ({ item }: ListRenderItemInfo<SurahInfo>) => {
-     const rowState = rowStates.get(item.id);
-@@ -172,6 +179,10 @@ export default function QuranLibraryScreen() {
-           </AppText>
-           {available ? <SectionMiniBar surahId={item.id} /> : null}
-         </View>
-+        <View style={[styles.rowActions, { flexDirection: row }]}>
-+          <DownloadButton surahId={item.id} reciterId={reciterId} size={16} />
-+          <FavoriteButton surahId={item.id} size={16} />
-+        </View>
-         <View style={[styles.plantState, !available && styles.soonState]}>
-           {available ? <MiniPlant state={state.plant} /> : null}
-           <AppText
-@@ -207,14 +218,80 @@ export default function QuranLibraryScreen() {
-       showsVerticalScrollIndicator={false}
-       keyboardShouldPersistTaps="handled"
-       initialNumToRender={12}
-+      ListEmptyComponent={
-+        filter === "favorites" ? (
-+          <View style={[styles.emptyFilter, { backgroundColor: colors.surface }]}>
-+            <AppText
-+              variant="body"
-+              style={{ color: colors.text, fontWeight: "700", textAlign: "center" }}
-+            >
-+              {t.fav_empty_title}
-+            </AppText>
-+            <AppText
-+              variant="caption"
-+              style={{ color: colors.textSecondary, textAlign: "center" }}
-+            >
-+              {t.fav_empty_body}
-+            </AppText>
-+          </View>
-+        ) : null
-+      }
-       ListHeaderComponent={
-         <View style={styles.header}>
--          <AppText
--            variant="h1"
--            style={{ color: colors.text, textAlign, fontWeight: "800" }}
-+          <View
-+            style={{
-+              flexDirection: row,
-+              justifyContent: "space-between",
-+              alignItems: "center",
-+            }}
-           >
--            {t.quran_library}
--          </AppText>
-+            <AppText
-+              variant="h1"
-+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
-+            >
-+              {t.quran_library}
-+            </AppText>
+@@ -108,9 +111,50 @@ export default function MemorizeScreen() {
+   const scrollY = useRef(0);
+   const guideScroll = useGuideScroll(scrollRef);
+   const recitingLine = useRef<View>(null);
++  const mushafContainerRef = useRef<View>(null);
++  const lastPopupCheck = useRef(0);
++  const [isZoomPopupVisible, setIsZoomPopupVisible] = useState(false);
++  //
++  const updateZoomPopupVisibility = useCallback(() => {
++    const now = Date.now();
 +
-+            <View style={{ flexDirection: row, gap: 8 }}>
-+              <Pressable
-+                accessibilityRole="button"
-+                accessibilityLabel={t.dl_title}
-+                onPress={() => router.push("/downloads")}
-+                style={[
-+                  styles.headerActionBtn,
-+                  { backgroundColor: colors.surface, flexDirection: row },
-+                ]}
-+              >
-+                <CloudDownload size={16} color={colors.primary} />
-+                <AppText
-+                  variant="caption"
-+                  style={{ color: colors.text, fontWeight: "700" }}
-+                >
-+                  {t.lib_downloads}
-+                </AppText>
-+              </Pressable>
++    if (now - lastPopupCheck.current < 100) {
++      return;
++    }
 +
-+              <Pressable
-+                accessibilityRole="button"
-+                accessibilityLabel={t.fav_title}
-+                onPress={() => router.push("/favorites")}
-+                style={[
-+                  styles.headerActionBtn,
-+                  { backgroundColor: colors.surface, flexDirection: row },
-+                ]}
-+              >
-+                <Heart size={16} color="#EF4444" fill="#EF4444" />
-+                <AppText
-+                  variant="caption"
-+                  style={{ color: colors.text, fontWeight: "700" }}
-+                >
-+                  {favoriteCount > 0
-+                    ? `${t.lib_favorites} ${number(favoriteCount)}`
-+                    : t.lib_favorites}
-+                </AppText>
-+              </Pressable>
-+            </View>
-+          </View>
-           <GuideTarget id="library.search">
-             <View
-               style={[
-@@ -284,6 +361,22 @@ const styles = StyleSheet.create({
-     gap: 12,
-     marginBottom: 4,
-   },
-+  rowActions: {
-+    alignItems: "center",
-+    gap: 2,
-+  },
-+  emptyFilter: {
-+    padding: 28,
-+    borderRadius: 20,
-+    gap: 8,
-+  },
-+  headerActionBtn: {
-+    paddingHorizontal: 10,
-+    paddingVertical: 6,
-+    borderRadius: 12,
-+    alignItems: "center",
-+    gap: 4,
-+  },
-   search: {
-     height: 48,
-     borderRadius: 16,
-diff --git a/src/features/quran/state/FavoritesContext.tsx b/src/features/quran/state/FavoritesContext.tsx
-new file mode 100644
-index 0000000..5ad45cd
---- /dev/null
-+++ b/src/features/quran/state/FavoritesContext.tsx
-@@ -0,0 +1,135 @@
-+import React, {
-+  createContext,
-+  useCallback,
-+  useContext,
-+  useEffect,
-+  useMemo,
-+  useRef,
-+  useState,
-+  type ReactNode,
-+} from "react";
-+import AsyncStorage from "@react-native-async-storage/async-storage";
-+import * as Haptics from "expo-haptics";
-+import { SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
++    lastPopupCheck.current = now;
 +
-+interface FavoritesContextValue {
-+  favorites: number[];
-+  favoriteCount: number;
-+  isFavorite: (surahId: number) => boolean;
-+  /** Resolves with the new state: true = now a favorite. */
-+  toggleFavorite: (surahId: number) => Promise<boolean>;
-+  getFavoriteSurahs: () => SurahInfo[];
-+}
++    mushafContainerRef.current?.measureInWindow(
++      (_x, y, _width, pageHeight) => {
++        const visibleTop = Math.max(y, 0);
++        const visibleBottom = Math.min(y + pageHeight, windowHeight);
 +
-+const FAVORITES_STORAGE_KEY = "@quran_favorites";
++        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
++        const visiblePercentage = visibleHeight / pageHeight;
 +
-+const FavoritesContext = createContext<FavoritesContextValue | undefined>(
-+  undefined,
-+);
-+
-+export function FavoritesProvider({ children }: { children: ReactNode }) {
-+  const [favorites, setFavorites] = useState<number[]>([]);
-+  // The latest list, readable synchronously, so two quick taps never read a stale one.
-+  const latest = useRef<number[]>([]);
-+
-+  const apply = useCallback((next: number[]) => {
-+    latest.current = next;
-+    setFavorites(next);
-+  }, []);
++        setIsZoomPopupVisible(visiblePercentage >= 0.60);
++      },
++    );
++  }, [windowHeight]);
 +
 +  useEffect(() => {
-+    let mounted = true;
-+
-+    AsyncStorage.getItem(FAVORITES_STORAGE_KEY)
-+      .then((saved) => {
-+        if (!mounted || !saved) {
-+          return;
-+        }
-+
-+        try {
-+          const parsed: unknown = JSON.parse(saved);
-+
-+          if (Array.isArray(parsed)) {
-+            const stored = parsed.filter(
-+              (id): id is number => typeof id === "number",
-+            );
-+
-+            // Anything tapped before the saved list arrived is kept too.
-+            apply([...new Set([...stored, ...latest.current])]);
-+          }
-+        } catch {
-+          // A damaged list is treated as empty.
-+        }
-+      })
-+      .catch(() => undefined);
-+
-+    return () => {
-+      mounted = false;
-+    };
-+  }, [apply]);
-+
-+  const isFavorite = useCallback(
-+    (surahId: number): boolean => favorites.includes(surahId),
-+    [favorites],
-+  );
-+
-+  const toggleFavorite = useCallback(
-+    async (surahId: number): Promise<boolean> => {
-+      try {
-+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-+      } catch {
-+        // Haptics are a bonus.
-+      }
-+
-+      const current = latest.current;
-+      const willBeFavorite = !current.includes(surahId);
-+      const next = willBeFavorite
-+        ? [...current, surahId]
-+        : current.filter((id) => id !== surahId);
-+
-+      apply(next);
-+
-+      try {
-+        await AsyncStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(next));
-+      } catch {
-+        // Still a favorite for this session; it is saved with the next change.
-+      }
-+
-+      return willBeFavorite;
-+    },
-+    [apply],
-+  );
-+
-+  const getFavoriteSurahs = useCallback((): SurahInfo[] => {
-+    const set = new Set(favorites);
-+
-+    return SURAHS.filter((surah) => set.has(surah.id));
-+  }, [favorites]);
-+
-+  const value = useMemo(
-+    () => ({
-+      favorites,
-+      favoriteCount: favorites.length,
-+      isFavorite,
-+      toggleFavorite,
-+      getFavoriteSurahs,
-+    }),
-+    [favorites, isFavorite, toggleFavorite, getFavoriteSurahs],
-+  );
-+
-+  return (
-+    <FavoritesContext.Provider value={value}>
-+      {children}
-+    </FavoritesContext.Provider>
-+  );
-+}
-+
-+export function useFavorites(): FavoritesContextValue {
-+  const context = useContext(FavoritesContext);
-+
-+  if (!context) {
-+    throw new Error("useFavorites must be used within FavoritesProvider");
-+  }
-+
-+  return context;
-+}
-diff --git a/src/features/quran/state/RecitationContext.tsx b/src/features/quran/state/RecitationContext.tsx
-index d576e3c..939cfe6 100644
---- a/src/features/quran/state/RecitationContext.tsx
-+++ b/src/features/quran/state/RecitationContext.tsx
-@@ -22,6 +22,7 @@ import {
- } from "@/features/quran/data/reciters";
- import { SURAHS } from "@/features/quran/data/surahs";
- import { logAyahReps } from "@/features/quran/state/sectionStore";
-+import { downloadManager } from "@/features/quran/audio/downloadManager";
- 
- export type PlaybackTarget =
-   | { kind: "surah"; surahId: number }
-@@ -93,6 +94,11 @@ function sourceFor(
-   ayah?: number,
- ): string {
-   if (target.kind === "surah") {
-+    // Check if offline downloaded file exists
-+    const local = downloadManager.getCachedUriSync(target.surahId, reciterId);
-+    if (local) {
-+      return local;
-+    }
-     return getReciter(reciterId).surahUrl(target.surahId);
-   }
- 
-diff --git a/src/features/quran/utils/confirm.ts b/src/features/quran/utils/confirm.ts
-new file mode 100644
-index 0000000..f3e503d
---- /dev/null
-+++ b/src/features/quran/utils/confirm.ts
-@@ -0,0 +1,44 @@
-+import { Alert, Platform } from "react-native";
-+
-+interface ConfirmOptions {
-+  title: string;
-+  message: string;
-+  confirmLabel: string;
-+  cancelLabel: string;
-+  /** Marks the confirm button red (iOS) for actions that delete something. */
-+  destructive?: boolean;
-+}
-+
-+/**
-+ * Asks the person to confirm. Resolves true only for the confirm button.
-+ * React Native's Alert does nothing in a browser, so the web uses window.confirm.
-+ */
-+export function confirmAction({
-+  title,
-+  message,
-+  confirmLabel,
-+  cancelLabel,
-+  destructive = false,
-+}: ConfirmOptions): Promise<boolean> {
-+  if (Platform.OS === "web") {
-+    const ask = (globalThis as { confirm?: (text: string) => boolean }).confirm;
-+
-+    return Promise.resolve(ask ? ask(`${title}\n\n${message}`) : true);
-+  }
-+
-+  return new Promise((resolve) => {
-+    Alert.alert(
-+      title,
-+      message,
-+      [
-+        { text: cancelLabel, style: "cancel", onPress: () => resolve(false) },
-+        {
-+          text: confirmLabel,
-+          style: destructive ? "destructive" : "default",
-+          onPress: () => resolve(true),
-+        },
-+      ],
-+      { cancelable: true, onDismiss: () => resolve(false) },
++    popupTranslateY.value = withSpring(
++      isZoomPopupVisible ? 0 : 80,
++      {
++        damping: 18,
++        stiffness: 140,
++      },
 +    );
++  }, [isZoomPopupVisible]);
+   // Zoom state
+   const zoomScale = useSharedValue(1);
+   const savedZoomScale = useSharedValue(1);
++  const popupTranslateY = useSharedValue(80);
++  const mushafSize = useSharedValue({
++    width: 0,
++    height: 0,
 +  });
-+}
-diff --git a/src/features/quran/utils/splashScene.ts b/src/features/quran/utils/splashScene.ts
-index 28a81bd..187a5ad 100644
---- a/src/features/quran/utils/splashScene.ts
-+++ b/src/features/quran/utils/splashScene.ts
-@@ -1,4 +1,5 @@
- import * as THREE from "three";
-+import { OPEN_FROM_RIGHT } from "@/features/quran/config";
- import {
-   COVER_GOLD,
-   PAGE_A,
-@@ -424,7 +425,12 @@ function makeCoverTexture(): THREE.DataTexture {
-     }
-   }
++  const [zoomPercentage, setZoomPercentage] = useState(100);
  
--  return bytesToTexture(data, width, height);
-+  // Printed on the cover: flipped once so the view flip of OPEN_FROM_RIGHT brings it back.
-+  return bytesToTexture(
-+    OPEN_FROM_RIGHT ? mirrorColumns(data, width, height) : data,
-+    width,
-+    height,
-+  );
+   // Pan state
+   const translateX = useSharedValue(0);
+@@ -126,11 +170,26 @@ export default function MemorizeScreen() {
+       { scale: zoomScale.value },
+     ],
+   }));
++  const updateZoomPercentage = (scale: number) => {
++    setZoomPercentage(Math.round(scale * 100));
++  };
+   const pinchGesture = Gesture.Pinch()
+     .onUpdate((event) => {
+       const nextScale = savedZoomScale.value * event.scale;
++      const scale = Math.min(Math.max(nextScale, 1), 3);
+ 
+-      zoomScale.value = Math.min(Math.max(nextScale, 1), 3);
++      zoomScale.value = scale;
++
++      const maxX = (mushafSize.value.width * (scale - 1)) / 2;
++      const maxY = (mushafSize.value.height * (scale - 1)) / 2;
++
++      const nextX = Math.min(Math.max(translateX.value, -maxX), maxX);
++      const nextY = Math.min(Math.max(translateY.value, -maxY), maxY);
++
++      translateX.value = nextX;
++      translateY.value = nextY;
++
++      runOnJS(updateZoomPercentage)(scale);
+     })
+     .onEnd(() => {
+       savedZoomScale.value = zoomScale.value;
+@@ -145,6 +204,7 @@ export default function MemorizeScreen() {
+     });
+ 
+   const panGesture = Gesture.Pan()
++    .enabled(zoomPercentage > 100)
+     .maxPointers(1)
+     .onStart(() => {
+       savedTranslateX.value = translateX.value;
+@@ -153,11 +213,16 @@ export default function MemorizeScreen() {
+     .onUpdate((event) => {
+       if (zoomScale.value <= 1) return;
+ 
+-      translateX.value =
+-        savedTranslateX.value + event.translationX;
++      const scale = zoomScale.value;
++
++      const maxX = (mushafSize.value.width * (scale - 1)) / 2;
++      const maxY = (mushafSize.value.height * (scale - 1)) / 2;
++
++      const nextX = savedTranslateX.value + event.translationX;
++      const nextY = savedTranslateY.value + event.translationY;
+ 
+-      translateY.value =
+-        savedTranslateY.value + event.translationY;
++      translateX.value = Math.min(Math.max(nextX, -maxX), maxX);
++      translateY.value = Math.min(Math.max(nextY, -maxY), maxY);
+     })
+     .onEnd(() => {
+       savedTranslateX.value = translateX.value;
+@@ -168,11 +233,14 @@ export default function MemorizeScreen() {
+     pinchGesture,
+     panGesture,
+   );
++
+   const zoomIn = () => {
+     const nextScale = Math.min(zoomScale.value + 0.25, 3);
+ 
+     zoomScale.value = withSpring(nextScale);
+     savedZoomScale.value = nextScale;
++
++    setZoomPercentage(Math.round(nextScale * 100));
+   };
+ 
+   const zoomOut = () => {
+@@ -181,6 +249,18 @@ export default function MemorizeScreen() {
+     zoomScale.value = withSpring(nextScale);
+     savedZoomScale.value = nextScale;
+ 
++    const maxX = (mushafSize.value.width * (nextScale - 1)) / 2;
++    const maxY = (mushafSize.value.height * (nextScale - 1)) / 2;
++
++    const nextX = Math.min(Math.max(translateX.value, -maxX), maxX);
++    const nextY = Math.min(Math.max(translateY.value, -maxY), maxY);
++
++    translateX.value = withSpring(nextX);
++    translateY.value = withSpring(nextY);
++
++    savedTranslateX.value = nextX;
++    savedTranslateY.value = nextY;
++
+     if (nextScale === 1) {
+       translateX.value = withSpring(0);
+       translateY.value = withSpring(0);
+@@ -188,6 +268,7 @@ export default function MemorizeScreen() {
+       savedTranslateX.value = 0;
+       savedTranslateY.value = 0;
+     }
++    setZoomPercentage(Math.round(nextScale * 100));
+   };
+ 
+   const resetZoom = () => {
+@@ -199,6 +280,7 @@ export default function MemorizeScreen() {
+ 
+     savedTranslateX.value = 0;
+     savedTranslateY.value = 0;
++    setZoomPercentage(100);
+   };
+   const params = useLocalSearchParams<{ ayah?: string }>();
+   const { mushaf, currentAyah, remember, needsReview, recordFor, learnedCount } =
+@@ -397,282 +479,337 @@ export default function MemorizeScreen() {
+ 
+   const pageWidth = width - PADDING * 2 - PAPER_PADDING * 2;
+ 
++  const popupAnimatedStyle = useAnimatedStyle(() => ({
++    transform: [{ translateY: popupTranslateY.value }],
++    opacity: 1 - popupTranslateY.value / 80,
++  }));
++
+   return (
+-    <ScrollView
+-      ref={scrollRef}
+-      style={{ backgroundColor: colors.background }}
+-      contentContainerStyle={[
+-        styles.content,
+-        { paddingTop: insets.top + 16, paddingHorizontal: PADDING },
+-      ]}
+-      showsVerticalScrollIndicator={false}
+-      scrollEventThrottle={16}
+-      onScroll={(event) => {
+-        scrollY.current = event.nativeEvent.contentOffset.y;
+-        guideScroll.onScroll(event);
+-      }}
+-    >
+-      <Rise>
+-        <View style={[styles.header, { flexDirection: row }]}>
+-          <Pressable
+-            accessibilityRole="button"
+-            accessibilityLabel={t.quran_back}
+-            onPress={() => router.replace("/")}
+-            style={[styles.iconButton, { backgroundColor: colors.surface }]}
+-          >
+-            <BackIcon size={22} color={colors.text} />
+-          </Pressable>
+-          <View style={styles.title}>
+-            <Text
+-              style={[styles.surahName, { color: colors.text }]}
+-              allowFontScaling={false}
+-            >
+-              {surah?.name}
+-            </Text>
+-            <AppText variant="caption" style={{ color: colors.textSecondary }}>
+-              {fill(t.quran_verses_range, {
+-                from: number(1),
+-                to: number(TOTAL_VERSES),
+-              })}
+-            </AppText>
+-          </View>
+-          <GuideTarget id="memorize.exam">
++    <View style={{ flex: 1, backgroundColor: colors.background }}>
++      <ScrollView
++        ref={scrollRef}
++        style={{ backgroundColor: colors.background }}
++        contentContainerStyle={[
++          styles.content,
++          { paddingTop: insets.top + 16, paddingHorizontal: PADDING },
++        ]}
++        showsVerticalScrollIndicator={false}
++        scrollEventThrottle={16}
++        onScroll={(event) => {
++          scrollY.current = event.nativeEvent.contentOffset.y;
++          guideScroll.onScroll(event);
++          updateZoomPopupVisibility();
++        }}
++      >
++        <Rise>
++          <View style={[styles.header, { flexDirection: row }]}>
+             <Pressable
+               accessibilityRole="button"
+-              accessibilityLabel={t.quran_exam_open}
+-              onPress={() => router.push("/exam")}
++              accessibilityLabel={t.quran_back}
++              onPress={() => router.replace("/")}
+               style={[styles.iconButton, { backgroundColor: colors.surface }]}
+             >
+-              <ClipboardCheck size={22} color={colors.text} />
++              <BackIcon size={22} color={colors.text} />
+             </Pressable>
++            <View style={styles.title}>
++              <Text
++                style={[styles.surahName, { color: colors.text }]}
++                allowFontScaling={false}
++              >
++                {surah?.name}
++              </Text>
++              <AppText variant="caption" style={{ color: colors.textSecondary }}>
++                {fill(t.quran_verses_range, {
++                  from: number(1),
++                  to: number(TOTAL_VERSES),
++                })}
++              </AppText>
++            </View>
++            <GuideTarget id="memorize.exam">
++              <Pressable
++                accessibilityRole="button"
++                accessibilityLabel={t.quran_exam_open}
++                onPress={() => router.push("/exam")}
++                style={[styles.iconButton, { backgroundColor: colors.surface }]}
++              >
++                <ClipboardCheck size={22} color={colors.text} />
++              </Pressable>
++            </GuideTarget>
++          </View>
++        </Rise>
++
++        <Rise delay={80}>
++          <GuideTarget id="memorize.modes">
++            <View
++              style={[
++                styles.segmented,
++                { backgroundColor: colors.tintSoft, flexDirection: row },
++              ]}
++            >
++              {MODES.map((item) => {
++                const selected = item === mode;
++
++                return (
++                  <Pressable
++                    key={item}
++                    accessibilityRole="radio"
++                    accessibilityState={{ selected }}
++                    onPress={() => changeMode(item)}
++                    style={[
++                      styles.segment,
++                      selected && { backgroundColor: colors.surface },
++                    ]}
++                  >
++                    <AppText
++                      variant="caption"
++                      numberOfLines={1}
++                      style={{
++                        color: colors.text,
++                        fontWeight: selected ? "800" : "500",
++                      }}
++                    >
++                      {t[`quran_mode_${item}`]}
++                    </AppText>
++                  </Pressable>
++                );
++              })}
++            </View>
+           </GuideTarget>
+-        </View>
+-      </Rise>
+-
+-      <Rise delay={80}>
+-        <GuideTarget id="memorize.modes">
+-          <View
+-            style={[
+-              styles.segmented,
+-              { backgroundColor: colors.tintSoft, flexDirection: row },
+-            ]}
+-          >
+-            {MODES.map((item) => {
+-              const selected = item === mode;
+-
+-              return (
+-                <Pressable
+-                  key={item}
+-                  accessibilityRole="radio"
+-                  accessibilityState={{ selected }}
+-                  onPress={() => changeMode(item)}
++        </Rise>
++
++        <Rise delay={160}>
++          <GuideTarget id="memorize.page" style={{ alignItems: "center" }}>
++            <View
++              ref={mushafContainerRef}
++              onLayout={updateZoomPopupVisibility}
++              style={[
++                styles.paper,
++                {
++                  padding: PAPER_PADDING,
++                  overflow: "hidden",
++                },
++              ]}
++            >
++              <GestureDetector gesture={mushafGesture}>
++                <Animated.View
++                  onLayout={(event) => {
++                    const { width, height } = event.nativeEvent.layout;
++
++                    mushafSize.value = { width, height };
++                  }}
+                   style={[
+-                    styles.segment,
+-                    selected && { backgroundColor: colors.surface },
++                    { width: pageWidth },
++                    zoomAnimatedStyle,
+                   ]}
+                 >
+-                  <AppText
+-                    variant="caption"
+-                    numberOfLines={1}
+-                    style={{
+-                      color: colors.text,
+-                      fontWeight: selected ? "800" : "500",
+-                    }}
+-                  >
+-                    {t[`quran_mode_${item}`]}
+-                  </AppText>
+-                </Pressable>
+-              );
+-            })}
++                  <MushafPage
++                    key={page.pageNumber}
++                    page={page}
++                    width={pageWidth}
++                    highlightAyah={current}
++                    recitingAyah={recitingAyah}
++                    recitingLineRef={recitingLine}
++                    hiddenIndices={hidden}
++                    hideVerseMarkers={mode === "challenge"}
++                    onRevealWord={reveal}
++                    accessibilityLabel={fill(t.quran_page_label, {
++                      page: number(page.pageNumber),
++                      surah: surah?.transliteration ?? "",
++                    })}
++                  />
++                </Animated.View>
++              </GestureDetector>
++            </View>
++
++          </GuideTarget>
++        </Rise>
++
++        <Rise delay={220}>
++          <View style={styles.hintRow}>
++            <View style={[styles.bubble, { backgroundColor: colors.surface }]}>
++              <AppText
++                variant="caption"
++                style={{
++                  color: colors.text,
++                  fontWeight: "700",
++                  textAlign: "center",
++                }}
++              >
++                {hintText}
++              </AppText>
++            </View>
++          </View>
++        </Rise>
++
++        <Rise delay={260}>
++          <GuideTarget id="memorize.listen">
++            <Pressable
++              accessibilityRole="button"
++              accessibilityLabel={t.quran_listen_verse}
++              onPress={listenToVerse}
++              style={[
++                styles.listenVerse,
++                { backgroundColor: colors.tintSoft, flexDirection: row },
++              ]}
++            >
++              <Volume2 size={18} color={colors.onTint} />
++              <AppText
++                variant="caption"
++                style={{ color: colors.onTint, fontWeight: "700" }}
++              >
++                {verseIsPlaying && playing ? t.quran_pause : t.quran_listen_verse}
++              </AppText>
++            </Pressable>
++          </GuideTarget>
++        </Rise>
++
++        <GuideTarget id="memorize.dots">
++          <View style={styles.progress}>
++            <AppText variant="caption" style={{ color: colors.textSecondary }}>
++              {fill(t.quran_verse_of, {
++                ayah: number(current),
++                total: number(TOTAL_VERSES),
++              })}
++            </AppText>
++            <View style={[styles.dotsRow, { flexDirection: row }]}>
++              {verses.map((verse) => {
++                const isCurrent = verse.ayah === current;
++                const marker = markers.get(verse.ayah);
++
++                return (
++                  <View key={verse.ayah} style={styles.dotCell}>
++                    {marker === "blossom" ? (
++                      <Flower2 size={14} color={BLOSSOM_COLOR} strokeWidth={2.4} />
++                    ) : marker === "leaf" ? (
++                      <Leaf size={12} color={LEAF_COLOR} strokeWidth={2.4} />
++                    ) : (
++                      <View style={styles.markerSpace} />
++                    )}
++                    <HizbDot
++                      size={isCurrent ? 18 : 14}
++                      color={
++                        isCurrent
++                          ? colors.highlight
++                          : STATUS_COLORS[verseStatus(verse.ayah).status]
++                      }
++                    />
++                  </View>
++                );
++              })}
++            </View>
++            {markers.size > 0 ? (
++              <AppText
++                variant="caption"
++                style={{ color: colors.textSecondary, textAlign: "center" }}
++              >
++                {t.quran_marker_hint}
++              </AppText>
++            ) : null}
+           </View>
+         </GuideTarget>
+-      </Rise>
+-
+-      <Rise delay={160}>
+-        <GuideTarget id="memorize.page">
+-  <View
+-    style={{
+-      height: 50,
+-      backgroundColor: "yellow",
+-      flexDirection: "row",
+-      justifyContent: "center",
+-      alignItems: "center",
+-      gap: 20,
+-      zIndex: 10,
+-    }}
+-  >
+-    <Pressable onPress={zoomOut}>
+-      <Text style={{ color: "black", fontSize: 24 }}>−</Text>
+-    </Pressable>
+-
+-    <Pressable onPress={resetZoom}>
+-      <Text style={{ color: "black", fontSize: 14 }}>بازنشانی</Text>
+-    </Pressable>
+-
+-    <Pressable onPress={zoomIn}>
+-      <Text style={{ color: "black", fontSize: 24 }}>+</Text>
+-    </Pressable>
+-  </View>
+-
+-  <View
+-    style={[
+-      styles.paper,
+-      {
+-        padding: PAPER_PADDING,
+-        overflow: "hidden",
+-      },
+-    ]}
+-  >
+-    <GestureDetector gesture={mushafGesture}>
++
++        <GuideTarget id="memorize.actions">
++          <View style={[styles.actions, { flexDirection: row }]}>
++            <Pressable
++              accessibilityRole="button"
++              onPress={() => void handleAgain()}
++              style={[
++                styles.secondary,
++                { backgroundColor: colors.surface, shadowColor: colors.tint },
++              ]}
++            >
++              <AppText
++                variant="bodySmall"
++                style={{ color: colors.text, fontWeight: "700" }}
++              >
++                {t.quran_again}
++              </AppText>
++            </Pressable>
++            <View style={styles.primary}>
++              <ChunkyButton
++                label={(mode === "full" ? t.quran_test_me : t.quran_knew) ?? ""}
++                onPress={() => void handleRemembered()}
++              />
++            </View>
++          </View>
++        </GuideTarget>
++
++        <GuideTarget id="memorize.sections">
++          <SectionPractice
++            surahId={mushaf.surahId}
++            focusAyah={current}
++            onSelectSection={(section) => {
++              setRevealed(new Set());
++              setPeeks(0);
++              setCurrent(section.from);
++            }}
++          />
++        </GuideTarget>
++      </ScrollView>
+       <Animated.View
++        pointerEvents={isZoomPopupVisible ? "auto" : "none"}
+         style={[
+-          { width: pageWidth },
+-          zoomAnimatedStyle,
++          {
++            position: "absolute",
++            bottom: 20,
++            alignSelf: "center",
++            zIndex: 100,
++          },
++          popupAnimatedStyle,
+         ]}
+       >
+-        <MushafPage
+-          key={page.pageNumber}
+-          page={page}
+-          width={pageWidth}
+-          highlightAyah={current}
+-          recitingAyah={recitingAyah}
+-          recitingLineRef={recitingLine}
+-          hiddenIndices={hidden}
+-          hideVerseMarkers={mode === "challenge"}
+-          onRevealWord={reveal}
+-          accessibilityLabel={fill(t.quran_page_label, {
+-            page: number(page.pageNumber),
+-            surah: surah?.transliteration ?? "",
+-          })}
+-        />
+-      </Animated.View>
+-    </GestureDetector>
+-  </View>
+-</GuideTarget>
+-      </Rise>
+-
+-      <Rise delay={220}>
+-        <View style={styles.hintRow}>
+-          <View style={[styles.bubble, { backgroundColor: colors.surface }]}>
+-            <AppText
+-              variant="caption"
+-              style={{
+-                color: colors.text,
+-                fontWeight: "700",
+-                textAlign: "center",
+-              }}
+-            >
+-              {hintText}
+-            </AppText>
+-          </View>
+-        </View>
+-      </Rise>
+-
+-      <Rise delay={260}>
+-        <GuideTarget id="memorize.listen">
+-          <Pressable
+-            accessibilityRole="button"
+-            accessibilityLabel={t.quran_listen_verse}
+-            onPress={listenToVerse}
+-            style={[
+-              styles.listenVerse,
+-              { backgroundColor: colors.tintSoft, flexDirection: row },
+-            ]}
+-          >
+-            <Volume2 size={18} color={colors.onTint} />
+-            <AppText
+-              variant="caption"
+-              style={{ color: colors.onTint, fontWeight: "700" }}
+-            >
+-              {verseIsPlaying && playing ? t.quran_pause : t.quran_listen_verse}
+-            </AppText>
++
++        <View
++          style={{
++            height: 45,
++            width: 180,
++            paddingHorizontal: 4,
++            paddingVertical: 4,
++            gap: 13,
++            borderRadius: 30,
++            backgroundColor: colors.isDark ? colors.tintSoft : colors.surface,
++            flexDirection: "row",
++            justifyContent: "center",
++            alignItems: "center",
++            zIndex: 10,
++            marginTop: 8,
++          }}
++        >
++
++          <Pressable onPress={resetZoom} style={{
++            width: 30,
++            height: 30,
++            borderRadius: 18, padding: 4, backgroundColor: colors.tintSoft,
++            alignItems: "center",
++            justifyContent: "center",
++
++          }}>
++            <Maximize color={colors.iconAccent} size={20} />
+           </Pressable>
+-        </GuideTarget>
+-      </Rise>
+-
+-      <GuideTarget id="memorize.dots">
+-        <View style={styles.progress}>
+-          <AppText variant="caption" style={{ color: colors.textSecondary }}>
+-            {fill(t.quran_verse_of, {
+-              ayah: number(current),
+-              total: number(TOTAL_VERSES),
+-            })}
+-          </AppText>
+-          <View style={[styles.dotsRow, { flexDirection: row }]}>
+-            {verses.map((verse) => {
+-              const isCurrent = verse.ayah === current;
+-              const marker = markers.get(verse.ayah);
+-
+-              return (
+-                <View key={verse.ayah} style={styles.dotCell}>
+-                  {marker === "blossom" ? (
+-                    <Flower2 size={14} color={BLOSSOM_COLOR} strokeWidth={2.4} />
+-                  ) : marker === "leaf" ? (
+-                    <Leaf size={12} color={LEAF_COLOR} strokeWidth={2.4} />
+-                  ) : (
+-                    <View style={styles.markerSpace} />
+-                  )}
+-                  <HizbDot
+-                    size={isCurrent ? 18 : 14}
+-                    color={
+-                      isCurrent
+-                        ? colors.highlight
+-                        : STATUS_COLORS[verseStatus(verse.ayah).status]
+-                    }
+-                  />
+-                </View>
+-              );
+-            })}
+-          </View>
+-          {markers.size > 0 ? (
+-            <AppText
+-              variant="caption"
+-              style={{ color: colors.textSecondary, textAlign: "center" }}
+-            >
+-              {t.quran_marker_hint}
+-            </AppText>
+-          ) : null}
+-        </View>
+-      </GuideTarget>
+-
+-      <GuideTarget id="memorize.actions">
+-        <View style={[styles.actions, { flexDirection: row }]}>
+-          <Pressable
+-            accessibilityRole="button"
+-            onPress={() => void handleAgain()}
+-            style={[
+-              styles.secondary,
+-              { backgroundColor: colors.surface, shadowColor: colors.tint },
+-            ]}
++
++          <Pressable onPress={zoomOut}>
++            <Minus color={colors.iconAccent} size={20} />
++          </Pressable>
++
++          <Text
++            style={{
++              color: colors.text,
++              fontSize: 14,
++              backgroundColor: colors.tint,
++              paddingHorizontal: 12,
++              paddingVertical: 6,
++              borderRadius: 20,
++            }}
+           >
+-            <AppText
+-              variant="bodySmall"
+-              style={{ color: colors.text, fontWeight: "700" }}
+-            >
+-              {t.quran_again}
+-            </AppText>
++            {zoomPercentage}%
++          </Text>
++
++          <Pressable onPress={zoomIn}>
++            <Plus color={colors.iconAccent} size={20} />
+           </Pressable>
+-          <View style={styles.primary}>
+-            <ChunkyButton
+-              label={(mode === "full" ? t.quran_test_me : t.quran_knew) ?? ""}
+-              onPress={() => void handleRemembered()}
+-            />
+-          </View>
+         </View>
+-      </GuideTarget>
+-
+-      <GuideTarget id="memorize.sections">
+-        <SectionPractice
+-          surahId={mushaf.surahId}
+-          focusAyah={current}
+-          onSelectSection={(section) => {
+-            setRevealed(new Set());
+-            setPeeks(0);
+-            setCurrent(section.from);
+-          }}
+-        />
+-      </GuideTarget>
+-    </ScrollView>
++      </Animated.View>
++    </View>
+   );
  }
  
- /** Inner side of the covers: green endpaper with a gold frame, no medallion. */
-@@ -730,22 +736,49 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
-   scene.add(pointLight);
- 
-   /* Materials */
-+  // The splash view is flipped left-right when the Quran opens from the right (OPEN_FROM_RIGHT).
-+  // That flip moves the spine and the opening direction, but it would also reverse everything
-+  // printed on the book. So the printed textures are flipped once here and the two flips cancel:
-+  // the geometry is mirrored, the writing and the page lines read the right way round.
-+  const unflip = (data: Uint8Array, width: number, height: number) =>
-+    OPEN_FROM_RIGHT ? mirrorColumns(data, width, height) : data;
-   const coverTexture = makeCoverTexture();
-   // One shared paper background, three inked pages, and the mirrored backs made by flipping.
-   const pageBackground = makePageBackground(PAGE_A.width, PAGE_A.height);
-   const dataA = makePageData(PAGE_A, pageBackground);
-   const dataB = makePageData(PAGE_B, pageBackground);
-   const dataC = makePageData(PAGE_C, pageBackground);
--  const textureA = bytesToTexture(dataA, PAGE_A.width, PAGE_A.height);
--  const textureB = bytesToTexture(dataB, PAGE_B.width, PAGE_B.height);
--  const textureC = bytesToTexture(dataC, PAGE_C.width, PAGE_C.height);
-+  const textureA = bytesToTexture(
-+    unflip(dataA, PAGE_A.width, PAGE_A.height),
-+    PAGE_A.width,
-+    PAGE_A.height,
-+  );
-+  const textureB = bytesToTexture(
-+    unflip(dataB, PAGE_B.width, PAGE_B.height),
-+    PAGE_B.width,
-+    PAGE_B.height,
-+  );
-+  const textureC = bytesToTexture(
-+    unflip(dataC, PAGE_C.width, PAGE_C.height),
-+    PAGE_C.width,
-+    PAGE_C.height,
-+  );
-+  // The backs of the flipped pages are the same art mirrored (then unflipped like the fronts).
-   const mirroredB = bytesToTexture(
--    mirrorColumns(dataB, PAGE_B.width, PAGE_B.height),
-+    unflip(
-+      mirrorColumns(dataB, PAGE_B.width, PAGE_B.height),
-+      PAGE_B.width,
-+      PAGE_B.height,
-+    ),
-     PAGE_B.width,
-     PAGE_B.height,
-   );
-   const mirroredC = bytesToTexture(
--    mirrorColumns(dataC, PAGE_C.width, PAGE_C.height),
-+    unflip(
-+      mirrorColumns(dataC, PAGE_C.width, PAGE_C.height),
-+      PAGE_C.width,
-+      PAGE_C.height,
-+    ),
-     PAGE_C.width,
-     PAGE_C.height,
-   );

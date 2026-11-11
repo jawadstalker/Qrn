@@ -105,12 +105,6 @@ export function MushafPage({
   const glyphLineHeight =
     fontSize * lineRatio * (GLYPH_LINE_HEIGHT_RATIO / LINE_HEIGHT_RATIO);
 
-  // Every word gets a box of exactly its font advance. Android measures and rounds each <Text>
-  // on its own, so with natural widths the line drifts: words poke out of the frame or leave
-  // gaps. Fixed boxes keep the layout identical to the web version.
-  const unitsToPx = fontSize / page.unitsPerEm;
-  const cellOverflow = fontSize * 0.75;
-
   // The first line that holds a word of the reciting verse.
   const recitingLineFrom =
     recitingAyah === undefined
@@ -146,16 +140,13 @@ export function MushafPage({
         const reciting =
           recitingAyah !== undefined && verseByIndex[index] === recitingAyah;
         const highlighted = verseByIndex[index] === highlightAyah;
-        const advance = page.advances[index];
+        // The box of a word has the exact width the font gives it, so the line never depends on
+        // how a phone measures the text (it differs a little between iOS, Android and browsers).
         const cellWidth =
-          advance === undefined ? undefined : advance * unitsToPx;
-        const cellStyle = [
-          styles.cell,
-          cellWidth === undefined
-            ? null
-            : { width: cellWidth, height: glyphLineHeight },
-        ];
-        const glyph = (
+          ((page.advances[index] ?? 0) * fontSize) / page.unitsPerEm;
+        // The glyph is only created once the page font is loaded. On a phone, text laid out before
+        // that is measured with a replacement font and is not measured again when the font arrives.
+        const glyph = fontReady ? (
           <Text
             allowFontScaling={false}
             importantForAccessibility="no"
@@ -163,13 +154,13 @@ export function MushafPage({
             ellipsizeMode="clip"
             style={[
               styles.glyph,
-              cellWidth === undefined
-                ? null
-                : { width: cellWidth + cellOverflow * 2, textAlign: "center" },
               {
                 fontFamily: page.fontFamily,
                 fontSize,
                 lineHeight: glyphLineHeight,
+                // Wider than the box (and centered in it), so a word is never wrapped or cut when
+                // the phone measures it a pixel wider than the font says.
+                ...(cellWidth > 0 ? { width: cellWidth + fontSize } : null),
                 color: reciting ? RECITING : highlighted ? HIGHLIGHT : INK,
               },
               hidden && {
@@ -186,6 +177,13 @@ export function MushafPage({
           >
             {cellText(page, index)}
           </Text>
+        ) : null;
+        const cell = (
+          <View
+            style={[styles.cell, cellWidth > 0 ? { width: cellWidth } : null]}
+          >
+            {glyph}
+          </View>
         );
 
         return hidden ? (
@@ -193,14 +191,11 @@ export function MushafPage({
             key={index}
             onPress={() => onRevealWord(index)}
             hitSlop={4}
-            style={cellStyle}
           >
-            {glyph}
+            {cell}
           </Pressable>
         ) : (
-          <View key={index} style={cellStyle}>
-            {glyph}
-          </View>
+          <View key={index}>{cell}</View>
         );
       })}
     </View>
@@ -209,7 +204,7 @@ export function MushafPage({
   // Page fonts load on demand; keep the layout stable and show a spinner until the glyphs exist.
   const lines = (
     <View>
-      <View style={{ opacity: fontReady ? 1 : 0 }}>{lineViews}</View>
+      <View key={page.fontFamily}>{lineViews}</View>
       {fontReady ? null : (
         <View style={styles.loading} pointerEvents="none">
           <ActivityIndicator color={GOLD_DARK} />
@@ -351,14 +346,17 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     alignItems: "center",
   },
-  cell: {
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 1,
-  },
   glyph: {
     includeFontPadding: false,
     textAlignVertical: "center",
+    textAlign: "center",
+  },
+  cell: {
+    alignItems: "center",
+    justifyContent: "center",
+    // Rounding to whole pixels can make a full line a pixel too wide; the words then shrink
+    // together instead of leaving the frame.
+    flexShrink: 1,
   },
   outerFrame: {
     backgroundColor: CREAM,

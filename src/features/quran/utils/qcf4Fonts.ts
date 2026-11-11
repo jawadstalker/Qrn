@@ -39,24 +39,28 @@ export function loadMushafFont(family: string): Promise<void> {
   return task;
 }
 
-/** Loads the page font on demand. Returns true once glyphs can be drawn. */
+/**
+ * Loads the page font on demand. Returns true once glyphs can be drawn.
+ *
+ * Readiness is read from expo-font on every render instead of being copied into state. A state
+ * copy is one render late when the page changes to a page with another font, and for that one
+ * render the words would be laid out with a font that is not there yet.
+ */
 export function useMushafFont(family: string): boolean {
-  const [ready, setReady] = useState(() => isMushafFontReady(family));
+  const [, refresh] = useState(0);
+  const ready = isMushafFontReady(family);
 
   useEffect(() => {
-    let active = true;
-
-    if (isMushafFontReady(family)) {
-      setReady(true);
-
+    if (ready) {
       return undefined;
     }
 
-    setReady(false);
+    let active = true;
+
     loadMushafFont(family)
       .then(() => {
         if (active) {
-          setReady(true);
+          refresh((count) => count + 1);
         }
       })
       .catch((error: unknown) => {
@@ -66,7 +70,7 @@ export function useMushafFont(family: string): boolean {
     return () => {
       active = false;
     };
-  }, [family]);
+  }, [family, ready]);
 
   return ready;
 }
