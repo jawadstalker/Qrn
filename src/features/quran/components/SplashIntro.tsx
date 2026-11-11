@@ -25,7 +25,7 @@ import {
   COVER_MARK_ASPECT,
   QuranCoverMark,
 } from "@/features/quran/components/QuranCoverMark";
-import { USE_3D_SPLASH } from "@/features/quran/config";
+import { OPEN_FROM_RIGHT, USE_3D_SPLASH } from "@/features/quran/config";
 import {
   FLATTEN_END,
   GL_FADE_END,
@@ -412,7 +412,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
 
         {glActive ? (
           <Animated.View
-            style={[StyleSheet.absoluteFill, glStyle]}
+            style={[StyleSheet.absoluteFill, mirror, glStyle]}
             pointerEvents="none"
           >
             <GLView
@@ -501,7 +501,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
           ]}
         >
           <Animated.View style={breatheStyle}>
-            <QuranCoverMark width={markWidth} />
+            <QuranCoverMark width={markWidth} spineRight={OPEN_FROM_RIGHT} />
           </Animated.View>
         </Animated.View>
 
@@ -512,6 +512,7 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
               width={width}
               height={height}
               markWidth={markWidth}
+              mirrored={OPEN_FROM_RIGHT}
               times={{
                 glintStart: GLINT_START,
                 glintEnd: GLINT_END,
@@ -540,6 +541,13 @@ export function SplashIntro({ onDone, onGlReleased }: SplashIntroProps) {
 }
 
 const GLOW = 360;
+/**
+ * The 3D book is built with its spine on the left (like a Latin book). A Quran has its spine on the
+ * right, so only the 3D layer is flipped: the cover then opens from the right. Its printed
+ * textures are flipped back inside splashScene.ts, so the writing is not reversed. The flat cover
+ * that replaces the 3D book at the end is drawn with the spine on the right instead of being flipped.
+ */
+const mirror = OPEN_FROM_RIGHT ? { transform: [{ scaleX: -1 }] } : undefined;
 
 const styles = StyleSheet.create({
   container: {

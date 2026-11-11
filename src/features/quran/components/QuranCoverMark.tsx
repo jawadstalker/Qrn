@@ -87,11 +87,19 @@ const BAND_HEIGHT = 11.2;
 interface QuranCoverMarkProps {
   /** Width of the whole mark (spine + cover). The height follows. */
   width: number;
+  /**
+   * Spine on the right, as on a Quran. Only the layout is mirrored: the tooling on the cover keeps
+   * reading the right way round.
+   */
+  spineRight?: boolean;
 }
 
-export function QuranCoverMark({ width }: QuranCoverMarkProps) {
+export function QuranCoverMark({ width, spineRight = false }: QuranCoverMarkProps) {
   const height = width / COVER_MARK_ASPECT;
-  const centerX = SPINE_WIDTH + COVER_ART_WIDTH / 2;
+  // Where the cover starts and where the spine starts, on the mark's grid.
+  const coverX = spineRight ? 0 : SPINE_WIDTH;
+  const spineX = spineRight ? COVER_ART_WIDTH : 0;
+  const centerX = coverX + COVER_ART_WIDTH / 2;
   const centerY = COVER_ART_HEIGHT / 2;
 
   return (
@@ -136,7 +144,7 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
       </Defs>
 
       <Rect
-        x={0}
+        x={spineX}
         y={0}
         width={SPINE_WIDTH}
         height={COVER_ART_HEIGHT}
@@ -145,7 +153,7 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
       {BAND_Y.map((y) => (
         <Rect
           key={y}
-          x={0}
+          x={spineRight ? spineX - 1.3 : 0}
           y={y - BAND_HEIGHT / 2}
           width={SPINE_WIDTH + 1.3}
           height={BAND_HEIGHT}
@@ -153,13 +161,13 @@ export function QuranCoverMark({ width }: QuranCoverMarkProps) {
         />
       ))}
       <Rect
-        x={SPINE_WIDTH}
+        x={coverX}
         y={0}
         width={COVER_ART_WIDTH}
         height={COVER_ART_HEIGHT}
         fill="url(#cover-leather)"
       />
-      <G transform={`translate(${SPINE_WIDTH} 0)`}>
+      <G transform={`translate(${coverX} 0)`}>
         <Path d={COVER_ART_PATH} fill="url(#cover-gold)" fillRule="evenodd" />
       </G>
     </Svg>

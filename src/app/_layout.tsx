@@ -26,6 +26,8 @@ import { GuideProvider } from "@/features/guide/GuideContext";
 import { MemorizationPlanProvider } from "@/features/quran/state/MemorizationPlanContext";
 import { QuranProgressProvider } from "@/features/quran/state/QuranProgressContext";
 import { RecitationProvider } from "@/features/quran/state/RecitationContext";
+import { FavoritesProvider } from "@/features/quran/state/FavoritesContext";
+import { DownloadProvider } from "@/features/quran/audio/DownloadContext";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -92,7 +94,11 @@ export default function RootLayout() {
                     <QuranProgressProvider>
                       <MemorizationPlanProvider>
                         <RecitationProvider>
-                          <Shell guideEnabled={splashStage === "done"} />
+                          <FavoritesProvider>
+                            <DownloadProvider>
+                              <Shell guideEnabled={splashStage === "done"} />
+                            </DownloadProvider>
+                          </FavoritesProvider>
                         </RecitationProvider>
                       </MemorizationPlanProvider>
                     </QuranProgressProvider>

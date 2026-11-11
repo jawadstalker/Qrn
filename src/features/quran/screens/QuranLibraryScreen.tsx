@@ -9,7 +9,7 @@ import {
   type ListRenderItemInfo,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { CloudDownload, Heart, Search } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useDirection } from "@/core/i18n/useDirection";
 import { useLanguage } from "@/core/i18n/LanguageContext";
@@ -22,12 +22,16 @@ import {
 } from "@/features/quran/components/MiniPlant";
 import { JUZ30_SURAHS, type SurahInfo } from "@/features/quran/data/surahs";
 import { useQuranProgress } from "@/features/quran/state/QuranProgressContext";
+import { useFavorites } from "@/features/quran/state/FavoritesContext";
+import { FavoriteButton } from "@/features/quran/components/FavoriteButton";
+import { DownloadButton } from "@/features/quran/components/DownloadButton";
+import { useRecitation } from "@/features/quran/state/RecitationContext";
 import { SectionMiniBar } from "@/features/quran/components/SectionMiniBar";
 import { GuideTarget, useGuideScroll } from "@/features/guide/guideTargets";
 
-type Filter = "all" | "learning" | "done";
+type Filter = "all" | "learning" | "done" | "favorites";
 
-const FILTERS: readonly Filter[] = ["all", "learning", "done"];
+const FILTERS: readonly Filter[] = ["all", "learning", "done", "favorites"];
 const ORNAMENT_SIZE = 40;
 const ORNAMENT_COLOR = "#C9B27A";
 const ORNAMENT_TEXT = "#7A5F22";
@@ -47,6 +51,8 @@ export default function QuranLibraryScreen() {
   const guideScroll = useGuideScroll();
   const router = useRouter();
   const { statsFor, setSurah } = useQuranProgress();
+  const { isFavorite, favoriteCount } = useFavorites();
+  const { reciterId } = useRecitation();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const number = (value: number) => formatNumber(value, language);
@@ -101,13 +107,14 @@ export default function QuranLibraryScreen() {
       const state = rowStates.get(surah.id);
       const matchesFilter =
         filter === "all" ||
+        (filter === "favorites" && isFavorite(surah.id)) ||
         (state !== undefined &&
           ((filter === "learning" && state.isLearning) ||
             (filter === "done" && state.isDone)));
 
       return matchesQuery && matchesFilter;
     });
-  }, [query, filter, rowStates]);
+  }, [query, filter, rowStates, isFavorite]);
 
   const renderRow = ({ item }: ListRenderItemInfo<SurahInfo>) => {
     const rowState = rowStates.get(item.id);
@@ -172,6 +179,10 @@ export default function QuranLibraryScreen() {
           </AppText>
           {available ? <SectionMiniBar surahId={item.id} /> : null}
         </View>
+        <View style={[styles.rowActions, { flexDirection: row }]}>
+          <DownloadButton surahId={item.id} reciterId={reciterId} size={16} />
+          <FavoriteButton surahId={item.id} size={16} />
+        </View>
         <View style={[styles.plantState, !available && styles.soonState]}>
           {available ? <MiniPlant state={state.plant} /> : null}
           <AppText
@@ -207,14 +218,80 @@ export default function QuranLibraryScreen() {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       initialNumToRender={12}
+      ListEmptyComponent={
+        filter === "favorites" ? (
+          <View style={[styles.emptyFilter, { backgroundColor: colors.surface }]}>
+            <AppText
+              variant="body"
+              style={{ color: colors.text, fontWeight: "700", textAlign: "center" }}
+            >
+              {t.fav_empty_title}
+            </AppText>
+            <AppText
+              variant="caption"
+              style={{ color: colors.textSecondary, textAlign: "center" }}
+            >
+              {t.fav_empty_body}
+            </AppText>
+          </View>
+        ) : null
+      }
       ListHeaderComponent={
         <View style={styles.header}>
-          <AppText
-            variant="h1"
-            style={{ color: colors.text, textAlign, fontWeight: "800" }}
+          <View
+            style={{
+              flexDirection: row,
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
           >
-            {t.quran_library}
-          </AppText>
+            <AppText
+              variant="h1"
+              style={{ color: colors.text, textAlign, fontWeight: "800" }}
+            >
+              {t.quran_library}
+            </AppText>
+
+            <View style={{ flexDirection: row, gap: 8 }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.dl_title}
+                onPress={() => router.push("/downloads")}
+                style={[
+                  styles.headerActionBtn,
+                  { backgroundColor: colors.surface, flexDirection: row },
+                ]}
+              >
+                <CloudDownload size={16} color={colors.primary} />
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.text, fontWeight: "700" }}
+                >
+                  {t.lib_downloads}
+                </AppText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.fav_title}
+                onPress={() => router.push("/favorites")}
+                style={[
+                  styles.headerActionBtn,
+                  { backgroundColor: colors.surface, flexDirection: row },
+                ]}
+              >
+                <Heart size={16} color="#EF4444" fill="#EF4444" />
+                <AppText
+                  variant="caption"
+                  style={{ color: colors.text, fontWeight: "700" }}
+                >
+                  {favoriteCount > 0
+                    ? `${t.lib_favorites} ${number(favoriteCount)}`
+                    : t.lib_favorites}
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
           <GuideTarget id="library.search">
             <View
               style={[
@@ -283,6 +360,22 @@ const styles = StyleSheet.create({
   header: {
     gap: 12,
     marginBottom: 4,
+  },
+  rowActions: {
+    alignItems: "center",
+    gap: 2,
+  },
+  emptyFilter: {
+    padding: 28,
+    borderRadius: 20,
+    gap: 8,
+  },
+  headerActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignItems: "center",
+    gap: 4,
   },
   search: {
     height: 48,

@@ -37,6 +37,8 @@ export const HIDDEN_ROUTES: readonly string[] = [
 ];
 /** Practice pages that live under the Memorize tab. */
 const MEMORIZE_ROUTES = ["/exam", "/stages", "/mistakes", "/report", "/scope"];
+/** Pages reached from the Library tab. */
+const LIBRARY_ROUTES = ["/downloads", "/favorites"];
 
 interface TabSpec {
   route: "/" | "/memorize" | "/tafsir" | "/listen" | "/library" | "/settings";
@@ -81,7 +83,8 @@ export function QuranTabBar() {
       {TABS.map((tab) => {
         const active =
           pathname === tab.route ||
-          (tab.route === "/memorize" && MEMORIZE_ROUTES.includes(pathname));
+          (tab.route === "/memorize" && MEMORIZE_ROUTES.includes(pathname)) ||
+          (tab.route === "/library" && LIBRARY_ROUTES.includes(pathname));
         const color = active ? colors.primary : colors.textSecondary;
         const Icon = tab.icon;
 

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { OPEN_FROM_RIGHT } from "@/features/quran/config";
 import {
   COVER_GOLD,
   PAGE_A,
@@ -424,7 +425,12 @@ function makeCoverTexture(): THREE.DataTexture {
     }
   }
 
-  return bytesToTexture(data, width, height);
+  // Printed on the cover: flipped once so the view flip of OPEN_FROM_RIGHT brings it back.
+  return bytesToTexture(
+    OPEN_FROM_RIGHT ? mirrorColumns(data, width, height) : data,
+    width,
+    height,
+  );
 }
 
 /** Inner side of the covers: green endpaper with a gold frame, no medallion. */
@@ -730,22 +736,49 @@ export function createSplashScene(aspect: number, height: number): SplashScene {
   scene.add(pointLight);
 
   /* Materials */
+  // The splash view is flipped left-right when the Quran opens from the right (OPEN_FROM_RIGHT).
+  // That flip moves the spine and the opening direction, but it would also reverse everything
+  // printed on the book. So the printed textures are flipped once here and the two flips cancel:
+  // the geometry is mirrored, the writing and the page lines read the right way round.
+  const unflip = (data: Uint8Array, width: number, height: number) =>
+    OPEN_FROM_RIGHT ? mirrorColumns(data, width, height) : data;
   const coverTexture = makeCoverTexture();
   // One shared paper background, three inked pages, and the mirrored backs made by flipping.
   const pageBackground = makePageBackground(PAGE_A.width, PAGE_A.height);
   const dataA = makePageData(PAGE_A, pageBackground);
   const dataB = makePageData(PAGE_B, pageBackground);
   const dataC = makePageData(PAGE_C, pageBackground);
-  const textureA = bytesToTexture(dataA, PAGE_A.width, PAGE_A.height);
-  const textureB = bytesToTexture(dataB, PAGE_B.width, PAGE_B.height);
-  const textureC = bytesToTexture(dataC, PAGE_C.width, PAGE_C.height);
+  const textureA = bytesToTexture(
+    unflip(dataA, PAGE_A.width, PAGE_A.height),
+    PAGE_A.width,
+    PAGE_A.height,
+  );
+  const textureB = bytesToTexture(
+    unflip(dataB, PAGE_B.width, PAGE_B.height),
+    PAGE_B.width,
+    PAGE_B.height,
+  );
+  const textureC = bytesToTexture(
+    unflip(dataC, PAGE_C.width, PAGE_C.height),
+    PAGE_C.width,
+    PAGE_C.height,
+  );
+  // The backs of the flipped pages are the same art mirrored (then unflipped like the fronts).
   const mirroredB = bytesToTexture(
-    mirrorColumns(dataB, PAGE_B.width, PAGE_B.height),
+    unflip(
+      mirrorColumns(dataB, PAGE_B.width, PAGE_B.height),
+      PAGE_B.width,
+      PAGE_B.height,
+    ),
     PAGE_B.width,
     PAGE_B.height,
   );
   const mirroredC = bytesToTexture(
-    mirrorColumns(dataC, PAGE_C.width, PAGE_C.height),
+    unflip(
+      mirrorColumns(dataC, PAGE_C.width, PAGE_C.height),
+      PAGE_C.width,
+      PAGE_C.height,
+    ),
     PAGE_C.width,
     PAGE_C.height,
   );

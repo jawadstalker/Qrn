@@ -51,6 +51,8 @@ interface SplashFinishProps {
   /** Width of the flat cover mark (spine + cover) on screen. */
   markWidth: number;
   times: SplashFinishTimes;
+  /** Spine on the right: the art starts at the left edge of the mark (it is not flipped). */
+  mirrored?: boolean;
 }
 
 const clamp01 = (value: number) => {
@@ -65,6 +67,7 @@ export function SplashFinish({
   height,
   markWidth,
   times,
+  mirrored = false,
 }: SplashFinishProps) {
   const scale = markWidth / COVER_MARK_WIDTH;
   const markHeight = markWidth / COVER_MARK_ASPECT;
@@ -182,11 +185,11 @@ export function SplashFinish({
       {artPath ? (
         <Group
           transform={[
-            { translateX: left + SPINE_WIDTH * scale },
+            // Spine on the right: the art starts at the left edge. Otherwise it follows the spine.
+            { translateX: left + (mirrored ? 0 : SPINE_WIDTH * scale) },
             { translateY: top },
             { scale },
           ]}
-          clip={artPath}
         >
           <Group
             opacity={goldOpacity}
