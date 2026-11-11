@@ -105,6 +105,12 @@ export function MushafPage({
   const glyphLineHeight =
     fontSize * lineRatio * (GLYPH_LINE_HEIGHT_RATIO / LINE_HEIGHT_RATIO);
 
+  // Every word gets a box of exactly its font advance. Android measures and rounds each <Text>
+  // on its own, so with natural widths the line drifts: words poke out of the frame or leave
+  // gaps. Fixed boxes keep the layout identical to the web version.
+  const unitsToPx = fontSize / page.unitsPerEm;
+  const cellOverflow = fontSize * 0.75;
+
   // The first line that holds a word of the reciting verse.
   const recitingLineFrom =
     recitingAyah === undefined
@@ -140,12 +146,26 @@ export function MushafPage({
         const reciting =
           recitingAyah !== undefined && verseByIndex[index] === recitingAyah;
         const highlighted = verseByIndex[index] === highlightAyah;
+        const advance = page.advances[index];
+        const cellWidth =
+          advance === undefined ? undefined : advance * unitsToPx;
+        const cellStyle = [
+          styles.cell,
+          cellWidth === undefined
+            ? null
+            : { width: cellWidth, height: glyphLineHeight },
+        ];
         const glyph = (
           <Text
             allowFontScaling={false}
             importantForAccessibility="no"
+            numberOfLines={1}
+            ellipsizeMode="clip"
             style={[
               styles.glyph,
+              cellWidth === undefined
+                ? null
+                : { width: cellWidth + cellOverflow * 2, textAlign: "center" },
               {
                 fontFamily: page.fontFamily,
                 fontSize,
@@ -173,11 +193,14 @@ export function MushafPage({
             key={index}
             onPress={() => onRevealWord(index)}
             hitSlop={4}
+            style={cellStyle}
           >
             {glyph}
           </Pressable>
         ) : (
-          <View key={index}>{glyph}</View>
+          <View key={index} style={cellStyle}>
+            {glyph}
+          </View>
         );
       })}
     </View>
@@ -327,6 +350,11 @@ const styles = StyleSheet.create({
   line: {
     flexDirection: "row-reverse",
     alignItems: "center",
+  },
+  cell: {
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 1,
   },
   glyph: {
     includeFontPadding: false,
