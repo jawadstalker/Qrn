@@ -26,6 +26,16 @@ return [
     'resend_cooldown_seconds' => 60,
     'mail_max_per_email_hour' => 6,      // emails per address per hour
     'mail_max_per_ip_hour' => 60,
+    // Memorization rooms (multiplayer game).
+    'room_turn_seconds' => 60,        // time for one turn (bot audio + recitation)
+    'room_pass_similarity' => 85,     // % of the ayah's words that must match to count as correct
+    'room_max_players' => 8,
+    'room_default_lives' => 3,
+    'room_create_max_per_hour' => 20,
+    'room_join_max_per_hour' => 60,   // wrong room codes per hour
+    // "client": the app sends the similarity it measured (testing only; players could cheat).
+    // The server-side Whisper check will use another value; until then keep "client".
+    'verify_mode' => 'client',
     // Days a login token stays valid after the last use.
     'session_days' => 90,
     // Limits (per window).

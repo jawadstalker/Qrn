@@ -7,6 +7,19 @@ require __DIR__ . '/src/Mailer.php';
 require __DIR__ . '/src/Codes.php';
 require __DIR__ . '/src/Auth.php';
 require __DIR__ . '/src/Sync.php';
+require __DIR__ . '/src/Quran.php';
+require __DIR__ . '/src/Profiles.php';
+require __DIR__ . '/src/Rooms.php';
+
+// CORS: lets the app's web build (browser) call this API. The API uses Bearer tokens, not cookies, so '*' is safe.
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token');
+header('Access-Control-Max-Age: 86400');
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
 $configFile = getenv('QG_CONFIG') ?: __DIR__ . '/config.php';
 if (!is_file($configFile)) {
@@ -34,6 +47,29 @@ try {
     $db = Db::pdo($cfg);
     $auth = new Auth($db, $cfg);
     $sync = new Sync($db, $cfg);
+    $profiles = new Profiles($db);
+    $rooms = new Rooms($db, $cfg, $auth);
+
+    // Routes with a room code in the path: /rooms/ABC234, /rooms/ABC234/start, /leave, /turn
+    if (preg_match('#^/rooms/([A-Za-z0-9]{6})(?:/(start|leave|turn))?$#', $path, $m)) {
+        $u = $auth->authenticate();
+        $action = $m[2] ?? '';
+        if ($method === 'GET' && $action === '') {
+            $since = isset($_GET['v']) && ctype_digit((string)$_GET['v']) ? (int)$_GET['v'] : null;
+            Http::json(200, $rooms->state($u['id'], $m[1], $since));
+        }
+        if ($method === 'POST' && $action === 'start') {
+            Http::json(200, $rooms->start($u['id'], $m[1]));
+        }
+        if ($method === 'POST' && $action === 'leave') {
+            $rooms->leave($u['id'], $m[1]);
+            Http::json(200, ['ok' => true]);
+        }
+        if ($method === 'POST' && $action === 'turn') {
+            Http::json(200, $rooms->submit($u['id'], $m[1], Http::body()));
+        }
+        throw new ApiError(404, 'not_found', 'Unknown endpoint.');
+    }
 
     switch ($route) {
         case 'POST /auth/register':
@@ -100,6 +136,24 @@ try {
             $b = Http::body();
             $r = $sync->push($u['id'], $b['items'] ?? null);
             Http::json(200, ['accepted' => $r['accepted'], 'newer' => (object)$r['newer'], 'serverTime' => time()]);
+
+        case 'GET /profile':
+            $u = $auth->authenticate();
+            Http::json(200, ['profile' => $profiles->get($u['id'])]);
+
+        case 'PUT /profile':
+            $u = $auth->authenticate();
+            $b = Http::body();
+            Http::json(200, ['profile' => $profiles->save($u['id'], $b['displayName'] ?? null, $b['avatar'] ?? null)]);
+
+        case 'POST /rooms':
+            $u = $auth->authenticate();
+            Http::json(201, $rooms->create($u['id'], Http::body()));
+
+        case 'POST /rooms/join':
+            $u = $auth->authenticate();
+            $b = Http::body();
+            Http::json(200, $rooms->join($u['id'], $b['code'] ?? null));
 
         default:
             throw new ApiError(404, 'not_found', 'Unknown endpoint.');

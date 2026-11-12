@@ -32,6 +32,11 @@ eq() { # name expected actual
   if [ "$2" = "$3" ]; then PASS=$((PASS+1)); echo "ok   $1"; else FAIL=$((FAIL+1)); echo "FAIL $1 (got '$3', expected '$2')"; fi; }
 
 check health 200 "$(req GET /health)"
+PRE=$(curl -s -o /dev/null -D "$T/hdr" -w '%{http_code}' -X OPTIONS "$U/auth/register" -H 'Origin: http://localhost:8081' -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type')
+eq "cors preflight status" 204 "$PRE"
+if grep -qi '^access-control-allow-origin: \*' "$T/hdr" && grep -qi '^access-control-allow-headers:.*authorization' "$T/hdr"; then PASS=$((PASS+1)); echo "ok   cors preflight headers"; else FAIL=$((FAIL+1)); echo "FAIL cors preflight headers"; fi
+curl -s -o /dev/null -D "$T/hdr" -X POST "$U/auth/login" -H 'Content-Type: application/json' -d '{}'
+if grep -qi '^access-control-allow-origin: \*' "$T/hdr"; then PASS=$((PASS+1)); echo "ok   cors on error responses"; else FAIL=$((FAIL+1)); echo "FAIL cors on error responses"; fi
 check "register bad email" 422 "$(req POST /auth/register '{"email":"nope","password":"password1"}')" invalid_email
 check "register weak pw" 422 "$(req POST /auth/register '{"email":"a@b.com","password":"123"}')" weak_password
 check register 201 "$(req POST /auth/register '{"email":"User@Example.com","password":"password1","lang":"en"}')" '"verificationRequired":true'
@@ -115,6 +120,33 @@ req POST /auth/forgot '{"email":"u4@example.com"}' >/dev/null
 C4=$(code_of u4@example.com)
 check "reset on unverified account" 200 "$(req POST /auth/reset "{\"email\":\"u4@example.com\",\"code\":\"$C4\",\"newPassword\":\"password44\"}")"
 check "u4 can log in (counts as verified)" 200 "$(req POST /auth/login '{"email":"u4@example.com","password":"password44"}')" token
+T4=$(php -r 'echo json_decode(file_get_contents($argv[1]),true)["token"];' "$T/out")
+
+# --- profile + memorization rooms over HTTP
+check "profile needs auth" 401 "$(req GET /profile)"
+check "rooms need auth" 401 "$(req POST /rooms '{"mode":"chain","surah":78}')"
+check "profile default" 200 "$(req GET /profile '' "$TOKEN")" '"hasProfile":false'
+check "profile save" 200 "$(req PUT /profile '{"displayName":"Ali","avatar":{"skin":2,"hair":"short"}}' "$TOKEN")" '"displayName":"Ali"'
+check "profile invalid" 422 "$(req PUT /profile '{"displayName":"A"}' "$TOKEN")" invalid_name
+req POST /auth/login '{"email":"u2@example.com","password":"secondpass2"}' >/dev/null
+T2=$(php -r 'echo json_decode(file_get_contents($argv[1]),true)["token"];' "$T/out")
+check "create room bad mode" 422 "$(req POST /rooms '{"mode":"x","surah":78}' "$TOKEN")" invalid_room
+check "create room" 201 "$(req POST /rooms '{"mode":"chain","surah":78,"startAyah":1,"endAyah":4,"maxPlayers":2}' "$TOKEN")" '"status":"lobby"'
+RC=$(php -r 'echo json_decode(file_get_contents($argv[1]),true)["code"];' "$T/out")
+check "join room" 200 "$(req POST /rooms/join "{\"code\":\"$RC\"}" "$T2")" '"players"'
+check "no email in room state" 0 "$(grep -c '@example.com' "$T/out" | sed 's/^0$/0/')" 
+check "outsider cannot read room" 403 "$(req GET /rooms/$RC '' "$T4")" not_in_room
+check "start by non-host" 403 "$(req POST /rooms/$RC/start '' "$T2")" not_host
+check "start" 200 "$(req POST /rooms/$RC/start '' "$TOKEN")" '"status":"playing"'
+VER=$(php -r 'echo json_decode(file_get_contents($argv[1]),true)["version"];' "$T/out")
+check "poll unchanged" 200 "$(req GET "/rooms/$RC?v=$VER" '' "$T2")" '"changed":false'
+check "turn by wrong player" 409 "$(req POST /rooms/$RC/turn '{"similarity":90}' "$T2")" not_your_turn
+check "turn" 200 "$(req POST /rooms/$RC/turn '{"similarity":90,"ayah":2}' "$TOKEN")" '"currentAyah":3'
+check "poll after change" 200 "$(req GET "/rooms/$RC?v=$VER" '' "$T2")" '"changed":true'
+check "malformed room path" 404 "$(req GET /rooms/ABC '' "$TOKEN")"
+check "leave room" 200 "$(req POST /rooms/$RC/leave '' "$T2")" '"ok":true'
+check "left player cannot read" 403 "$(req GET /rooms/$RC '' "$T2")" not_in_room
+
 
 for i in 1 2 3; do req POST /auth/login '{"email":"rl@example.com","password":"wrongpass"}' >/dev/null; done
 check "login rate limit" 429 "$(req POST /auth/login '{"email":"rl@example.com","password":"wrongpass"}')" rate_limited
