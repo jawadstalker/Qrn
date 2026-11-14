@@ -31,6 +31,14 @@ const FRAME_INSET = 12;
 const BISMILLAH_WIDTH_RATIO = 0.46;
 /** The bismillah glyphs always come from the QCF_BSML font (2048 units per em). */
 const BISMILLAH_UNITS_PER_EM = 2048;
+/**
+ * The three bismillah glyphs are drawn as one calligraphic line: their ink reaches far outside
+ * their own advance box (the first glyph extends 3073 font units to the left of it, the second
+ * 1865; the third 987 to the right). A phone clips text to the bounds of its view, so each glyph
+ * gets this much room on both sides (in em) or its joining strokes are cut off and the words
+ * look far apart. Browsers do not clip, which is why the web version looked right.
+ */
+const BISMILLAH_INK_SLACK_EM = 3200 / BISMILLAH_UNITS_PER_EM;
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
 function toArabicDigits(value: number): string {
@@ -304,23 +312,48 @@ export function MushafPage({
                   { height: lineHeight, justifyContent: "center" },
                 ]}
               >
-                {surahHeader.bismillahCodepoints.map((codepoint) => (
-                  <Text
-                    key={codepoint}
-                    allowFontScaling={false}
-                    style={[
-                      styles.glyph,
-                      {
-                        fontFamily: surahHeader!.bismillahFont,
-                        fontSize: bismillahSize,
-                        lineHeight: bismillahSize * GLYPH_LINE_HEIGHT_RATIO,
-                        color: INK,
-                      },
-                    ]}
-                  >
-                    {String.fromCodePoint(codepoint)}
-                  </Text>
-                ))}
+                {surahHeader.bismillahCodepoints.map((codepoint, index) => {
+                  // Same idea as the words of the page: the box has exactly the width the font
+                  // gives the glyph, and the text is wider than the box so nothing is clipped.
+                  const cellWidth =
+                    ((surahHeader!.bismillahAdvances?.[index] ?? 0) *
+                      bismillahSize) /
+                    BISMILLAH_UNITS_PER_EM;
+
+                  return (
+                    <View
+                      key={codepoint}
+                      style={[
+                        styles.bismillahCell,
+                        cellWidth > 0 ? { width: cellWidth } : null,
+                      ]}
+                    >
+                      <Text
+                        allowFontScaling={false}
+                        numberOfLines={1}
+                        ellipsizeMode="clip"
+                        style={[
+                          styles.glyph,
+                          {
+                            fontFamily: surahHeader!.bismillahFont,
+                            fontSize: bismillahSize,
+                            lineHeight: bismillahSize * GLYPH_LINE_HEIGHT_RATIO,
+                            color: INK,
+                            ...(cellWidth > 0
+                              ? {
+                                  width:
+                                    cellWidth +
+                                    bismillahSize * BISMILLAH_INK_SLACK_EM * 2,
+                                }
+                              : null),
+                          },
+                        ]}
+                      >
+                        {String.fromCodePoint(codepoint)}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
             ) : null}
           </>
@@ -350,6 +383,10 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: "center",
     textAlign: "center",
+  },
+  bismillahCell: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   cell: {
     alignItems: "center",
