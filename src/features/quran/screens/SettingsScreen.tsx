@@ -284,39 +284,41 @@ export default function SettingsScreen() {
       </Rise>
 
       <Rise delay={280}>
-        <Card>
-          <View style={[styles.switchRow, { flexDirection: row }]}>
-            <View style={styles.switchText}>
-              <AppText
-                variant="body"
-                style={{ color: colors.text, textAlign, fontWeight: "800" }}
-              >
-                {t.quran_reminders}
-              </AppText>
-              <AppText
-                variant="caption"
-                style={{ color: colors.textSecondary, textAlign }}
-              >
-                {t.quran_reminders_hint}
-              </AppText>
-              {remindersOn && permissionDenied ? (
+        <GuideTarget id="settings.reminders">
+          <Card>
+            <View style={[styles.switchRow, { flexDirection: row }]}>
+              <View style={styles.switchText}>
+                <AppText
+                  variant="body"
+                  style={{ color: colors.text, textAlign, fontWeight: "800" }}
+                >
+                  {t.quran_reminders}
+                </AppText>
                 <AppText
                   variant="caption"
                   style={{ color: colors.textSecondary, textAlign }}
                 >
-                  {t.quran_reminders_denied}
+                  {t.quran_reminders_hint}
                 </AppText>
-              ) : null}
+                {remindersOn && permissionDenied ? (
+                  <AppText
+                    variant="caption"
+                    style={{ color: colors.textSecondary, textAlign }}
+                  >
+                    {t.quran_reminders_denied}
+                  </AppText>
+                ) : null}
+              </View>
+              <Switch
+                value={remindersOn}
+                onValueChange={(next) => void toggleReminders(next)}
+                accessibilityLabel={t.quran_reminders}
+                trackColor={{ true: colors.primary, false: colors.track }}
+                thumbColor="#FFFFFF"
+              />
             </View>
-            <Switch
-              value={remindersOn}
-              onValueChange={(next) => void toggleReminders(next)}
-              accessibilityLabel={t.quran_reminders}
-              trackColor={{ true: colors.primary, false: colors.track }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-        </Card>
+          </Card>
+        </GuideTarget>
       </Rise>
 
       <Rise delay={320}>
