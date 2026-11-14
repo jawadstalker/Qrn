@@ -22,6 +22,7 @@ import { VERSE_TEXT } from "@/features/quran/data/verseText";
 import { usePT } from "@/features/quran/i18n/practice";
 import { logAnswer, logAttempt } from "@/features/quran/state/practiceStore";
 import {
+  PASS_PERCENT,
   rangeOf,
   selectionOf,
   useScope,
@@ -154,7 +155,7 @@ export default function SessionScreen() {
   const score = answers.filter((item) => item.right).length;
   const percent =
     questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
-  const passed = percent >= scope.passPercent;
+  const passed = percent >= PASS_PERCENT;
 
   const choose = useCallback(
     (option: QuizOption) => {
@@ -252,7 +253,7 @@ export default function SessionScreen() {
     <ScreenFrame
       arabicTitle="الْجَلْسَةُ"
       title={title}
-      subtitle={`${p("scope_pass")}: ${number(scope.passPercent)}٪`}
+      subtitle={`${p("scope_pass")}: ${number(PASS_PERCENT)}٪`}
       backTo="/scope"
       compact={phase !== "result"}
     >
@@ -451,7 +452,7 @@ export default function SessionScreen() {
             variant="bodySmall"
             style={{ color: colors.textSecondary, textAlign: "center" }}
           >
-            {p("session_percent", { percent: percent, pass: scope.passPercent })}
+            {p("session_percent", { percent: percent, pass: PASS_PERCENT })}
           </AppText>
           <AppText
             variant="bodySmall"

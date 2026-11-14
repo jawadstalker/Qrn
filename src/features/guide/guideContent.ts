@@ -590,8 +590,8 @@ const GUIDE_LIST: readonly GuideDef[] = [
         icon: SlidersHorizontal,
         title: L("تنظیم آزمون", "Exam settings"),
         body: L(
-          "تعداد پرسش~ها و نمرهٔ قبولی را تعیین کن.",
-          "Set the number of questions and the pass mark.",
+          "تعداد پرسش~ها را تعیین کن.",
+          "Set the number of questions.",
         ),
         target: "scope.exam",
         radius: 24,

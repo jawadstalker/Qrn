@@ -3,7 +3,6 @@ import { View } from "react-native";
 import {
   FACE_TONES,
   HAIR_COLORS,
-  HAT_COLORS,
   OUTFIT_COLORS,
   sanitizeAvatar,
 } from "@/features/rooms/avatar";
@@ -18,13 +17,6 @@ export function AvatarBadge({ avatar, size }: AvatarBadgeProps) {
   const params = sanitizeAvatar(avatar);
   const face = size * 0.5;
   const hair = face * 1.22;
-  const scarf = params.hat === "hijab";
-  const showHair = params.hairStyle !== "none" && !scarf;
-  const covering = scarf
-    ? HAT_COLORS[params.hatColor]
-    : showHair
-      ? HAIR_COLORS[params.hairColor]
-      : null;
 
   return (
     <View
@@ -37,18 +29,16 @@ export function AvatarBadge({ avatar, size }: AvatarBadgeProps) {
         alignItems: "center",
       }}
     >
-      {covering ? (
-        <View
-          style={{
-            position: "absolute",
-            top: size * 0.05,
-            width: hair,
-            height: hair,
-            borderRadius: hair / 2,
-            backgroundColor: covering,
-          }}
-        />
-      ) : null}
+      <View
+        style={{
+          position: "absolute",
+          top: size * 0.05,
+          width: hair,
+          height: hair,
+          borderRadius: hair / 2,
+          backgroundColor: HAIR_COLORS[params.hairColor],
+        }}
+      />
       <View
         style={{
           marginTop: size * 0.16,

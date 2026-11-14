@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import {
   ACCENT_COLORS,
+  EYE_COLORS,
   FACE_TONES,
   GLOW_COLORS,
   HAIR_COLORS,
-  HAT_COLORS,
   OUTFIT_COLORS,
   PANTS_COLORS,
   type AvatarParams,
@@ -17,14 +17,14 @@ export interface AvatarMood {
   talking: boolean;
   /** Listening to the bot. */
   listening: boolean;
-  /** Eliminated or gone: grey, eyes closed, head down. */
+  /** Eliminated or gone: grey, eyes closed, slumped. */
   faded: boolean;
 }
 
 export interface AvatarRig {
   /** Root of the character; the feet are at y = 0. */
   group: THREE.Group;
-  /** Approximate height including hair and hat. */
+  /** Approximate height including the hair. */
   height: number;
   setFaded: (faded: boolean) => void;
   animate: (
@@ -37,7 +37,6 @@ export interface AvatarRig {
 }
 
 const HEAD_SCALE = { x: 1, y: 0.95, z: 0.94 };
-const HEAD_Y = 1.58;
 const FADE_COLOR = new THREE.Color("#9AA0A6");
 
 function mulberry32(seed: number): () => number {
@@ -52,6 +51,12 @@ function mulberry32(seed: number): () => number {
 
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function hash01(n: number): number {
+  const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453;
+
+  return x - Math.floor(x);
 }
 
 /** Lightens (amount > 0) or darkens (amount < 0) a colour. */
@@ -70,18 +75,63 @@ function damp(current: number, target: number, k: number): number {
   return current + (target - current) * Math.min(1, k);
 }
 
+/** Narrows the lower half of the head into a soft chin (yn is -1 at the bottom, 1 at the top). */
+function taper(yn: number): number {
+  return yn < 0 ? 1 - 0.2 * Math.pow(-yn, 1.6) : 1;
+}
+
+/** A smooth limb: a tapered tube with round ends. Its top end is at y = 0 and it hangs down by `length`. */
+function capsule(
+  rTop: number,
+  rBottom: number,
+  length: number,
+  segments = 20,
+): THREE.LatheGeometry {
+  const points: THREE.Vector2[] = [];
+  const steps = 6;
+
+  for (let i = 0; i <= steps; i++) {
+    const a = -Math.PI / 2 + (i / steps) * (Math.PI / 2);
+
+    points.push(
+      new THREE.Vector2(rBottom * Math.cos(a), -length + rBottom * Math.sin(a)),
+    );
+  }
+
+  for (let i = 1; i <= steps; i++) {
+    const a = (i / steps) * (Math.PI / 2);
+
+    points.push(new THREE.Vector2(rTop * Math.cos(a), rTop * Math.sin(a)));
+  }
+
+  return new THREE.LatheGeometry(points, segments);
+}
+
+interface ArmRig {
+  shoulder: THREE.Group;
+  elbow: THREE.Group;
+  fingers: THREE.Group[];
+}
+
+interface LegRig {
+  hip: THREE.Group;
+  knee: THREE.Group;
+  ankle: THREE.Group;
+}
+
 /**
- * The app mascot as a smooth, low-poly 3D character (about 2 units tall with hair): big head, a puffy
- * "cloud" of hair with glowing lights, and a hoodie. Colours, hair, hat and clothes come from `params`.
+ * The app mascot as a smooth, articulated 3D character: a big round head with large anime eyes, the
+ * glowing "cloud" hair, and a body with shoulders, elbows, fingers, knees and feet that can pose
+ * naturally. Colours and clothes come from `params`.
  */
 export function createAvatar(params: AvatarParams): AvatarRig {
   const faceColor = FACE_TONES[params.face] ?? FACE_TONES[0];
   const hairColor = HAIR_COLORS[params.hairColor] ?? HAIR_COLORS[0];
   const glowColor = GLOW_COLORS[params.glow] ?? GLOW_COLORS[0];
+  const eyeColor = EYE_COLORS[params.eyes] ?? EYE_COLORS[0];
   const topColor = OUTFIT_COLORS[params.outfit] ?? OUTFIT_COLORS[0];
   const pantsColor = PANTS_COLORS[params.pants] ?? PANTS_COLORS[0];
   const accentColor = ACCENT_COLORS[params.accent] ?? ACCENT_COLORS[0];
-  const hatColor = HAT_COLORS[params.hatColor] ?? HAT_COLORS[0];
 
   const geometries: THREE.BufferGeometry[] = [];
   const materials: THREE.Material[] = [];
@@ -96,7 +146,6 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     return g;
   };
 
-  /** Shaded colour material (cached per colour). */
   const mat = (color: string, roughness = 0.55): THREE.MeshStandardMaterial => {
     const key = `${color}:${roughness}`;
     const cached = materialCache.get(key);
@@ -118,7 +167,6 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     return material;
   };
 
-  /** Unlit material for lights and highlights. */
   const glowMat = (color: string, fades: boolean): THREE.MeshBasicMaterial => {
     const material = new THREE.MeshBasicMaterial({ color });
 
@@ -131,8 +179,9 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     return material;
   };
 
-  const sphereHi = geo(new THREE.SphereGeometry(1, 28, 20));
-  const sphereLo = geo(new THREE.SphereGeometry(1, 14, 10));
+  const sphereHi = geo(new THREE.SphereGeometry(1, 24, 18));
+  const sphereMid = geo(new THREE.SphereGeometry(1, 18, 14));
+  const sphereLo = geo(new THREE.SphereGeometry(1, 12, 9));
   const sphereTiny = geo(new THREE.SphereGeometry(1, 8, 6));
 
   const part = (
@@ -153,83 +202,139 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     return mesh;
   };
 
-  const group = new THREE.Group();
   const robe = params.outfitStyle === "robe";
-  const hasHood = params.outfitStyle === "hoodie";
+  const tee = params.outfitStyle === "tee";
+  const skin = mat(faceColor, 0.6);
+
+  // ------------------------------------------------------------------ skeleton
+  const root = new THREE.Group();
+  const pelvis = new THREE.Group();
+
+  pelvis.position.set(0, 0.66, 0);
+  pelvis.name = "pelvis";
+  root.add(pelvis);
+
+  const chest = new THREE.Group();
+
+  chest.position.set(0, 0.06, 0);
+  pelvis.add(chest);
+
+  part(
+    pelvis,
+    sphereMid,
+    mat(pantsColor, 0.7),
+    [0, -0.03, 0],
+    [0.215, 0.14, 0.17],
+  );
 
   // ------------------------------------------------------------------ torso
   const torso = new THREE.Group();
 
-  torso.scale.z = 0.84;
-  group.add(torso);
+  torso.scale.z = 0.82;
+  chest.add(torso);
 
-  const profile: [number, number][] = robe
-    ? [
-        [0.42, 0.1],
-        [0.41, 0.22],
-        [0.33, 0.5],
-        [0.32, 0.72],
-        [0.33, 0.9],
-        [0.3, 1.04],
-        [0.2, 1.1],
-        [0, 1.12],
-      ]
-    : [
-        [0.23, 0.55],
-        [0.28, 0.57],
-        [0.33, 0.66],
-        [0.35, 0.82],
-        [0.33, 0.98],
-        [0.28, 1.07],
-        [0.18, 1.12],
-        [0, 1.13],
-      ];
+  const torsoProfile: [number, number][] = [
+    [0.23, -0.07],
+    [0.28, -0.04],
+    [0.315, 0.05],
+    [0.345, 0.18],
+    [0.35, 0.3],
+    [0.31, 0.4],
+    [0.2, 0.46],
+    [0, 0.47],
+  ];
 
   part(
     torso,
     geo(
       new THREE.LatheGeometry(
-        profile.map(([r, y]) => new THREE.Vector2(r, y)),
+        torsoProfile.map(([r, y]) => new THREE.Vector2(r, y)),
         40,
       ),
     ),
     mat(topColor, 0.62),
   );
 
-  // Hem band and chest details.
-  part(
-    torso,
-    geo(new THREE.TorusGeometry(robe ? 0.415 : 0.265, 0.03, 10, 40)),
-    mat(accentColor, 0.5),
-    [0, robe ? 0.105 : 0.565, 0],
-    [1, 1, 1],
-    [Math.PI / 2, 0, 0],
-  );
+  const frontZ = 0.292;
 
-  const frontZ = 0.295;
+  if (robe) {
+    // A long skirt hanging from the hips, with trim at the hem, waist and neck.
+    const skirt: [number, number][] = [
+      [0.41, -0.58],
+      [0.375, -0.42],
+      [0.31, -0.2],
+      [0.265, -0.04],
+      [0.235, 0.04],
+      [0, 0.06],
+    ];
 
-  if (params.outfitStyle !== "robe") {
+    part(
+      pelvis,
+      geo(
+        new THREE.LatheGeometry(
+          skirt.map(([r, y]) => new THREE.Vector2(r, y)),
+          40,
+        ),
+      ),
+      mat(topColor, 0.62),
+      [0, 0, 0],
+      [1, 1, 0.86],
+    );
+    part(
+      pelvis,
+      geo(new THREE.TorusGeometry(0.4, 0.026, 10, 40)),
+      mat(accentColor, 0.5),
+      [0, -0.575, 0],
+      [1, 0.86, 1],
+      [Math.PI / 2, 0, 0],
+    );
+    part(
+      torso,
+      geo(new THREE.TorusGeometry(0.3, 0.024, 10, 36)),
+      mat(accentColor, 0.5),
+      [0, 0.03, 0],
+      [1, 1, 1],
+      [Math.PI / 2, 0, 0],
+    );
+    part(
+      torso,
+      geo(new THREE.TorusGeometry(0.2, 0.024, 10, 32)),
+      mat(accentColor, 0.5),
+      [0, 0.44, 0],
+      [1, 1, 1],
+      [Math.PI / 2, 0, 0],
+    );
+  } else {
+    part(
+      torso,
+      geo(new THREE.TorusGeometry(0.275, 0.028, 10, 40)),
+      mat(accentColor, 0.5),
+      [0, -0.045, 0],
+      [1, 1, 1],
+      [Math.PI / 2, 0, 0],
+    );
+
     // Anchor-like emblem like the one on the mascot's hoodie.
     const emblem = new THREE.Group();
     const emblemMaterial = mat(accentColor, 0.4);
 
-    emblem.position.set(0, 0.86, frontZ + 0.004);
+    emblem.position.set(0, 0.27, frontZ + 0.003);
     torso.add(emblem);
     part(
       emblem,
-      geo(new THREE.TorusGeometry(0.03, 0.009, 8, 20)),
+      geo(new THREE.TorusGeometry(0.028, 0.008, 8, 20)),
       emblemMaterial,
       [0, 0.05, 0],
     );
     part(
       emblem,
-      geo(new THREE.CylinderGeometry(0.008, 0.008, 0.13, 8)),
+      geo(new THREE.CylinderGeometry(0.007, 0.007, 0.12, 8)),
       emblemMaterial,
       [0, -0.005, 0],
     );
     part(
       emblem,
-      geo(new THREE.CylinderGeometry(0.008, 0.008, 0.08, 8)),
+      geo(new THREE.CylinderGeometry(0.007, 0.007, 0.075, 8)),
       emblemMaterial,
       [0, 0.02, 0],
       [1, 1, 1],
@@ -237,63 +342,44 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     );
     part(
       emblem,
-      geo(new THREE.TorusGeometry(0.05, 0.009, 8, 20, Math.PI)),
+      geo(new THREE.TorusGeometry(0.046, 0.008, 8, 20, Math.PI)),
       emblemMaterial,
       [0, -0.03, 0],
       [1, 1, 1],
       [0, 0, Math.PI],
     );
 
-    // Zipper.
     part(
       torso,
-      geo(new THREE.BoxGeometry(0.014, 0.5, 0.012)),
+      geo(new THREE.BoxGeometry(0.013, 0.46, 0.01)),
       mat(accentColor, 0.4),
-      [0, 0.84, frontZ - 0.012],
-    );
-  } else {
-    // Robe: belt and collar trim.
-    part(
-      torso,
-      geo(new THREE.TorusGeometry(0.33, 0.028, 10, 40)),
-      mat(accentColor, 0.5),
-      [0, 0.78, 0],
-      [1, 1, 1],
-      [Math.PI / 2, 0, 0],
-    );
-    part(
-      torso,
-      geo(new THREE.TorusGeometry(0.19, 0.026, 10, 32)),
-      mat(accentColor, 0.5),
-      [0, 1.1, 0],
-      [1, 1, 1],
-      [Math.PI / 2, 0, 0],
+      [0, 0.2, frontZ - 0.01],
     );
   }
 
-  if (hasHood) {
-    // Hood resting behind the neck, drawstrings and a kangaroo pocket.
+  if (params.outfitStyle === "hoodie") {
     part(
       torso,
-      geo(new THREE.TorusGeometry(0.19, 0.095, 14, 28)),
+      geo(new THREE.TorusGeometry(0.19, 0.09, 14, 28)),
       mat(topColor, 0.65),
-      [0, 1.1, -0.1],
+      [0, 0.46, -0.09],
       [1, 1, 0.9],
-      [Math.PI / 2.4, 0, 0],
+      [Math.PI / 2.3, 0, 0],
     );
+
     for (const side of [-1, 1]) {
       part(
         torso,
-        geo(new THREE.CylinderGeometry(0.008, 0.008, 0.2, 6)),
+        geo(new THREE.CylinderGeometry(0.007, 0.007, 0.18, 6)),
         mat(accentColor, 0.5),
-        [side * 0.07, 0.98, frontZ - 0.01],
+        [side * 0.06, 0.34, frontZ - 0.01],
       );
       part(
         torso,
         sphereTiny,
         mat(accentColor, 0.5),
-        [side * 0.07, 0.87, frontZ - 0.005],
-        [0.016, 0.016, 0.016],
+        [side * 0.06, 0.245, frontZ - 0.005],
+        [0.015, 0.015, 0.015],
       );
     }
 
@@ -301,16 +387,16 @@ export function createAvatar(params: AvatarParams): AvatarRig {
       torso,
       sphereLo,
       mat(shade(topColor, -0.12), 0.7),
-      [0, 0.7, frontZ - 0.015],
-      [0.17, 0.08, 0.03],
+      [0, 0.07, frontZ - 0.012],
+      [0.16, 0.075, 0.03],
     );
 
     for (const side of [-1, 1]) {
       part(
         torso,
-        geo(new THREE.BoxGeometry(0.012, 0.13, 0.012)),
+        geo(new THREE.BoxGeometry(0.011, 0.12, 0.011)),
         mat(accentColor, 0.45),
-        [side * 0.16, 0.72, frontZ - 0.005],
+        [side * 0.15, 0.09, frontZ - 0.005],
         [1, 1, 1],
         [0, 0, side * 0.4],
       );
@@ -318,177 +404,54 @@ export function createAvatar(params: AvatarParams): AvatarRig {
   } else if (params.outfitStyle === "jacket") {
     part(
       torso,
-      geo(new THREE.TorusGeometry(0.19, 0.055, 12, 32)),
+      geo(new THREE.TorusGeometry(0.19, 0.052, 12, 32)),
       mat(topColor, 0.65),
-      [0, 1.09, 0],
+      [0, 0.45, 0],
       [1, 1, 1],
       [Math.PI / 2, 0, 0],
     );
-    part(
-      torso,
-      geo(new THREE.BoxGeometry(0.3, 0.02, 0.012)),
-      mat(accentColor, 0.45),
-      [0, 0.62, frontZ - 0.02],
-    );
   }
 
-  // ------------------------------------------------------------------ arms
-  const makeArm = (side: -1 | 1) => {
-    const pivot = new THREE.Group();
+  // ------------------------------------------------------------------ neck and head
+  const headPivot = new THREE.Group();
 
-    pivot.position.set(side * 0.35, 1.04, 0);
-    group.add(pivot);
-    part(
-      pivot,
-      sphereLo,
-      mat(topColor, 0.62),
-      [0, 0, 0],
-      [0.092, 0.092, 0.092],
-    );
+  headPivot.position.set(0, 0.42, 0);
+  headPivot.name = "headPivot";
+  chest.add(headPivot);
+  part(headPivot, geo(capsule(0.075, 0.08, 0.14)), skin, [0, 0.1, 0]);
 
-    const sleeveLength = params.outfitStyle === "tee" ? 0.17 : 0.46;
-    const radiusTop = robe ? 0.105 : 0.088;
-    const radiusEnd = robe ? 0.09 : 0.077;
-
-    part(
-      pivot,
-      geo(new THREE.CylinderGeometry(radiusTop, radiusEnd, sleeveLength, 22)),
-      mat(topColor, 0.62),
-      [0, -sleeveLength / 2, 0],
-    );
-
-    if (params.outfitStyle === "tee") {
-      // Bare forearm.
-      part(
-        pivot,
-        geo(new THREE.CylinderGeometry(0.07, 0.064, 0.3, 18)),
-        mat(faceColor, 0.62),
-        [0, -sleeveLength - 0.14, 0],
-      );
-      part(
-        pivot,
-        geo(new THREE.TorusGeometry(0.095, 0.022, 8, 24)),
-        mat(accentColor, 0.5),
-        [0, -sleeveLength + 0.01, 0],
-        [1, 1, 1],
-        [Math.PI / 2, 0, 0],
-      );
-    } else {
-      part(
-        pivot,
-        geo(new THREE.TorusGeometry(radiusEnd + 0.004, 0.03, 10, 28)),
-        mat(accentColor, 0.5),
-        [0, -sleeveLength + 0.015, 0],
-        [1, 1, 1],
-        [Math.PI / 2, 0, 0],
-      );
-    }
-
-    const handY =
-      params.outfitStyle === "tee"
-        ? -sleeveLength - 0.32
-        : -sleeveLength - 0.05;
-
-    part(
-      pivot,
-      sphereLo,
-      mat(faceColor, 0.62),
-      [0, handY, 0],
-      [0.078, 0.078, 0.078],
-    );
-    part(
-      pivot,
-      sphereTiny,
-      mat(faceColor, 0.62),
-      [-side * 0.055, handY + 0.02, 0.04],
-      [0.03, 0.03, 0.03],
-    );
-
-    return pivot;
-  };
-
-  const armLeft = makeArm(-1);
-  const armRight = makeArm(1);
-
-  armLeft.rotation.z = 0.14;
-  armRight.rotation.z = -0.14;
-
-  // ------------------------------------------------------------------ legs and shoes
-  const makeLeg = (side: -1 | 1) => {
-    const pivot = new THREE.Group();
-
-    pivot.position.set(side * 0.12, 0.6, 0);
-    group.add(pivot);
-    part(
-      pivot,
-      geo(new THREE.CylinderGeometry(0.1, 0.085, 0.5, 20)),
-      mat(pantsColor, 0.7),
-      [0, -0.25, 0],
-    );
-    part(
-      pivot,
-      geo(new THREE.BoxGeometry(0.014, 0.46, 0.04)),
-      mat(accentColor, 0.45),
-      [side * 0.094, -0.25, 0.005],
-    );
-
-    // Sneaker: white sole, coloured upper, accent stripe.
-    part(
-      pivot,
-      sphereLo,
-      mat("#F4F4FA", 0.5),
-      [0, -0.575, 0.05],
-      [0.135, 0.052, 0.23],
-    );
-    part(
-      pivot,
-      sphereLo,
-      mat(shade(topColor, -0.05), 0.55),
-      [0, -0.53, 0.045],
-      [0.122, 0.085, 0.2],
-    );
-    part(
-      pivot,
-      geo(new THREE.BoxGeometry(0.012, 0.05, 0.15)),
-      mat(accentColor, 0.45),
-      [side * 0.117, -0.54, 0.03],
-    );
-    part(
-      pivot,
-      sphereTiny,
-      mat(accentColor, 0.45),
-      [0, -0.5, 0.215],
-      [0.055, 0.033, 0.045],
-    );
-
-    return pivot;
-  };
-
-  const legLeft = makeLeg(-1);
-  const legRight = makeLeg(1);
-
-  // ------------------------------------------------------------------ head
   const head = new THREE.Group();
 
-  head.position.y = HEAD_Y;
-  group.add(head);
+  head.position.set(0, 0.47, 0);
+  headPivot.add(head);
 
-  const faceMaterial = mat(faceColor, 0.6);
+  const headGeometry = geo(new THREE.SphereGeometry(0.5, 56, 40));
+  const headPositions = headGeometry.attributes.position;
 
+  for (let i = 0; i < headPositions.count; i++) {
+    const yn = headPositions.getY(i) / 0.5;
+    const k = taper(yn);
+
+    headPositions.setX(i, headPositions.getX(i) * k);
+    headPositions.setZ(i, headPositions.getZ(i) * k);
+  }
+
+  headGeometry.computeVertexNormals();
   part(
     head,
-    geo(new THREE.SphereGeometry(0.5, 48, 36)),
-    faceMaterial,
+    headGeometry,
+    skin,
     [0, 0, 0],
     [HEAD_SCALE.x, HEAD_SCALE.y, HEAD_SCALE.z],
   );
+
   for (const side of [-1, 1]) {
     part(
       head,
       sphereLo,
-      faceMaterial,
-      [side * 0.495, -0.03, -0.02],
-      [0.05, 0.085, 0.07],
+      skin,
+      [side * 0.488, -0.03, -0.02],
+      [0.045, 0.08, 0.065],
     );
   }
 
@@ -502,40 +465,80 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     const cx = Math.sin(az) * Math.cos(el);
     const cy = Math.sin(el);
     const cz = Math.cos(az) * Math.cos(el);
+    const k = taper(cy);
 
     object.position.set(
-      cx * (0.5 * HEAD_SCALE.x + lift),
+      cx * (0.5 * HEAD_SCALE.x * k + lift),
       cy * (0.5 * HEAD_SCALE.y + lift),
-      cz * (0.5 * HEAD_SCALE.z + lift),
+      cz * (0.5 * HEAD_SCALE.z * k + lift),
     );
     object.rotation.order = "YXZ";
     object.rotation.y = az;
     object.rotation.x = -el;
   };
 
-  // Big glossy eyes.
-  const eyes: THREE.Group[] = [];
-  const eyeDark = mat("#1B1240", 0.25);
-  const eyeIris = mat("#5A47D6", 0.3);
-  const eyePupil = mat("#0F0A2A", 0.3);
+  // ------------------------------------------------------------------ anime eyes
   const white = glowMat("#FFFFFF", false);
+  const sclera = mat("#F7F5FF", 0.3);
+  const irisOuter = mat(shade(eyeColor, -0.62), 0.25);
+  const irisMain = mat(eyeColor, 0.25);
+  const irisGlow = mat(shade(eyeColor, 0.5), 0.25);
+  const pupil = mat("#120D2B", 0.3);
+  const lidLine = mat("#241A44", 0.4);
+
+  const eyeGroups: THREE.Group[] = [];
+  const irisGroups: THREE.Group[] = [];
 
   for (const side of [-1, 1]) {
     const eye = new THREE.Group();
 
-    placeOnHead(eye, side * 0.43, -0.03, 0.0);
+    placeOnHead(eye, side * 0.43, -0.03, 0);
     head.add(eye);
-    part(eye, sphereHi, eyeDark, [0, 0, 0], [0.105, 0.135, 0.04]);
-    part(eye, sphereHi, eyeIris, [0, -0.02, 0.022], [0.078, 0.09, 0.03]);
-    part(eye, sphereHi, eyePupil, [0, -0.006, 0.034], [0.05, 0.062, 0.03]);
-    part(eye, sphereLo, white, [-0.032, 0.05, 0.05], [0.036, 0.04, 0.012]);
-    part(eye, sphereLo, white, [0.03, -0.045, 0.05], [0.016, 0.016, 0.01]);
-    eyes.push(eye);
+    eye.name = "eye";
+    eyeGroups.push(eye);
+
+    part(eye, sphereMid, sclera, [0, 0, 0], [0.125, 0.155, 0.032]);
+
+    const iris = new THREE.Group();
+
+    iris.name = "iris";
+    eye.add(iris);
+    irisGroups.push(iris);
+    part(iris, sphereMid, irisOuter, [0, 0, 0.004], [0.104, 0.134, 0.034]);
+    part(iris, sphereMid, irisMain, [0, -0.008, 0.009], [0.092, 0.118, 0.034]);
+    part(iris, sphereMid, irisGlow, [0, -0.052, 0.013], [0.07, 0.048, 0.034]);
+    part(iris, sphereMid, pupil, [0, 0.006, 0.018], [0.047, 0.066, 0.034]);
+
+    // Highlights stay put while the iris moves, like in anime.
+    part(eye, sphereLo, white, [-0.037, 0.058, 0.044], [0.036, 0.042, 0.012]);
+    part(eye, sphereLo, white, [0.036, -0.054, 0.044], [0.016, 0.016, 0.01]);
+    part(eye, sphereTiny, white, [0.022, 0.078, 0.044], [0.009, 0.009, 0.008]);
+
+    // Heavy upper lid line and a few lashes flicking outwards.
+    part(
+      eye,
+      geo(new THREE.TorusGeometry(0.128, 0.014, 8, 28, Math.PI * 1.05)),
+      lidLine,
+      [0, 0.005, 0.03],
+      [1, 1.1, 1],
+      [0, 0, -Math.PI * 0.025],
+    );
+
+    for (let i = 0; i < 3; i++) {
+      part(
+        eye,
+        geo(new THREE.ConeGeometry(0.006, 0.05, 5)),
+        lidLine,
+        [side * (0.118 + i * 0.006), 0.05 + i * 0.022, 0.034],
+        [1, 1, 1],
+        [0, 0, -side * (1.0 + i * 0.28)],
+      );
+    }
 
     if (params.glasses) {
       part(
         eye,
-        geo(new THREE.TorusGeometry(0.128, 0.011, 8, 28)),
+        geo(new THREE.TorusGeometry(0.155, 0.011, 8, 30)),
         mat("#23262E", 0.35),
         [0, 0, 0.055],
       );
@@ -545,33 +548,35 @@ export function createAvatar(params: AvatarParams): AvatarRig {
   if (params.glasses) {
     part(
       head,
-      geo(new THREE.CylinderGeometry(0.01, 0.01, 0.12, 6)),
+      geo(new THREE.CylinderGeometry(0.009, 0.009, 0.1, 6)),
       mat("#23262E", 0.35),
-      [0, -0.01, 0.455],
+      [0, -0.005, 0.455],
       [1, 1, 1],
       [0, 0, Math.PI / 2],
     );
   }
 
-  // Brows, blush and mouth.
+  // Brows, blush, nose and mouth.
   const browColor = params.face === 0 ? "#5A4B9A" : "#3B2A22";
+  const brows: { mesh: THREE.Mesh; baseY: number }[] = [];
 
   for (const side of [-1, 1]) {
     const brow = new THREE.Mesh(
-      geo(new THREE.TorusGeometry(0.065, 0.009, 6, 14, Math.PI * 0.7)),
+      geo(new THREE.TorusGeometry(0.07, 0.008, 6, 14, Math.PI * 0.62)),
       mat(browColor, 0.5),
     );
 
-    placeOnHead(brow, side * 0.43, 0.3, 0.0);
-    brow.rotation.z = Math.PI * 0.15 - side * 0.1;
+    placeOnHead(brow, side * 0.43, 0.31, 0);
+    brow.rotation.z = Math.PI * 0.19 - side * 0.12;
     head.add(brow);
+    brows.push({ mesh: brow, baseY: brow.position.y });
 
     const blush = new THREE.Mesh(
-      geo(new THREE.CircleGeometry(0.06, 20)),
+      geo(new THREE.CircleGeometry(0.065, 20)),
       new THREE.MeshBasicMaterial({
         color: "#FF9DB8",
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.3,
         depthWrite: false,
       }),
     );
@@ -581,44 +586,63 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     head.add(blush);
   }
 
+  const nose = new THREE.Group();
+
+  placeOnHead(nose, 0, -0.13, 0.002);
+  head.add(nose);
+  part(
+    nose,
+    sphereLo,
+    mat(shade(faceColor, -0.1), 0.6),
+    [0, 0, 0],
+    [0.02, 0.013, 0.014],
+  );
+
   const mouth = new THREE.Group();
 
-  placeOnHead(mouth, 0, -0.36, 0.004);
+  placeOnHead(mouth, 0, -0.345, 0.004);
   head.add(mouth);
-  const mouthShape = part(
-    mouth,
-    sphereHi,
-    mat("#6A1D3A", 0.4),
-    [0, 0, 0],
-    [0.078, 0.05, 0.028],
-  );
 
-  part(
+  const smile = part(
     mouth,
+    geo(new THREE.TorusGeometry(0.052, 0.007, 6, 18, Math.PI * 0.8)),
+    mat("#B4506E", 0.5),
+    [0, 0.03, 0],
+    [1, 1, 1],
+    [0, 0, Math.PI * 1.1],
+  );
+  const openMouth = new THREE.Group();
+
+  openMouth.name = "openMouth";
+
+  mouth.add(openMouth);
+  part(
+    openMouth,
+    sphereMid,
+    mat("#5C1A36", 0.4),
+    [0, 0, 0],
+    [0.066, 0.05, 0.022],
+  );
+  part(
+    openMouth,
     sphereLo,
     mat("#FF6F91", 0.5),
-    [0, -0.018, 0.012],
-    [0.045, 0.02, 0.02],
+    [0, -0.02, 0.008],
+    [0.04, 0.02, 0.016],
   );
+  openMouth.scale.y = 0.001;
 
-  // ------------------------------------------------------------------ hair
+  // ------------------------------------------------------------------ cloud hair
   const hairGroup = new THREE.Group();
   const glowDots: THREE.Mesh[] = [];
+  const puffs: { mesh: THREE.Mesh; base: THREE.Vector3; phase: number }[] = [];
 
   head.add(hairGroup);
 
-  const hatHidesTop =
-    params.hat === "beanie" ||
-    params.hat === "cap" ||
-    params.hat === "kufi" ||
-    params.hat === "grad";
-  const showHair = params.hairStyle !== "none" && params.hat !== "hijab";
   let hairTop = 0.5;
 
-  if (showHair) {
-    const random = mulberry32(
-      params.hairColor * 31 + params.hairStyle.length * 7 + 5,
-    );
+  {
+    const random = mulberry32(params.hairColor * 31 + 5);
     const tones = [
       mat(hairColor, 0.42),
       mat(shade(hairColor, 0.16), 0.4),
@@ -626,6 +650,7 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     ];
     const glowMaterial = glowMat(glowColor, true);
     const dotCenters: THREE.Vector3[] = [];
+    const puffGeometry = geo(new THREE.SphereGeometry(1, 18, 13));
 
     const addPuff = (
       direction: THREE.Vector3,
@@ -639,14 +664,15 @@ export function createAvatar(params: AvatarParams): AvatarRig {
         dir.y * distance * HEAD_SCALE.y,
         dir.z * distance * HEAD_SCALE.z,
       );
-      const puff = part(
+      const mesh = part(
         hairGroup,
-        sphereLo,
+        puffGeometry,
         tones[Math.floor(random() * tones.length)] ?? tones[0]!,
         [center.x, center.y, center.z],
         [radius, radius, radius],
       );
 
+      puffs.push({ mesh, base: center.clone(), phase: random() * 6.28 });
       hairTop = Math.max(hairTop, center.y + radius);
 
       if (withDot && random() < 0.75) {
@@ -665,11 +691,9 @@ export function createAvatar(params: AvatarParams): AvatarRig {
         glowDots.push(dot);
         dotCenters.push(dot.position.clone());
       }
-
-      return puff;
     };
 
-    const count = params.hairStyle === "short" ? 36 : 50;
+    const count = 50;
     const golden = Math.PI * (3 - Math.sqrt(5));
 
     for (let i = 0; i < count; i++) {
@@ -681,26 +705,8 @@ export function createAvatar(params: AvatarParams): AvatarRig {
         y,
         Math.sin(angle) * ring,
       );
-      const facing = direction.z > 0.3 && direction.y < 0.62;
 
-      if (facing) {
-        continue;
-      }
-
-      if (params.hairStyle === "short") {
-        if (direction.y < 0.3) {
-          continue;
-        }
-
-        addPuff(direction, 0.13 + random() * 0.06, 0.47 + 0.1, true);
-        continue;
-      }
-
-      if (direction.y < -0.2 && params.hairStyle !== "long") {
-        continue;
-      }
-
-      if (hatHidesTop && direction.y > 0.32) {
+      if ((direction.z > 0.3 && direction.y < 0.62) || direction.y < -0.2) {
         continue;
       }
 
@@ -710,43 +716,13 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     }
 
     // Puffs above the forehead, like the mascot's fringe.
-    if (params.hairStyle !== "short" && !hatHidesTop) {
-      for (const az of [-0.5, 0, 0.5]) {
-        addPuff(
-          new THREE.Vector3(Math.sin(az), 0.82, Math.cos(az) * 0.6),
-          0.16,
-          0.62,
-          true,
-        );
-      }
-    } else if (params.hairStyle === "short") {
-      for (const az of [-0.4, 0, 0.4]) {
-        addPuff(
-          new THREE.Vector3(Math.sin(az), 0.8, Math.cos(az) * 0.7),
-          0.12,
-          0.56,
-          false,
-        );
-      }
-    }
-
-    if (params.hairStyle === "long") {
-      for (let i = 0; i < 12; i++) {
-        const angle = Math.PI * (0.55 + (i / 11) * 0.9) + Math.PI / 2;
-        const drop = -0.35 - (i % 3) * 0.28;
-        const radius = 0.2 + random() * 0.07;
-
-        addPuff(
-          new THREE.Vector3(
-            Math.cos(angle) * 0.95,
-            drop,
-            -Math.abs(Math.sin(angle)) * 0.9 - 0.15,
-          ),
-          radius,
-          0.62,
-          false,
-        );
-      }
+    for (const az of [-0.5, 0, 0.5]) {
+      addPuff(
+        new THREE.Vector3(Math.sin(az), 0.82, Math.cos(az) * 0.6),
+        0.16,
+        0.62,
+        true,
+      );
     }
 
     // Faint "neural" lines between nearby lights.
@@ -791,178 +767,157 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     }
   }
 
-  // ------------------------------------------------------------------ hats
-  const hatGroup = new THREE.Group();
+  // ------------------------------------------------------------------ arms
+  const makeArm = (side: -1 | 1): ArmRig => {
+    const shoulder = new THREE.Group();
 
-  head.add(hatGroup);
+    shoulder.position.set(side * 0.325, 0.34, 0);
+    shoulder.name = side > 0 ? "shoulderPlus" : "shoulderMinus";
+    chest.add(shoulder);
 
-  const hatMat = mat(hatColor, 0.55);
+    const upperLength = 0.26;
+    const foreLength = 0.24;
+    const sleeve = mat(topColor, 0.62);
+    const wide = (robe ? 1.18 : 1) * 1.18;
 
-  if (params.hat === "beanie") {
+    // The upper arm is skin with a short sleeve over it for a t-shirt.
     part(
-      hatGroup,
-      geo(
-        new THREE.SphereGeometry(0.54, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2),
-      ),
-      hatMat,
-      [0, 0.2, -0.01],
-      [1, 0.86, 1],
+      shoulder,
+      geo(capsule(0.066 * wide, 0.056 * wide, upperLength)),
+      tee ? skin : sleeve,
     );
-    part(
-      hatGroup,
-      geo(new THREE.TorusGeometry(0.535, 0.06, 12, 40)),
-      mat(shade(hatColor, -0.1), 0.6),
-      [0, 0.2, -0.01],
-      [1, 1, 1],
-      [Math.PI / 2, 0, 0],
-    );
-    part(
-      hatGroup,
-      sphereLo,
-      mat(shade(hatColor, 0.2), 0.7),
-      [0, 0.2 + 0.54 * 0.86 + 0.04, -0.01],
-      [0.1, 0.1, 0.1],
-    );
-    hairTop = Math.max(hairTop, 0.78);
-  } else if (params.hat === "cap") {
-    part(
-      hatGroup,
-      geo(
-        new THREE.SphereGeometry(0.53, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2),
-      ),
-      hatMat,
-      [0, 0.2, -0.01],
-      [1, 0.9, 1],
-    );
-    part(
-      hatGroup,
-      geo(
-        new THREE.CylinderGeometry(
-          0.36,
-          0.36,
-          0.035,
-          32,
-          1,
-          false,
-          -Math.PI / 2,
-          Math.PI,
-        ),
-      ),
-      mat(shade(hatColor, -0.12), 0.55),
-      [0, 0.2, 0.2],
-      [1.05, 1, 1],
-      [0.12, 0, 0],
-    );
-    part(
-      hatGroup,
-      sphereLo,
-      mat(shade(hatColor, -0.2), 0.6),
-      [0, 0.2 + 0.53 * 0.9 + 0.01, -0.01],
-      [0.045, 0.045, 0.045],
-    );
-    hairTop = Math.max(hairTop, 0.72);
-  } else if (params.hat === "kufi") {
-    const kufiTheta = Math.PI * 0.43;
 
-    part(
-      hatGroup,
-      geo(
-        new THREE.SphereGeometry(0.515, 40, 16, 0, Math.PI * 2, 0, kufiTheta),
-      ),
-      hatMat,
-      [0, 0.03, -0.01],
-      [1, 0.93, 1],
-    );
-    part(
-      hatGroup,
-      geo(new THREE.TorusGeometry(0.515 * Math.sin(kufiTheta), 0.026, 8, 40)),
-      mat(accentColor, 0.5),
-      [0, 0.03 + 0.515 * 0.93 * Math.cos(kufiTheta), -0.01],
-      [1, 1, 1],
-      [Math.PI / 2, 0, 0],
-    );
-    hairTop = Math.max(hairTop, 0.56);
-  } else if (params.hat === "hijab") {
-    part(
-      hatGroup,
-      geo(new THREE.SphereGeometry(0.58, 40, 28)),
-      hatMat,
-      [0, -0.02, -0.15],
-      [1, 1.02, 0.97],
-    );
-    part(
-      hatGroup,
-      geo(new THREE.CylinderGeometry(0.47, 0.54, 0.42, 36)),
-      hatMat,
-      [0, -0.55, -0.1],
-      [1, 1, 0.9],
-    );
-    hairTop = Math.max(hairTop, 0.58);
-  } else if (params.hat === "grad") {
-    part(
-      hatGroup,
-      geo(new THREE.CylinderGeometry(0.35, 0.4, 0.16, 28)),
-      hatMat,
-      [0, 0.46, 0],
-    );
-    part(
-      hatGroup,
-      geo(new THREE.BoxGeometry(1.0, 0.055, 1.0)),
-      hatMat,
-      [0, 0.58, 0],
-      [1, 1, 1],
-      [0, Math.PI / 4, 0],
-    );
-    part(
-      hatGroup,
-      sphereLo,
-      mat("#E0B94A", 0.4),
-      [0, 0.62, 0],
-      [0.04, 0.04, 0.04],
-    );
-    part(
-      hatGroup,
-      geo(new THREE.CylinderGeometry(0.008, 0.008, 0.34, 6)),
-      mat("#E0B94A", 0.4),
-      [0.6, 0.43, 0],
-    );
-    part(
-      hatGroup,
-      geo(new THREE.CylinderGeometry(0.035, 0.022, 0.11, 10)),
-      mat("#E0B94A", 0.4),
-      [0.6, 0.22, 0],
-    );
-    hairTop = Math.max(hairTop, 0.66);
-  } else if (params.hat === "crown") {
-    const gold = mat("#E0B94A", 0.32);
-    const base = hairTop > 0.7 ? hairTop - 0.1 : 0.5;
+    if (tee) {
+      part(shoulder, geo(capsule(0.082, 0.078, 0.1)), sleeve);
+    }
 
-    part(hatGroup, geo(new THREE.CylinderGeometry(0.36, 0.4, 0.16, 32)), gold, [
-      0,
-      base,
-      0,
-    ]);
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * Math.PI * 2;
-      const x = Math.sin(angle) * 0.36;
-      const z = Math.cos(angle) * 0.36;
+    const elbow = new THREE.Group();
 
-      part(hatGroup, geo(new THREE.ConeGeometry(0.07, 0.2, 10)), gold, [
-        x,
-        base + 0.17,
-        z,
-      ]);
+    elbow.position.set(0, -upperLength, 0);
+    elbow.name = side > 0 ? "elbowPlus" : "elbowMinus";
+    shoulder.add(elbow);
+    part(
+      elbow,
+      geo(capsule(0.054 * wide, 0.044 * wide, foreLength)),
+      tee ? skin : sleeve,
+    );
+
+    if (!tee) {
       part(
-        hatGroup,
-        sphereTiny,
-        mat(hatColor, 0.3),
-        [x, base + 0.29, z],
-        [0.032, 0.032, 0.032],
+        elbow,
+        geo(new THREE.TorusGeometry(0.047 * wide, 0.018, 10, 24)),
+        mat(accentColor, 0.5),
+        [0, -foreLength + 0.012, 0],
+        [1, 1, 1],
+        [Math.PI / 2, 0, 0],
       );
     }
 
-    hairTop = Math.max(hairTop, base + 0.3);
-  }
+    const wrist = new THREE.Group();
+
+    wrist.position.set(0, -foreLength, 0);
+    elbow.add(wrist);
+
+    // Hand: palm, four fingers that can curl, and a thumb.
+    part(wrist, sphereMid, skin, [0, -0.044, 0], [0.05, 0.062, 0.03]);
+
+    const fingers: THREE.Group[] = [];
+    const fingerGeometry = geo(capsule(0.0145, 0.0122, 0.056, 8));
+
+    [-0.03, -0.01, 0.01, 0.03].forEach((x, i) => {
+      const finger = new THREE.Group();
+
+      finger.position.set(x, -0.096, 0);
+      wrist.add(finger);
+      part(
+        finger,
+        fingerGeometry,
+        skin,
+        [0, 0, 0],
+        [1, 1 - Math.abs(i - 1.5) * 0.08, 1],
+      );
+      fingers.push(finger);
+    });
+
+    const thumb = new THREE.Group();
+
+    thumb.position.set(-side * 0.044, -0.045, 0.014);
+    thumb.rotation.z = side * 0.7;
+    wrist.add(thumb);
+    part(thumb, geo(capsule(0.016, 0.014, 0.045, 8)), skin);
+
+    return { shoulder, elbow, fingers };
+  };
+
+  const armPlus = makeArm(1);
+  const armMinus = makeArm(-1);
+
+  // ------------------------------------------------------------------ legs
+  const makeLeg = (side: -1 | 1): LegRig => {
+    const hip = new THREE.Group();
+
+    hip.position.set(side * 0.115, -0.03, 0);
+    pelvis.add(hip);
+    part(hip, geo(capsule(0.09, 0.072, 0.28)), mat(pantsColor, 0.7));
+    part(
+      hip,
+      geo(new THREE.BoxGeometry(0.011, 0.24, 0.036)),
+      mat(accentColor, 0.45),
+      [side * 0.082, -0.15, 0.004],
+    );
+
+    const knee = new THREE.Group();
+
+    knee.position.set(0, -0.28, 0);
+    knee.name = side > 0 ? "kneePlus" : "kneeMinus";
+    hip.add(knee);
+    part(knee, geo(capsule(0.072, 0.052, 0.27)), mat(pantsColor, 0.7));
+    part(
+      knee,
+      geo(new THREE.BoxGeometry(0.011, 0.22, 0.03)),
+      mat(accentColor, 0.45),
+      [side * 0.063, -0.14, 0.004],
+    );
+
+    const ankle = new THREE.Group();
+
+    ankle.position.set(0, -0.27, 0);
+    knee.add(ankle);
+
+    // Sneaker: white sole, coloured upper, accent stripe.
+    part(
+      ankle,
+      sphereMid,
+      mat("#F4F4FA", 0.5),
+      [0, -0.035, 0.05],
+      [0.09, 0.036, 0.16],
+    );
+    part(
+      ankle,
+      sphereMid,
+      mat(shade(topColor, -0.05), 0.55),
+      [0, -0.008, 0.042],
+      [0.079, 0.056, 0.135],
+    );
+    part(
+      ankle,
+      geo(new THREE.BoxGeometry(0.01, 0.034, 0.1)),
+      mat(accentColor, 0.45),
+      [side * 0.08, -0.012, 0.034],
+    );
+    part(
+      ankle,
+      sphereTiny,
+      mat(accentColor, 0.45),
+      [0, 0.014, 0.145],
+      [0.045, 0.029, 0.038],
+    );
+
+    return { hip, knee, ankle };
+  };
+
+  const legPlus = makeLeg(1);
+  const legMinus = makeLeg(-1);
 
   // Soft ground shadow.
   const shadowMaterial = new THREE.MeshBasicMaterial({
@@ -974,7 +929,7 @@ export function createAvatar(params: AvatarParams): AvatarRig {
 
   materials.push(shadowMaterial);
   part(
-    group,
+    root,
     geo(new THREE.CircleGeometry(0.55, 28)),
     shadowMaterial,
     [0, 0.012, 0.02],
@@ -983,16 +938,77 @@ export function createAvatar(params: AvatarParams): AvatarRig {
   );
 
   // ------------------------------------------------------------------ animation
+  const pose: Record<string, number> = {
+    pelvisX: 0,
+    pelvisRoll: 0,
+    pelvisYaw: 0,
+    pelvisY: 0,
+    chestX: 0,
+    chestRoll: 0,
+    chestYaw: 0,
+    breath: 0,
+    headX: 0,
+    headY: 0,
+    headZ: 0,
+    pShX: 0,
+    pShZ: -0.1,
+    pElX: -0.25,
+    pCurl: -0.35,
+    mShX: 0,
+    mShZ: 0.1,
+    mElX: -0.25,
+    mCurl: -0.35,
+    pThigh: 0,
+    pKnee: 0.05,
+    pAnkle: 0,
+    mThigh: 0,
+    mKnee: 0.05,
+    mAnkle: 0,
+    gazeX: 0,
+    gazeY: 0,
+    brow: 0,
+    mouth: 0,
+    smile: 1,
+    blink: 1,
+  };
+  const rates: Record<string, number> = {
+    gazeX: 22,
+    gazeY: 22,
+    mouth: 18,
+    smile: 8,
+    brow: 8,
+  };
+  /** Fastest allowed movement of each joint in radians per second, so big pose changes never snap. */
+  const maxSpeed: Record<string, number> = {
+    pelvisYaw: 2,
+    pelvisRoll: 2,
+    chestX: 3,
+    chestRoll: 3,
+    chestYaw: 3,
+    headX: 4,
+    headY: 4,
+    headZ: 4,
+    pShX: 5,
+    pShZ: 5,
+    pElX: 5.5,
+    mShX: 5,
+    mShZ: 5,
+    mElX: 5.5,
+    pCurl: 5,
+    mCurl: 5,
+    pThigh: 8,
+    mThigh: 8,
+    pKnee: 8,
+    mKnee: 8,
+    pAnkle: 8,
+    mAnkle: 8,
+  };
+  const target: Record<string, number> = { ...pose };
+
   let walkPhase = 0;
   let walkAmount = 0;
-  let headX = 0;
-  let headY = 0;
-  let headZ = 0;
-  let mouthOpen = 0.45;
-  let blink = 1;
-  let rightArmX = 0;
-  let rightArmZ = -0.14;
-  let leftArmZ = 0.14;
+  let hairLag = 0;
+  let hairLagRoll = 0;
 
   const animate = (
     seconds: number,
@@ -1001,88 +1017,248 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     seed: number,
   ) => {
     const t = seconds + seed * 1.7;
-    const k = dt * 9;
+    const s = seed * 2.3;
 
-    walkAmount = damp(walkAmount, Math.min(1, mood.speed / 1.4), dt * 6);
-    walkPhase += dt * (4 + mood.speed * 5);
+    walkAmount = damp(
+      walkAmount,
+      mood.faded ? 0 : Math.min(1, mood.speed / 1.4),
+      dt * 6,
+    );
+    walkPhase += dt * (3.6 + mood.speed * 3.8);
+
+    const idle = 1 - walkAmount;
+    const w = Math.sin(t * 0.42 + s); // slow weight shift from one leg to the other
+    const talking = mood.talking && !mood.faded;
+    const listening = mood.listening && !mood.faded;
+
+    // ---- targets
+    target.pelvisX = w * 0.022 * idle;
+    target.pelvisRoll = -w * 0.045 * idle;
+    target.pelvisYaw = Math.sin(t * 0.3 + s) * 0.04 * idle;
+    target.pelvisY = 0;
+    target.chestRoll = w * 0.035 * idle;
+    target.chestYaw = -pose.headY * 0.25 + Math.sin(t * 0.5) * 0.015;
+    target.chestX = talking ? 0.05 : 0;
+    target.breath = Math.sin(t * 1.9) * 0.5 + 0.5;
+
+    // Where the eyes look: small jumps every second or two, towards the bot while listening.
+    const gazeIndex = Math.floor(t * 0.62 + s * 0.37);
+
+    target.gazeX = (hash01(gazeIndex) - 0.5) * 1.3;
+    target.gazeY = (hash01(gazeIndex + 11) - 0.5) * 0.7;
+
+    if (listening) {
+      target.gazeX = -0.9;
+      target.gazeY = 0.15;
+    } else if (talking) {
+      target.gazeX = (hash01(gazeIndex) - 0.5) * 0.35;
+      target.gazeY = 0.05;
+    }
+
+    target.headX = talking
+      ? Math.sin(t * 5.2) * 0.035 - 0.02
+      : listening
+        ? 0.04 + Math.sin(t * 1.6) * 0.045
+        : Math.sin(t * 0.6 + s) * 0.02;
+    target.headY = listening
+      ? -0.3
+      : target.gazeX * 0.22 + Math.sin(t * 0.37 + s) * 0.04;
+    target.headZ = listening ? 0.09 : Math.sin(t * 0.5 + s) * 0.03 - w * 0.02;
+    target.brow = talking
+      ? 0.5 + Math.sin(t * 4) * 0.25
+      : listening
+        ? 0.7
+        : Math.sin(t * 0.8) * 0.1;
+    target.mouth = talking ? 0.25 + Math.abs(Math.sin(t * 11.5)) * 0.75 : 0;
+    target.smile = talking ? 0.2 : 1;
+
+    // Arms rest naturally with a soft bend and relaxed fingers.
+    target.pShX = Math.sin(t * 0.9 + s) * 0.04;
+    target.pShZ = -0.1 - Math.sin(t * 0.7 + s) * 0.02;
+    target.pElX = -0.28 - Math.sin(t * 0.8) * 0.04;
+    target.pCurl = -0.35;
+    target.mShX = Math.sin(t * 0.9 + s + 1.5) * 0.04;
+    target.mShZ = 0.1 + Math.sin(t * 0.7 + s + 1) * 0.02;
+    target.mElX = -0.28 - Math.sin(t * 0.8 + 2) * 0.04;
+    target.mCurl = -0.35;
+
+    if (talking) {
+      // The hand towards the microphone gestures while reciting; the other one joins in sometimes.
+      const g = t * 1.9;
+
+      target.pShX = -0.5 + Math.sin(g) * 0.18;
+      target.pShZ = -0.5 + Math.sin(g * 0.7) * 0.08;
+      target.pElX = -1.05 + Math.sin(g * 1.4 + 1) * 0.25;
+      target.pCurl = -0.15 - Math.max(0, Math.sin(g * 1.4)) * 0.4;
+
+      const other = Math.max(0, Math.sin(t * 0.7 + 1));
+
+      target.mShX = -0.35 * other;
+      target.mElX = -0.6 * other - 0.28;
+    }
+
+    if (listening) {
+      // A hand up near the ear, as if listening closely.
+      target.mShX = -0.55;
+      target.mShZ = 0.55;
+      target.mElX = -2.0;
+      target.mCurl = -0.6;
+    }
+
+    // Standing: the unloaded leg bends a little. Walking: opposite legs and arms swing together.
+    target.pThigh = Math.max(0, w) * 0.05 * idle;
+    target.pKnee = 0.05 + Math.max(0, w) * 0.14 * idle;
+    target.mThigh = Math.max(0, -w) * 0.05 * idle;
+    target.mKnee = 0.05 + Math.max(0, -w) * 0.14 * idle;
+    target.pAnkle = 0;
+    target.mAnkle = 0;
+
+    if (walkAmount > 0.02) {
+      const swing = Math.sin(walkPhase) * 0.55 * walkAmount;
+      const swingOpposite = -swing;
+      const kneeP = Math.max(0, -Math.cos(walkPhase)) * 0.7 * walkAmount;
+      const kneeM = Math.max(0, Math.cos(walkPhase)) * 0.7 * walkAmount;
+
+      target.pThigh += swing;
+      target.mThigh += swingOpposite;
+      target.pKnee += kneeP;
+      target.mKnee += kneeM;
+      target.pAnkle = -(swing + kneeP) * 0.4;
+      target.mAnkle = -(swingOpposite + kneeM) * 0.4;
+      target.pShX += -swing * 0.8;
+      target.mShX += -swingOpposite * 0.8;
+      target.chestYaw += Math.sin(walkPhase) * 0.1 * walkAmount;
+      target.pelvisYaw += -Math.sin(walkPhase) * 0.08 * walkAmount;
+    }
 
     if (mood.faded) {
-      headX = damp(headX, 0.38, k);
-      headY = damp(headY, 0, k);
-      headZ = damp(headZ, 0.05, k);
-      blink = damp(blink, 0.08, k);
-      mouthOpen = damp(mouthOpen, 0.2, k);
-      rightArmX = damp(rightArmX, 0, k);
-      rightArmZ = damp(rightArmZ, -0.1, k);
-      leftArmZ = damp(leftArmZ, 0.1, k);
-      walkAmount = 0;
-    } else {
-      // Blink every few seconds.
-      const blinkTime = (t * 0.9) % 3.4;
-      const blinkTarget = blinkTime < 0.13 ? 0.08 : 1;
-
-      blink = damp(blink, blinkTarget, blinkTarget < 1 ? dt * 40 : dt * 22);
-
-      const talking = mood.talking;
-      const headXTarget = talking
-        ? Math.sin(t * 5.5) * 0.05 - 0.02
-        : Math.sin(t * 0.9) * 0.015;
-      const headYTarget = mood.listening ? -0.28 : Math.sin(t * 0.55) * 0.05;
-      const headZTarget = mood.listening ? 0.1 : Math.sin(t * 0.8) * 0.03;
-
-      headX = damp(headX, headXTarget, k);
-      headY = damp(headY, headYTarget, k);
-      headZ = damp(headZ, headZTarget, k);
-
-      const mouthTarget = talking
-        ? 0.45 + Math.abs(Math.sin(t * 12.5)) * 0.85
-        : 0.5 + Math.sin(t * 1.4) * 0.03;
-
-      mouthOpen = damp(mouthOpen, mouthTarget, dt * 18);
-
-      // The right hand rises towards the microphone while reciting.
-      rightArmX = damp(
-        rightArmX,
-        talking ? -1.0 + Math.sin(t * 4.2) * 0.1 : 0,
-        dt * 6,
-      );
-      rightArmZ = damp(
-        rightArmZ,
-        talking ? -0.3 : -0.14 - Math.sin(t * 1.6) * 0.02,
-        dt * 6,
-      );
-      leftArmZ = damp(leftArmZ, 0.14 + Math.sin(t * 1.6 + 1) * 0.02, dt * 6);
+      target.chestX = 0.3;
+      target.headX = 0.5;
+      target.headY = 0;
+      target.headZ = 0.06;
+      target.pShX = 0.05;
+      target.mShX = 0.05;
+      target.pElX = -0.12;
+      target.mElX = -0.12;
+      target.pCurl = -0.15;
+      target.mCurl = -0.15;
+      target.pKnee = 0.25;
+      target.mKnee = 0.25;
+      target.pThigh = -0.12;
+      target.mThigh = -0.12;
+      target.pelvisY = -0.05;
+      target.mouth = 0;
+      target.smile = 0.3;
+      target.brow = -0.3;
+      target.gazeX = 0;
+      target.gazeY = -0.5;
     }
 
-    const swing = Math.sin(walkPhase) * 0.6 * walkAmount;
+    // Blinking: every few seconds, sometimes twice in a row. Faded characters keep their eyes closed.
+    const blinkCycle = (t * 0.85 + s) % 3.6;
+    const blinkClosed =
+      blinkCycle < 0.12 ||
+      (blinkCycle > 0.3 &&
+        blinkCycle < 0.4 &&
+        hash01(Math.floor(t * 0.85 + s) + 3) > 0.7);
 
-    legLeft.rotation.x = swing;
-    legRight.rotation.x = -swing;
-    armLeft.rotation.x = -swing * 0.8;
-    armLeft.rotation.z = leftArmZ;
-    armRight.rotation.x = rightArmX + (mood.talking ? 0 : swing * 0.8);
-    armRight.rotation.z = rightArmZ;
+    target.blink = mood.faded ? 0.12 : blinkClosed ? 0.08 : 1;
 
-    const bob = Math.abs(Math.sin(walkPhase)) * 0.045 * walkAmount;
-    const breathe = mood.faded ? 0 : Math.sin(t * 2) * 0.012;
+    // ---- ease towards the targets (never snap), then apply
+    for (const key of Object.keys(pose)) {
+      const rate =
+        key === "blink" ? (target.blink < 0.5 ? 45 : 24) : (rates[key] ?? 7);
 
-    group.position.y = bob;
-    torso.scale.y = 1 + breathe;
-    head.position.y = HEAD_Y + breathe * 0.6;
-    head.rotation.set(headX, headY, headZ);
+      const current = pose[key] ?? 0;
+      let step = ((target[key] ?? 0) - current) * Math.min(1, dt * rate);
+      const limit = maxSpeed[key];
 
-    for (const eye of eyes) {
-      eye.scale.y = blink;
+      if (limit !== undefined) {
+        const cap = limit * dt;
+
+        step = Math.max(-cap, Math.min(cap, step));
+      }
+
+      pose[key] = current + step;
     }
 
-    mouth.scale.y = mouthOpen / 0.5;
-    mouthShape.scale.x = 0.078 * (1 + (mouthOpen - 0.5) * 0.1);
+    const bob = Math.abs(Math.sin(walkPhase)) * 0.04 * walkAmount;
+    const breath = (pose.breath ?? 0) * (mood.faded ? 0.3 : 1);
 
-    // The hair breathes a little and its lights pulse.
-    hairGroup.rotation.z = Math.sin(t * 0.9) * 0.012;
+    pelvis.position.set(pose.pelvisX ?? 0, 0.66 + bob + (pose.pelvisY ?? 0), 0);
+    pelvis.rotation.set(0, pose.pelvisYaw ?? 0, pose.pelvisRoll ?? 0);
+    chest.rotation.set(
+      pose.chestX ?? 0,
+      pose.chestYaw ?? 0,
+      pose.chestRoll ?? 0,
+    );
+    chest.scale.set(1 + breath * 0.012, 1 + breath * 0.016, 1 + breath * 0.012);
+    headPivot.rotation.set(pose.headX ?? 0, pose.headY ?? 0, pose.headZ ?? 0);
+
+    armPlus.shoulder.rotation.set(pose.pShX ?? 0, 0, pose.pShZ ?? 0);
+    armPlus.elbow.rotation.set(pose.pElX ?? 0, 0, 0);
+    armMinus.shoulder.rotation.set(pose.mShX ?? 0, 0, pose.mShZ ?? 0);
+    armMinus.elbow.rotation.set(pose.mElX ?? 0, 0, 0);
+
+    armPlus.fingers.forEach((finger, i) => {
+      finger.rotation.x = (pose.pCurl ?? 0) - (i % 2) * 0.12;
+    });
+    armMinus.fingers.forEach((finger, i) => {
+      finger.rotation.x = (pose.mCurl ?? 0) - (i % 2) * 0.12;
+    });
+
+    legPlus.hip.rotation.x = pose.pThigh ?? 0;
+    legPlus.knee.rotation.x = pose.pKnee ?? 0;
+    legPlus.ankle.rotation.x = pose.pAnkle ?? 0;
+    legMinus.hip.rotation.x = pose.mThigh ?? 0;
+    legMinus.knee.rotation.x = pose.mKnee ?? 0;
+    legMinus.ankle.rotation.x = pose.mAnkle ?? 0;
+
+    // Eyes: the iris slides inside the eye, the lids close for a blink.
+    const gx = (pose.gazeX ?? 0) * 0.03;
+    const gy = (pose.gazeY ?? 0) * 0.024;
+
+    for (const iris of irisGroups) {
+      iris.position.set(gx, gy, 0);
+    }
+
+    for (const eye of eyeGroups) {
+      eye.scale.y = pose.blink ?? 1;
+    }
+
+    for (const brow of brows) {
+      brow.mesh.position.y = brow.baseY + (pose.brow ?? 0) * 0.022;
+    }
+
+    const open = Math.max(0.001, pose.mouth ?? 0);
+
+    openMouth.scale.y = open;
+    openMouth.scale.x = 1 + open * 0.15;
+    smile.visible = open < 0.18;
+    smile.scale.setScalar(0.85 + (pose.smile ?? 1) * 0.15);
+
+    // Hair follows the head a moment late and its lights pulse.
+    hairLag = damp(hairLag, pose.headY ?? 0, dt * 3);
+    hairLagRoll = damp(hairLagRoll, pose.headZ ?? 0, dt * 2.5);
+    hairGroup.rotation.y = (hairLag - (pose.headY ?? 0)) * 0.7;
+    hairGroup.rotation.z =
+      (hairLagRoll - (pose.headZ ?? 0)) * 0.6 + Math.sin(t * 0.9) * 0.01;
+
+    for (const puff of puffs) {
+      const wobble = mood.faded
+        ? 0
+        : Math.sin(t * 1.3 + puff.phase) * 0.005 * (1 + walkAmount * 1.5);
+
+      puff.mesh.position.set(
+        puff.base.x + wobble,
+        puff.base.y + wobble * 0.7,
+        puff.base.z,
+      );
+    }
+
     glowDots.forEach((dot, i) => {
       const pulse =
-        0.03 * (1 + 0.35 * Math.sin(t * (mood.talking ? 6 : 2.2) + i * 1.3));
+        0.03 * (1 + 0.35 * Math.sin(t * (talking ? 6 : 2.2) + i * 1.3));
 
       dot.scale.setScalar(mood.faded ? 0.02 : pulse);
     });
@@ -1106,9 +1282,17 @@ export function createAvatar(params: AvatarParams): AvatarRig {
     }
   };
 
+  // Start in the resting pose instead of jumping into it on the first frame.
+  animate(
+    0,
+    1 / 60,
+    { speed: 0, talking: false, listening: false, faded: false },
+    0,
+  );
+
   return {
-    group,
-    height: Math.max(HEAD_Y + hairTop, 2),
+    group: root,
+    height: Math.max(0.66 + 0.06 + 0.42 + 0.47 + hairTop, 2),
     setFaded,
     animate,
     dispose,

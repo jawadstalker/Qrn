@@ -15,12 +15,11 @@ export interface ScopeState {
   /** Verses the learner marked as memorized, per surah. Missing = every verse in the range. */
   selected: Record<number, number[]>;
   questionCount: number;
-  /** Pass mark in percent. */
-  passPercent: number;
 }
 
 export const QUESTION_COUNTS: readonly number[] = [5, 8, 12];
-export const PASS_MARKS: readonly number[] = [60, 70, 80, 90];
+/** Pass mark in percent. Fixed by the app; the learner cannot change it. */
+export const PASS_PERCENT = 70;
 
 const STORAGE_KEY = "@quran_garden_scope_v1";
 
@@ -35,7 +34,6 @@ let state: ScopeState = {
   ranges: {},
   selected: {},
   questionCount: 8,
-  passPercent: 70,
 };
 let loading: Promise<void> | null = null;
 const listeners = new Set<() => void>();
@@ -71,11 +69,11 @@ function emit(next: ScopeState) {
 
 async function persist() {
   try {
-    const { surahId, ranges, selected, questionCount, passPercent } = state;
+    const { surahId, ranges, selected, questionCount } = state;
 
     await AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ surahId, ranges, selected, questionCount, passPercent }),
+      JSON.stringify({ surahId, ranges, selected, questionCount }),
     );
   } catch (error) {
     console.error("[QURAN] Failed to save scope:", error);
@@ -92,7 +90,6 @@ export function reloadScopeStore(): Promise<void> {
     ranges: {},
     selected: {},
     questionCount: 8,
-    passPercent: 70,
   };
 
   return load();
@@ -122,9 +119,6 @@ function load(): Promise<void> {
           questionCount: QUESTION_COUNTS.includes(parsed.questionCount ?? 0)
             ? parsed.questionCount!
             : state.questionCount,
-          passPercent: PASS_MARKS.includes(parsed.passPercent ?? 0)
-            ? parsed.passPercent!
-            : state.passPercent,
         });
       })
       .catch(() => emit({ ...state, loaded: true }));
@@ -216,6 +210,6 @@ export function setScopeSelection(surahId: number, ayahs: readonly number[]) {
   });
 }
 
-export function setExamSettings(questionCount: number, passPercent: number) {
-  return update((current) => ({ ...current, questionCount, passPercent }));
+export function setExamSettings(questionCount: number) {
+  return update((current) => ({ ...current, questionCount }));
 }

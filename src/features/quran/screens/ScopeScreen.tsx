@@ -18,7 +18,7 @@ import {
 import { getSurah } from "@/features/quran/data/surahs";
 import { usePT } from "@/features/quran/i18n/practice";
 import {
-  PASS_MARKS,
+  PASS_PERCENT,
   QUESTION_COUNTS,
   SCOPE_SURAHS,
   rangeOf,
@@ -124,7 +124,7 @@ export default function ScopeScreen() {
     to,
     count: selection.length,
     questions,
-    pass: scope.passPercent,
+    pass: PASS_PERCENT,
   });
 
   const go = (mode: "both" | "exam" | "practice") =>
@@ -286,20 +286,7 @@ export default function ScopeScreen() {
                   key={count}
                   label={number(count)}
                   active={scope.questionCount === count}
-                  onPress={() => void setExamSettings(count, scope.passPercent)}
-                />
-              ))}
-            </View>
-            <AppText variant="caption" style={{ color: colors.textSecondary, textAlign }}>
-              {p("scope_pass")}
-            </AppText>
-            <View style={[styles.chips, { flexDirection: row }]}>
-              {PASS_MARKS.map((mark) => (
-                <Chip
-                  key={mark}
-                  label={`${number(mark)}٪`}
-                  active={scope.passPercent === mark}
-                  onPress={() => void setExamSettings(scope.questionCount, mark)}
+                  onPress={() => void setExamSettings(count)}
                 />
               ))}
             </View>

@@ -48,8 +48,8 @@ ok(
 );
 const bad = A.sanitizeAvatar({
   face: 99,
-  hairStyle: "evil",
-  hat: 3,
+  eyes: 77,
+  outfitStyle: "evil",
   outfit: 1.5,
   glasses: "yes",
   glow: -1,
@@ -57,8 +57,8 @@ const bad = A.sanitizeAvatar({
 ok(
   "sanitize clamps bad values",
   bad.face === 0 &&
-    bad.hairStyle === "cloud" &&
-    bad.hat === "none" &&
+    bad.eyes === 0 &&
+    bad.outfitStyle === "hoodie" &&
     bad.outfit === 0 &&
     bad.glasses === false &&
     bad.glow === 0,
@@ -66,20 +66,19 @@ ok(
 const legacy = A.sanitizeAvatar({
   skin: 3,
   head: "scarf",
+  hat: "crown",
+  hairStyle: "long",
   outfit: 2,
   glasses: true,
 });
 ok(
-  "v1 avatars still load (scarf -> hijab, skin shifts)",
-  legacy.hat === "hijab" &&
-    legacy.face === 4 &&
+  "older avatars still load; removed hat and hair styles are ignored",
+  legacy.face === 4 &&
     legacy.outfit === 2 &&
-    legacy.glasses === true,
+    legacy.glasses === true &&
+    !("hat" in legacy) &&
+    !("hairStyle" in legacy),
   JSON.stringify(legacy),
-);
-ok(
-  "v1 short hair maps over",
-  A.sanitizeAvatar({ head: "long" }).hairStyle === "long",
 );
 ok(
   "avatar JSON stays a flat small object",
@@ -92,49 +91,49 @@ let combos = 0,
   worst = 0,
   maxTris = 0,
   bad2 = 0;
-for (const hairStyle of A.HAIR_STYLES)
-  for (const hat of A.HATS)
-    for (const outfitStyle of A.OUTFIT_STYLES)
-      for (const glasses of [false, true]) {
-        const params = {
-          ...A.DEFAULT_AVATAR,
-          hairStyle,
-          hat,
-          outfitStyle,
-          glasses,
-          hatColor: combos % 8,
-          hairColor: combos % 8,
-          outfit: combos % 8,
-          face: combos % 6,
-        };
-        const rig = createAvatar(params);
-        rig.animate(
-          1,
-          0.016,
-          { speed: 0, talking: false, listening: false, faded: false },
-          0,
-        );
-        const box = new THREE.Box3().setFromObject(rig.group);
-        let tris = 0;
-        rig.group.traverse((o) => {
-          if (o.geometry)
-            tris +=
-              (o.geometry.index
-                ? o.geometry.index.count
-                : o.geometry.attributes.position.count) / 3;
-        });
-        if (
-          !Number.isFinite(box.max.y) ||
-          box.max.y < 1.8 ||
-          box.max.y > 3.4 ||
-          box.min.y < -0.05
-        )
-          bad2++;
-        worst = Math.max(worst, box.max.y);
-        maxTris = Math.max(maxTris, tris);
-        rig.dispose();
-        combos++;
-      }
+for (const outfitStyle of A.OUTFIT_STYLES)
+  for (const glasses of [false, true])
+    for (let eyes = 0; eyes < A.EYE_COLORS.length; eyes++) {
+      const params = {
+        ...A.DEFAULT_AVATAR,
+        outfitStyle,
+        glasses,
+        eyes,
+        hairColor: combos % 8,
+        outfit: combos % 8,
+        face: combos % 6,
+        glow: combos % 5,
+        pants: combos % 6,
+        accent: combos % 6,
+      };
+      const rig = createAvatar(params);
+      rig.animate(
+        1,
+        0.016,
+        { speed: 0, talking: false, listening: false, faded: false },
+        0,
+      );
+      const box = new THREE.Box3().setFromObject(rig.group);
+      let tris = 0;
+      rig.group.traverse((o) => {
+        if (o.geometry)
+          tris +=
+            (o.geometry.index
+              ? o.geometry.index.count
+              : o.geometry.attributes.position.count) / 3;
+      });
+      if (
+        !Number.isFinite(box.max.y) ||
+        box.max.y < 1.9 ||
+        box.max.y > 3.0 ||
+        box.min.y < -0.05
+      )
+        bad2++;
+      worst = Math.max(worst, box.max.y);
+      maxTris = Math.max(maxTris, tris);
+      rig.dispose();
+      combos++;
+    }
 ok(
   `all ${combos} style combinations build with sane height (max ${worst.toFixed(2)})`,
   bad2 === 0,
@@ -142,52 +141,174 @@ ok(
 );
 ok(
   `triangle budget per character (max ${Math.round(maxTris)})`,
-  maxTris < 60000,
+  maxTris < 70000,
   String(maxTris),
 );
 
-// ---- animation stays finite for every mood
-const rig = createAvatar({ ...A.DEFAULT_AVATAR, hat: "crown", glasses: true });
-let nan = false,
-  maxLeg = 0,
-  mouthMin = 9,
-  mouthMax = 0;
-const moods = [
-  { speed: 0, talking: false, listening: false, faded: false },
-  { speed: 1.4, talking: false, listening: false, faded: false },
-  { speed: 0, talking: true, listening: false, faded: false },
-  { speed: 0, talking: false, listening: true, faded: false },
-  { speed: 0, talking: false, listening: false, faded: true },
+// ---- natural animation
+const find = (rig, name) => {
+  let hit = null;
+  rig.group.traverse((o) => {
+    if (o.name === name && !hit) hit = o;
+  });
+  return hit;
+};
+const findAll = (rig, name) => {
+  const hits = [];
+  rig.group.traverse((o) => {
+    if (o.name === name) hits.push(o);
+  });
+  return hits;
+};
+const rig = createAvatar({ ...A.DEFAULT_AVATAR, glasses: true });
+const parts = {
+  pelvis: find(rig, "pelvis"),
+  head: find(rig, "headPivot"),
+  shP: find(rig, "shoulderPlus"),
+  elP: find(rig, "elbowPlus"),
+  shM: find(rig, "shoulderMinus"),
+  elM: find(rig, "elbowMinus"),
+  kP: find(rig, "kneePlus"),
+  kM: find(rig, "kneeMinus"),
+  mouth: find(rig, "openMouth"),
+};
+const irises = findAll(rig, "iris"),
+  eyes = findAll(rig, "eye");
+ok(
+  "rig exposes joints, two irises and two eyes",
+  Object.values(parts).every(Boolean) &&
+    irises.length === 2 &&
+    eyes.length === 2,
+);
+
+const IDLE = { speed: 0, talking: false, listening: false, faded: false };
+let t = 0,
+  nan = false;
+const check = () =>
+  rig.group.traverse((o) => {
+    if (
+      !Number.isFinite(
+        o.position.x +
+          o.position.y +
+          o.position.z +
+          o.rotation.x +
+          o.rotation.y +
+          o.rotation.z +
+          o.scale.x +
+          o.scale.y +
+          o.scale.z,
+      )
+    )
+      nan = true;
+  });
+const joints = () => [
+  parts.pelvis.rotation.z,
+  parts.pelvis.position.x,
+  parts.head.rotation.x,
+  parts.head.rotation.y,
+  parts.head.rotation.z,
+  parts.shP.rotation.x,
+  parts.shP.rotation.z,
+  parts.elP.rotation.x,
+  parts.shM.rotation.x,
+  parts.shM.rotation.z,
+  parts.elM.rotation.x,
+  parts.kP.rotation.x,
+  parts.kM.rotation.x,
 ];
-let t = 0;
-for (const mood of moods)
-  for (let i = 0; i < 120; i++) {
+let prev = joints(),
+  maxStep = 0,
+  worstJoint = -1,
+  worstTime = 0;
+const run = (mood, seconds, onFrame) => {
+  for (let i = 0; i < seconds * 60; i++) {
     t += 1 / 60;
     rig.animate(t, 1 / 60, mood, 3);
-    rig.group.traverse((o) => {
-      if (
-        !Number.isFinite(
-          o.position.x +
-            o.position.y +
-            o.position.z +
-            o.rotation.x +
-            o.rotation.y +
-            o.rotation.z +
-            o.scale.x +
-            o.scale.y +
-            o.scale.z,
-        )
-      )
-        nan = true;
+    check();
+    const now = joints();
+    now.forEach((v, k) => {
+      const d = Math.abs(v - prev[k]);
+      if (d > maxStep) {
+        maxStep = d;
+        worstJoint = k;
+        worstTime = t;
+      }
     });
-    if (mood.speed > 1)
-      rig.group.children.forEach((c) => {
-        if (c.type === "Group")
-          maxLeg = Math.max(maxLeg, Math.abs(c.rotation.x));
-      });
+    prev = now;
+    onFrame && onFrame();
   }
+};
+
+let irisMin = 9,
+  irisMax = -9,
+  blinkMin = 9,
+  rollMin = 9,
+  rollMax = -9,
+  headMin = 9,
+  headMax = -9;
+run(IDLE, 12, () => {
+  const x = irises[0].position.x;
+  irisMin = Math.min(irisMin, x);
+  irisMax = Math.max(irisMax, x);
+  blinkMin = Math.min(blinkMin, eyes[0].scale.y);
+  rollMin = Math.min(rollMin, parts.pelvis.rotation.z);
+  rollMax = Math.max(rollMax, parts.pelvis.rotation.z);
+  headMin = Math.min(headMin, parts.head.rotation.y);
+  headMax = Math.max(headMax, parts.head.rotation.y);
+});
+ok(
+  `eyes look around (iris range ${(irisMax - irisMin).toFixed(3)})`,
+  irisMax - irisMin > 0.02,
+);
+ok("eyes blink", blinkMin < 0.3, String(blinkMin));
+ok(
+  `weight shifts from leg to leg (hip roll range ${(rollMax - rollMin).toFixed(3)})`,
+  rollMax - rollMin > 0.03,
+);
+ok("head turns a little on its own", headMax - headMin > 0.03);
+
+let mouthMax = 0,
+  elbowMin = 0;
+run({ ...IDLE, talking: true }, 4, () => {
+  mouthMax = Math.max(mouthMax, parts.mouth.scale.y);
+  elbowMin = Math.min(elbowMin, parts.elP.rotation.x);
+});
+ok(
+  "mouth opens and the hand gestures while reciting",
+  mouthMax > 0.4 && elbowMin < -0.9,
+  `${mouthMax} ${elbowMin}`,
+);
+
+let earZ = 0,
+  earElbow = 0;
+run({ ...IDLE, listening: true }, 3, () => {
+  earZ = Math.max(earZ, parts.shM.rotation.z);
+  earElbow = Math.min(earElbow, parts.elM.rotation.x);
+});
+ok(
+  "a hand goes up to the ear while listening",
+  earZ > 0.4 && earElbow < -1.5,
+  `${earZ} ${earElbow}`,
+);
+
+let kneeMax = 0;
+run({ ...IDLE, speed: 1.6 }, 3, () => {
+  kneeMax = Math.max(kneeMax, parts.kP.rotation.x, parts.kM.rotation.x);
+});
+ok("knees bend while walking", kneeMax > 0.4, String(kneeMax));
+
+run({ ...IDLE, faded: true }, 2);
+ok(
+  "slumps when eliminated (head down, eyes closed)",
+  parts.head.rotation.x > 0.35 && eyes[0].scale.y < 0.3,
+  `${parts.head.rotation.x} ${eyes[0].scale.y}`,
+);
 ok("animation never produces NaN", !nan);
-ok("legs and arms swing while walking", maxLeg > 0.3, String(maxLeg));
+ok(
+  `poses blend smoothly (largest joint step per frame ${maxStep.toFixed(3)} rad)`,
+  maxStep < 0.13,
+  `${maxStep} joint #${worstJoint} t=${worstTime.toFixed(2)}`,
+);
 rig.dispose();
 
 // ---- stage with microphone
@@ -209,19 +330,16 @@ stage.setState({
 });
 const groups = () =>
   stage.scene.children.filter(
-    (c) =>
-      c.type === "Group" &&
-      c.children.length > 5 &&
-      c.children.some((m) => m.type === "Group"),
+    (c) => c.type === "Group" && c.getObjectByName("pelvis"),
   );
 let time = 0;
-const run = (seconds) => {
+const runStage = (seconds) => {
   for (let i = 0; i < seconds * 30; i++) {
     time += 1 / 30;
     stage.update(time);
   }
 };
-run(2);
+runStage(2);
 ok("four characters on stage", groups().length === 4, String(groups().length));
 
 stage.setState({
@@ -230,9 +348,9 @@ stage.setState({
   speakerPlaying: true,
   reciting: false,
 });
-run(1);
+runStage(1);
 const walkers = groups().map((g) => g.position.clone());
-run(5);
+runStage(5);
 const front = groups().reduce((a, b) => (a.position.z > b.position.z ? a : b));
 ok(
   "player in turn stands in front of the microphone",
@@ -259,7 +377,7 @@ stage.setState({
   speakerPlaying: false,
   reciting: true,
 });
-run(1);
+runStage(1);
 const led = stage.scene.children
   .flatMap((c) => (c.type === "Group" ? c.children : []))
   .flatMap((c) => (c.type === "Group" ? c.children : []))
@@ -298,7 +416,7 @@ stage.setState({
   speakerPlaying: false,
   reciting: false,
 });
-run(6);
+runStage(6);
 ok(
   "removed player leaves the scene",
   groups().length === 3,
@@ -314,13 +432,15 @@ stage.setState({
   players: players
     .slice(0, 3)
     .map((p) =>
-      p.userId === 1 ? { ...p, avatar: { ...p.avatar, hat: "crown" } } : p,
+      p.userId === 1
+        ? { ...p, avatar: { ...p.avatar, glasses: !p.avatar.glasses } }
+        : p,
     ),
   turnUserId: 1,
   speakerPlaying: false,
   reciting: false,
 });
-run(1);
+runStage(1);
 ok("avatar change keeps the group count", groups().length === 3);
 let threw = false;
 try {
@@ -356,19 +476,19 @@ ok("eight players run without trouble", big.scene.children.length > 8);
 big.dispose();
 
 // ---- preview
-const prev = createAvatarPreviewScene({
+const preview = createAvatarPreviewScene({
   width: 300,
   height: 300,
   avatar: A.DEFAULT_AVATAR,
 });
-prev.update(1, 0.4, true);
-prev.setAvatar({ ...A.DEFAULT_AVATAR, hat: "hijab", glasses: true });
-prev.update(8, 0.4, false);
+preview.update(1, 0.4, true);
+preview.setAvatar({ ...A.DEFAULT_AVATAR, outfitStyle: "robe", glasses: true });
+preview.update(8, 0.4, false);
 ok(
   "preview scene updates and swaps characters",
-  prev.scene.children.some((c) => c.type === "Group"),
+  preview.scene.children.some((c) => c.type === "Group"),
 );
-prev.dispose();
+preview.dispose();
 
 console.log(fail ? "FAILED" : "all ok");
 process.exit(fail ? 1 : 0);

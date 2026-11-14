@@ -20,20 +20,16 @@ import {
 import {
   ACCENT_COLORS,
   DEFAULT_AVATAR,
+  EYE_COLORS,
   FACE_TONES,
   GLOW_COLORS,
   HAIR_COLORS,
-  HAIR_STYLES,
-  HATS,
-  HAT_COLORS,
   OUTFIT_COLORS,
   OUTFIT_STYLES,
   PANTS_COLORS,
   randomAvatar,
   sanitizeAvatar,
   type AvatarParams,
-  type HairStyle,
-  type Hat,
   type OutfitStyle,
 } from "@/features/rooms/avatar";
 import { roomsApi } from "@/features/rooms/api";
@@ -50,7 +46,7 @@ import { AppText } from "@/shared/components/ui/AppText";
 const NAME_MIN = 2;
 const NAME_MAX = 24;
 
-type Tab = "look" | "hair" | "hat" | "outfit";
+type Tab = "look" | "hair" | "outfit";
 
 export default function AvatarScreen() {
   const { t } = useLanguage();
@@ -125,18 +121,9 @@ export default function AvatarScreen() {
   const tabs = [
     { value: "look", label: t.avatar_tab_look },
     { value: "hair", label: t.avatar_tab_hair },
-    { value: "hat", label: t.avatar_tab_hat },
     { value: "outfit", label: t.avatar_tab_outfit },
   ] as const;
 
-  const hairOptions = HAIR_STYLES.map((value) => ({
-    value,
-    label: t[`hair_${value}`] ?? value,
-  }));
-  const hatOptions = HATS.map((value) => ({
-    value,
-    label: t[`hat_${value}`] ?? value,
-  }));
   const outfitOptions = OUTFIT_STYLES.map((value) => ({
     value,
     label: t[`outfit_${value}`] ?? value,
@@ -200,6 +187,12 @@ export default function AvatarScreen() {
                 selected={avatar.face}
                 onSelect={(face) => update({ face })}
               />
+              <SwatchRow
+                label={t.avatar_eyes}
+                colors={EYE_COLORS}
+                selected={avatar.eyes}
+                onSelect={(eyes) => update({ eyes })}
+              />
               <ChipRow<"on" | "off">
                 label={t.avatar_glasses}
                 options={[
@@ -214,12 +207,6 @@ export default function AvatarScreen() {
 
           {tab === "hair" ? (
             <>
-              <ChipRow<HairStyle>
-                label={t.avatar_hairstyle}
-                options={hairOptions}
-                selected={avatar.hairStyle}
-                onSelect={(hairStyle) => update({ hairStyle })}
-              />
               <SwatchRow
                 label={t.avatar_hair}
                 colors={HAIR_COLORS}
@@ -232,25 +219,6 @@ export default function AvatarScreen() {
                 selected={avatar.glow}
                 onSelect={(glow) => update({ glow })}
               />
-            </>
-          ) : null}
-
-          {tab === "hat" ? (
-            <>
-              <ChipRow<Hat>
-                label={t.avatar_hat}
-                options={hatOptions}
-                selected={avatar.hat}
-                onSelect={(hat) => update({ hat })}
-              />
-              {avatar.hat !== "none" ? (
-                <SwatchRow
-                  label={t.avatar_hat_color}
-                  colors={HAT_COLORS}
-                  selected={avatar.hatColor}
-                  onSelect={(hatColor) => update({ hatColor })}
-                />
-              ) : null}
             </>
           ) : null}
 
