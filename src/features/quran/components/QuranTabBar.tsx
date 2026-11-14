@@ -34,9 +34,19 @@ export const HIDDEN_ROUTES: readonly string[] = [
   "/forgot-password",
   "/reset-password",
   "/account",
+  "/room",
+  "/room-create",
+  "/avatar",
 ];
 /** Practice pages that live under the Memorize tab. */
-const MEMORIZE_ROUTES = ["/exam", "/stages", "/mistakes", "/report", "/scope"];
+const MEMORIZE_ROUTES = [
+  "/exam",
+  "/stages",
+  "/mistakes",
+  "/report",
+  "/scope",
+  "/rooms",
+];
 /** Pages reached from the Library tab. */
 const LIBRARY_ROUTES = ["/downloads", "/favorites"];
 

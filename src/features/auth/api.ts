@@ -34,7 +34,7 @@ export interface SyncItem {
 
 const TIMEOUT_MS = 20000;
 
-async function request<T>(
+export async function request<T>(
   method: string,
   path: string,
   options: { body?: unknown; token?: string | null } = {},

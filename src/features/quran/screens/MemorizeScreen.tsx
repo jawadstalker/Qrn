@@ -26,6 +26,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ClipboardCheck,
+  Users,
   Flower2,
   Leaf,
   Volume2,
@@ -525,7 +526,16 @@ export default function MemorizeScreen() {
                 })}
               </AppText>
             </View>
-            <GuideTarget id="memorize.exam">
+            <View style={[styles.headerActions, { flexDirection: row }]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t.room_title}
+                onPress={() => router.push("/rooms")}
+                style={[styles.iconButton, { backgroundColor: colors.surface }]}
+              >
+                <Users size={22} color={colors.text} />
+              </Pressable>
+              <GuideTarget id="memorize.exam">
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t.quran_exam_open}
@@ -535,6 +545,7 @@ export default function MemorizeScreen() {
                 <ClipboardCheck size={22} color={colors.text} />
               </Pressable>
             </GuideTarget>
+            </View>
           </View>
         </Rise>
 
@@ -821,6 +832,10 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  headerActions: {
+    alignItems: "center",
+    gap: 8,
   },
   iconButton: {
     width: 44,

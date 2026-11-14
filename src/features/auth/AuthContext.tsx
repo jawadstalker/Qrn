@@ -41,6 +41,8 @@ interface AuthValue {
   register: (email: string, password: string) => Promise<void>;
   /** Throws an ApiError with code "email_not_verified" when the email still needs its code. */
   login: (email: string, password: string) => Promise<void>;
+  /** The current login token, or null when signed out. For authenticated calls outside the sync engine. */
+  getToken: () => string | null;
   verifyEmail: (email: string, code: string) => Promise<void>;
   resendCode: (email: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
@@ -221,6 +223,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [startSession],
   );
 
+  const getToken = useCallback(() => tokenRef.current, []);
+
   const resendCode = useCallback(
     async (email: string) => {
       await api.resendCode(email, mailLang);
@@ -288,6 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dataEpoch,
       register,
       login,
+      getToken,
       verifyEmail,
       resendCode,
       forgotPassword,
@@ -305,6 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dataEpoch,
       register,
       login,
+      getToken,
       verifyEmail,
       resendCode,
       forgotPassword,
